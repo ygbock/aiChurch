@@ -14,7 +14,7 @@ import {
   AlertTriangle,
   Loader2
 } from 'lucide-react';
-import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -27,6 +27,7 @@ export default function AdminRegistration() {
   const [loading, setLoading] = useState(true);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteData, setInviteData] = useState<any>(null);
+  const [isPreAuthorized, setIsPreAuthorized] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: '',
@@ -86,27 +87,69 @@ export default function AdminRegistration() {
       return;
     }
 
+    // Verify email matches invite if invite has one
+    if (inviteData?.email && formData.email.toLowerCase().trim() !== inviteData.email.toLowerCase().trim()) {
+      setSubmitError(`This invitation was sent to ${inviteData.email}. Please use that email to register.`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       // 1. Create the Firebase Auth account
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
-      // 2. Submit the admin request for Superadmin approval
+      // 2. Create the user profile in Firestore
+      const emailLower = formData.email.toLowerCase().trim();
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        fullName: formData.fullName,
+        email: emailLower,
+        phone: formData.phone,
+        role: inviteData.role,
+        districtId: inviteData.districtId,
+        branchId: inviteData.branchId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      // 3. Check if already pre-authorized in accessControl
+      const accessRef = doc(db, 'accessControl', emailLower);
+      const accessSnap = await getDoc(accessRef);
+      
+      const preAuthorized = accessSnap.exists() && accessSnap.data().status === 'pre-authorized';
+      setIsPreAuthorized(preAuthorized);
+
+      // 4. Submit the admin request for Superadmin approval (if not pre-authorized)
       const requestPayload = {
         uid: user.uid,
         fullName: formData.fullName,
-        email: formData.email,
+        email: emailLower,
         phone: formData.phone,
         role: inviteData.role,
         districtId: inviteData.districtId,
         branchId: inviteData.branchId,
         inviteId: inviteId,
-        status: 'pending_approval',
+        status: preAuthorized ? 'approved' : 'pending_approval',
+        approvedAt: preAuthorized ? serverTimestamp() : null,
         createdAt: serverTimestamp()
       };
 
       await addDoc(collection(db, 'adminRequests'), requestPayload);
+      
+      // Update accessControl if pre-authorized to set to active
+      if (preAuthorized) {
+        await setDoc(accessRef, {
+          ...accessSnap.data(),
+          uid: user.uid,
+          status: 'active',
+          updatedAt: serverTimestamp()
+        });
+      }
+      
+      // Update invite status
+      const inviteRef = doc(db, 'invites', inviteId);
+      await setDoc(inviteRef, { ...inviteData, status: 'used', usedAt: serverTimestamp(), usedBy: user.uid });
 
       setSuccess(true);
     } catch (err: any) {
@@ -173,14 +216,30 @@ export default function AdminRegistration() {
             <CheckCircle2 size={40} />
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-2">Registration Complete</h2>
-          <p className="text-slate-600 mb-6">Your administrator account has been created and is currently <strong className="text-orange-500">Pending Approval</strong> by the global super administration team.</p>
+          <p className="text-slate-600 mb-6">
+            {isPreAuthorized ? (
+              <>Your administrator account has been created and <strong className="text-emerald-500">Auto-Approved</strong>.</>
+            ) : (
+              <>Your administrator account has been created and is currently <strong className="text-orange-500">Pending Approval</strong>.</>
+            )}
+          </p>
           
           <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 mb-6 text-left">
             <h4 className="text-sm font-bold text-blue-900 mb-1">What's Next?</h4>
             <ul className="text-xs text-blue-800 space-y-2 list-disc pl-4">
-              <li>Your account will be reviewed shortly.</li>
-              <li>Once approved, you will be able to log in using the email and password you just created.</li>
-              <li>You will receive a notification upon approval.</li>
+              {isPreAuthorized ? (
+                <>
+                  <li>You can now log in and start managing your dashboard.</li>
+                  <li>Go back to the homepage and click "Login".</li>
+                  <li>Our systems are currently provisioning your profile.</li>
+                </>
+              ) : (
+                <>
+                  <li>Your account will be reviewed shortly by an administrator.</li>
+                  <li>Once approved, you will be able to log in.</li>
+                  <li>You will receive a notification upon approval.</li>
+                </>
+              )}
             </ul>
           </div>
 

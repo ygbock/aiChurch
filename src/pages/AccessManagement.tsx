@@ -238,6 +238,15 @@ export default function AccessManagement() {
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded text-blue-600 bg-blue-50">
                         {access.role}
                       </span>
+                      {access.status && (
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                          access.status === 'pre-authorized' 
+                            ? 'text-orange-600 bg-orange-50 border border-orange-100' 
+                            : 'text-emerald-600 bg-emerald-50 border border-emerald-100'
+                        }`}>
+                          {access.status}
+                        </span>
+                      )}
                       {access.districtId && <span className="text-[10px] text-slate-400">District: {access.districtId}</span>}
                       {access.branchId && <span className="text-[10px] text-slate-400">&bull; Branch: {access.branchId}</span>}
                     </div>

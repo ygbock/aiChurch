@@ -100,16 +100,25 @@ export default function DistrictDashboard() {
   const [leaders, setLeaders] = useState<any[]>([]);
   const [editingBranchId, setEditingBranchId] = useState<string | null>(null);
   const [isDistrictEditModalOpen, setIsDistrictEditModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'branches' | 'leadership' | 'members'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'branches' | 'leadership' | 'members' | 'baptism'>('overview');
   const [members, setMembers] = useState<MemberData[]>([]);
+  const [baptismRequests, setBaptismRequests] = useState<any[]>([]);
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
   const [branchFilter, setBranchFilter] = useState('all');
+  const [levelFilter, setLevelFilter] = useState('all');
+  const [baptismFilter, setBaptismFilter] = useState('all');
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [isBulkRoleModalOpen, setIsBulkRoleModalOpen] = useState(false);
+  const [isBulkStatusModalOpen, setIsBulkStatusModalOpen] = useState(false);
+  const [bulkRole, setBulkRole] = useState('Member');
+  const [bulkStatus, setBulkStatus] = useState('Active');
 
   // Leadership Provisioning State
   const [provisionType, setProvisionType] = useState<'existing' | 'new'>('existing');
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [leaderRole, setLeaderRole] = useState('admin');
   const [leaderBranchId, setLeaderBranchId] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
   const [inviteLink, setInviteLink] = useState('');
 
   // Form states
@@ -128,6 +137,72 @@ export default function DistrictDashboard() {
   });
   
   const [saving, setSaving] = useState(false);
+
+  const handleBulkRoleUpdate = async () => {
+    if (selectedMembers.length === 0) return;
+    setSaving(true);
+    try {
+      for (const memberId of selectedMembers) {
+        const member = members.find(m => m.id === memberId);
+        if (member) {
+          const path = `districts/${districtId}/branches/${member.branchId}/members/${memberId}`;
+          await updateDoc(doc(db, path), {
+            level: bulkRole,
+            updatedAt: serverTimestamp()
+          });
+        }
+      }
+      setSelectedMembers([]);
+      setIsBulkRoleModalOpen(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBulkStatusUpdate = async () => {
+    if (selectedMembers.length === 0) return;
+    setSaving(true);
+    try {
+      for (const memberId of selectedMembers) {
+        const member = members.find(m => m.id === memberId);
+        if (member) {
+          const path = `districts/${districtId}/branches/${member.branchId}/members/${memberId}`;
+          await updateDoc(doc(db, path), {
+            status: bulkStatus,
+            updatedAt: serverTimestamp()
+          });
+        }
+      }
+      setSelectedMembers([]);
+      setIsBulkStatusModalOpen(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleExport = () => {
+    if (selectedMembers.length === 0) return;
+    const selectedData = members.filter(m => selectedMembers.includes(m.id));
+    const headers = ["Full Name", "Email", "Phone", "Branch", "Level", "Status"];
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n"
+      + selectedData.map(m => {
+        const branchName = branches.find(b => b.id === m.branchId)?.name || 'Central';
+        return `"${m.fullName || ''}","${m.email || ''}","${m.phone || ''}","${branchName}","${m.level || ''}","${m.status || ''}"`;
+      }).join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `members_export_${new Date().getTime()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   useEffect(() => {
     if (!districtId || !profile) return;
@@ -203,11 +278,31 @@ export default function DistrictDashboard() {
       }
     });
 
+    // Listen to baptism requests (members in this district with baptismStatus)
+    const baptismQuery = query(
+      collectionGroup(db, 'members'),
+      where('districtId', '==', districtId),
+      where('isBaptised', '==', false)
+    );
+    const unsubscribeBaptism = onSnapshot(baptismQuery, (snapshot) => {
+      const results: any[] = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.baptismStatus && data.baptismStatus !== 'Approved') {
+          results.push({ id: doc.id, refPath: doc.ref.path, ...data });
+        }
+      });
+      setBaptismRequests(results);
+    }, (error) => {
+      console.warn("Snapshot error (baptism):", error);
+    });
+
     return () => {
       unsubscribeBranches();
       unsubscribeDistrict();
       unsubscribeLeaders();
       unsubscribeMembers();
+      unsubscribeBaptism();
     };
   }, [districtId]);
 
@@ -304,7 +399,8 @@ export default function DistrictDashboard() {
           districtId: districtId,
           branchId: leaderBranchId || member.branchId, 
           grantedAt: serverTimestamp(),
-          grantedBy: profile?.uid || 'system'
+          grantedBy: profile?.uid || 'system',
+          status: 'active'
         };
 
         await setDoc(doc(db, 'accessControl', emailLower), payload);
@@ -317,9 +413,27 @@ export default function DistrictDashboard() {
           branchId: leaderBranchId,
           requestedBy: profile?.uid || 'system',
           createdAt: serverTimestamp(),
-          status: 'pending'
+          status: 'pending',
+          email: inviteEmail.toLowerCase().trim() || null
         };
+        
         const docRef = await addDoc(collection(db, 'invites'), invitePayload);
+        
+        // PRE-AUTHORIZE: If email provided, create access record immediately
+        if (inviteEmail) {
+          const emailLower = inviteEmail.toLowerCase().trim();
+          await setDoc(doc(db, 'accessControl', emailLower), {
+            email: emailLower,
+            role: leaderRole,
+            districtId: districtId,
+            branchId: leaderBranchId || null,
+            grantedAt: serverTimestamp(),
+            grantedBy: profile?.uid || 'system',
+            inviteId: docRef.id,
+            status: 'pre-authorized'
+          });
+        }
+
         const link = `${window.location.origin}/register?invite=${docRef.id}`;
         setInviteLink(link);
       }
@@ -374,8 +488,8 @@ export default function DistrictDashboard() {
         </motion.div>
       )}
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+        <div className="w-full lg:w-auto">
           <button 
             onClick={() => window.history.length > 1 ? window.history.back() : window.location.href = '/'}
             className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-blue-600 mb-2 transition-colors"
@@ -383,7 +497,7 @@ export default function DistrictDashboard() {
             <ChevronRight size={16} className="rotate-180" />
             Back
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between lg:justify-start gap-3">
             <h2 className="text-2xl font-bold text-slate-900">{districtData?.name || 'District Oversight'}</h2>
             <button 
               onClick={() => setIsDistrictEditModalOpen(true)}
@@ -393,52 +507,57 @@ export default function DistrictDashboard() {
               <Settings size={18} />
             </button>
           </div>
-          <p className="text-slate-500 text-sm">Managing {branches.length} branches across the {districtData?.name || 'District'}.</p>
+          <p className="text-slate-500 text-sm mt-1">Managing {branches.length} branches across the {districtData?.name || 'District'}.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full lg:w-auto">
           <button 
             onClick={() => {
               setEditingBranchId(null);
               setBranchForm({ name: '', location: '', capacity: '' });
               setIsBranchModalOpen(true);
             }}
-            className="group relative bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg shadow-slate-200"
+            className="flex-1 lg:flex-none group relative bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-200"
           >
             <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
             Establish Branch
           </button>
-          <button className="bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm hidden sm:flex">
+          <button className="flex-1 lg:flex-none bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm">
             <FileText size={18} className="text-blue-600" />
-            Generate Report
+            Report
           </button>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-200 gap-8">
-        {[
-          { id: 'overview', label: 'District Overview', icon: <BarChart3 size={18} /> },
-          { id: 'branches', label: 'Branch Management', icon: <Building2 size={18} /> },
-          { id: 'members', label: 'Members', icon: <Users size={18} /> },
-          { id: 'leadership', label: 'Leadership', icon: <Shield size={18} /> }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 py-4 text-sm font-bold transition-all relative ${
-              activeTab === tab.id ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-            {activeTab === tab.id && (
-              <motion.div 
-                layoutId="activeTabIndicator"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" 
-              />
-            )}
-          </button>
-        ))}
+      {/* Navigation Tabs - Responsive Scrollable */}
+      <div className="relative">
+        <div className="overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex border-b border-slate-200 gap-6 sm:gap-8 min-w-max">
+            {[
+              { id: 'overview', label: 'Overview', icon: <BarChart3 size={18} /> },
+              { id: 'branches', label: 'Branches', icon: <Building2 size={18} /> },
+              { id: 'members', label: 'Members', icon: <Users size={18} /> },
+              { id: 'leadership', label: 'Leadership', icon: <Shield size={18} /> },
+              { id: 'baptism', label: 'Baptism', icon: <div className="relative"><CheckCircle2 size={18} />{baptismRequests.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white">{baptismRequests.length}</span>}</div> }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-2 py-4 text-sm font-bold transition-all relative ${
+                  activeTab === tab.id ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+                {activeTab === tab.id && (
+                  <motion.div 
+                    layoutId="activeTabIndicator"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" 
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {activeTab === 'overview' && (
@@ -565,13 +684,13 @@ export default function DistrictDashboard() {
       {activeTab === 'branches' && (
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="px-6 py-5 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
+            <div className="px-6 py-5 border-b border-slate-200 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+              <div className="w-full xl:w-auto">
                 <h3 className="text-lg font-bold text-slate-900">Branch Performance</h3>
                 <p className="text-sm text-slate-500">Live summary of all satellite locations</p>
               </div>
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <div className="relative flex-1 sm:w-64">
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+                <div className="relative w-full sm:flex-1 xl:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                   <input 
                     type="text" 
@@ -581,32 +700,33 @@ export default function DistrictDashboard() {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all" 
                   />
                 </div>
-                <button className="p-2.5 text-slate-600 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-xl font-bold transition-all">
+                <button className="w-full sm:w-auto px-4 py-2 text-slate-600 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
                   <Filter size={18} />
+                  <span className="sm:hidden">Filters</span>
                 </button>
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/50">
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Branch Details</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Region</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Growth</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
+            <div className="overflow-hidden">
+              <div className="grid grid-cols-2 md:table w-full text-left border-collapse gap-3 md:gap-0 p-3 md:p-0">
+                <div className="hidden md:table-header-group">
+                  <div className="md:table-row bg-slate-50/50">
+                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Branch Details</div>
+                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Region</div>
+                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Growth</div>
+                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">Actions</div>
+                  </div>
+                </div>
+                <div className="md:table-row-group col-span-2 contents">
                   {branches.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                    <div className="md:table-row col-span-2">
+                      <div className="md:table-cell px-6 py-12 text-center text-slate-400">
                         <div className="flex flex-col items-center gap-2">
                           <Building2 size={40} className="text-slate-200" />
                           <p className="text-sm font-medium">No branches established in this district yet.</p>
                           <button onClick={() => setIsBranchModalOpen(true)} className="text-blue-600 font-bold text-xs hover:underline">Create First Branch</button>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ) : (
                     branches.filter(b => b.name.toLowerCase().includes(searchTerm.toLowerCase())).map(branch => (
                       <BranchRow 
@@ -621,8 +741,8 @@ export default function DistrictDashboard() {
                       />
                     ))
                   )}
-                </tbody>
-              </table>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -631,127 +751,281 @@ export default function DistrictDashboard() {
       {activeTab === 'members' && (
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="px-6 py-5 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
+            <div className="px-6 py-5 border-b border-slate-200 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+              <div className="w-full xl:w-auto">
                 <h3 className="text-lg font-bold text-slate-900">District Members</h3>
                 <p className="text-sm text-slate-500">Complete directory of members across all branches</p>
               </div>
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <div className="relative flex-1 sm:w-64">
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+                <div className="relative w-full sm:flex-1 xl:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                   <input 
                     type="text" 
                     value={memberSearchTerm} 
                     onChange={e => setMemberSearchTerm(e.target.value)} 
-                    placeholder="Search by name or email..." 
+                    placeholder="Search name, level..." 
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all" 
                   />
                 </div>
-                <select 
-                  value={branchFilter}
-                  onChange={e => setBranchFilter(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                >
-                  <option value="all">All Branches</option>
-                  {branches.map(branch => (
-                    <option key={branch.id} value={branch.id}>{branch.name}</option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                  <select 
+                    value={branchFilter}
+                    onChange={e => setBranchFilter(e.target.value)}
+                    className="min-w-[120px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-wider outline-none focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    <option value="all">Branch: All</option>
+                    {branches.map(branch => (
+                      <option key={branch.id} value={branch.id}>{branch.name}</option>
+                    ))}
+                  </select>
+                  <select 
+                    value={levelFilter}
+                    onChange={e => setLevelFilter(e.target.value)}
+                    className="min-w-[120px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-wider outline-none focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    <option value="all">Level: All</option>
+                    <option value="Convert">Convert</option>
+                    <option value="Disciple">Disciple</option>
+                    <option value="Worker">Worker</option>
+                    <option value="Leader">Leader</option>
+                    <option value="Visitor">Visitor</option>
+                  </select>
+                  <select 
+                    value={baptismFilter}
+                    onChange={e => setBaptismFilter(e.target.value)}
+                    className="min-w-[120px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-wider outline-none focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    <option value="all">Baptism: All</option>
+                    <option value="baptised">Baptised</option>
+                    <option value="pending">Awaiting</option>
+                  </select>
+                </div>
               </div>
             </div>
+
+            {selectedMembers.length > 0 && (
+              <div className="px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between animate-in slide-in-from-top duration-300">
+                <div className="flex items-center gap-2">
+                  <div className="bg-blue-600 text-white w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold">
+                    {selectedMembers.length}
+                  </div>
+                  <span className="text-xs font-bold text-blue-700">Members Selected</span>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setIsBulkRoleModalOpen(true)} className="px-3 py-1 bg-white border border-blue-200 rounded-lg text-[10px] font-bold text-blue-600 hover:bg-blue-600 hover:text-white transition-all">Assign Role</button>
+                  <button onClick={() => setIsBulkStatusModalOpen(true)} className="px-3 py-1 bg-white border border-blue-200 rounded-lg text-[10px] font-bold text-blue-600 hover:bg-blue-600 hover:text-white transition-all">Change Status</button>
+                  <button onClick={handleExport} className="px-3 py-1 bg-white border border-blue-200 rounded-lg text-[10px] font-bold text-blue-600 hover:bg-blue-600 hover:text-white transition-all">Export</button>
+                  <button onClick={() => setSelectedMembers([])} className="p-1 px-2 text-blue-400 hover:text-blue-600 text-[10px] uppercase font-bold">Cancel</button>
+                </div>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/50">
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Member</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Branch</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Contact</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Status</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
+              <div className="grid grid-cols-2 md:table w-full text-left border-collapse gap-4 md:gap-0 p-4 md:p-0">
+                <div className="hidden md:table-header-group">
+                  <div className="md:table-row bg-slate-50/50">
+                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedMembers.length === members.length && members.length > 0} 
+                          onChange={(e) => setSelectedMembers(e.target.checked ? members.map(m => m.id) : [])}
+                          className="rounded border-slate-300 text-blue-600"
+                        />
+                        Member
+                      </div>
+                    </div>
+                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Branch</div>
+                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Contact</div>
+                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Status</div>
+                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">Actions</div>
+                  </div>
+                </div>
+                <div className="md:table-row-group col-span-2 contents md:block">
                   {members.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                    <div className="md:table-row col-span-2">
+                      <div className="md:table-cell px-6 py-12 text-center text-slate-400">
                         <div className="flex flex-col items-center gap-2">
                           <Users size={40} className="text-slate-200" />
                           <p className="text-sm font-medium">No members found in this district.</p>
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ) : (
                     members
                       .filter(m => {
-                        const matchesSearch = m.fullName.toLowerCase().includes(memberSearchTerm.toLowerCase()) || 
-                                           m.email?.toLowerCase().includes(memberSearchTerm.toLowerCase());
+                        const matchesSearch = (m.fullName || '').toLowerCase().includes(memberSearchTerm.toLowerCase()) || 
+                                           (m.email || '').toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
+                                           (m.level || '').toLowerCase().includes(memberSearchTerm.toLowerCase());
                         const matchesBranch = branchFilter === 'all' || m.branchId === branchFilter;
-                        return matchesSearch && matchesBranch;
+                        const matchesLevel = levelFilter === 'all' || m.level === levelFilter;
+                        const matchesBaptism = baptismFilter === 'all' || 
+                                             (baptismFilter === 'baptised' ? m.isBaptised : !m.isBaptised);
+                        return matchesSearch && matchesBranch && matchesLevel && matchesBaptism;
                       })
                       .map(member => (
-                        <tr key={member.id} className="hover:bg-slate-50 transition-colors group">
-                          <td className="px-6 py-4">
+                        <div key={member.id} className="bg-white border border-slate-100 rounded-2xl md:rounded-none md:border-none p-3 md:p-0 hover:bg-slate-50 transition-all flex flex-col md:table-row min-w-0">
+                          <div className="px-0 md:px-6 py-2 md:py-4 block md:table-cell">
                             <div className="flex items-center gap-3">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedMembers.includes(member.id)} 
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedMembers([...selectedMembers, member.id]);
+                                  else setSelectedMembers(selectedMembers.filter(id => id !== member.id));
+                                }}
+                                className="hidden md:block rounded border-slate-300 text-blue-600"
+                              />
                               {member.photoUrl ? (
-                                <img src={member.photoUrl} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-slate-100" referrerPolicy="no-referrer" />
+                                <img src={member.photoUrl} alt="" className="w-8 h-8 md:w-10 md:h-10 rounded-full md:rounded-xl object-cover border-2 border-slate-100 shrink-0" referrerPolicy="no-referrer" />
                               ) : (
-                                <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold text-sm">
-                                  {member.fullName.charAt(0)}
+                                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full md:rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs shrink-0">
+                                  {(member.fullName || '?').charAt(0)}
                                 </div>
                               )}
-                              <div>
-                                <h4 className="text-sm font-bold text-slate-900 truncate max-w-[150px]">{member.fullName}</h4>
-                                <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{member.level}</p>
+                              <div className="flex flex-col min-w-0">
+                                <h4 className="text-sm font-bold text-slate-900 truncate">{member.fullName}</h4>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[9px] font-bold text-blue-600 uppercase tracking-widest">{member.level || 'Member'}</span>
+                                  <span className="text-[9px] text-slate-300 md:hidden">•</span>
+                                  <span className="text-[9px] text-slate-500 md:hidden truncate">
+                                    {branches.find(b => b.id === member.branchId)?.name || 'Central'}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
+                          </div>
+                          <div className="hidden md:table-cell px-6 py-4">
                             <span className="text-sm text-slate-600 font-medium">
-                              {branches.find(b => b.id === member.branchId)?.name || 'Unknown Branch'}
+                              {branches.find(b => b.id === member.branchId)?.name || 'Central'}
                             </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="space-y-1">
+                          </div>
+                          <div className="px-0 md:px-6 py-2 md:py-4 block md:table-cell">
+                            <div className="flex flex-row md:flex-col gap-3 md:gap-1">
                               {member.email && (
-                                <span className="text-xs text-slate-500 flex items-center gap-1.5">
-                                  <Mail size={12} className="text-slate-400" />
-                                  {member.email}
+                                <span className="text-xs text-slate-500 flex items-center gap-1.5 min-w-0 lg:max-w-[150px] xl:max-w-none truncate">
+                                  <Mail size={12} className="text-slate-400 shrink-0" />
+                                  <span className="truncate">{member.email}</span>
                                 </span>
                               )}
                               {member.phone && (
                                 <span className="text-xs text-slate-500 flex items-center gap-1.5">
-                                  <Phone size={12} className="text-slate-400" />
+                                  <Phone size={12} className="text-slate-400 shrink-0" />
                                   {member.phone}
                                 </span>
                               )}
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest ${
-                              member.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              {member.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
+                          </div>
+                          <div className="px-0 md:px-6 py-2 md:py-4 block md:table-cell">
+                            <div className="flex items-center justify-between md:inline-block">
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                member.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {member.status}
+                              </span>
+                              <div className="md:hidden flex items-center gap-2">
+                                <button onClick={() => navigate(`/members/edit/${member.id}`)} className="p-2 text-slate-400 hover:text-blue-600 bg-slate-50 rounded-lg">
+                                  <Edit2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="hidden md:table-cell px-6 py-4 text-right">
                             <button 
                               onClick={() => navigate(`/members/edit/${member.id}`)}
-                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all"
                             >
                               <Edit2 size={16} />
                             </button>
-                          </td>
-                        </tr>
+                          </div>
+                        </div>
                       ))
                   )}
-                </tbody>
-              </table>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {activeTab === 'leadership' && (
+      {activeTab === 'baptism' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="px-6 py-5 border-b border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900">Baptism Approval Workflow</h3>
+              <p className="text-sm text-slate-500">Review candidates submitted by branches for baptism approval.</p>
+            </div>
+            
+            <div className="p-6">
+              {baptismRequests.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle2 size={32} className="text-slate-200" />
+                  </div>
+                  <p className="text-slate-500 font-medium">No pending baptism requests.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {baptismRequests.map(req => (
+                    <div key={req.id} className="group bg-slate-50 rounded-2xl border border-slate-100 p-4 hover:border-blue-200 transition-all">
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div className="flex items-center gap-4">
+                          {req.photoUrl ? (
+                            <img src={req.photoUrl} alt="" className="w-12 h-12 rounded-xl object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400">
+                              <Users size={20} />
+                            </div>
+                          )}
+                          <div>
+                            <h4 className="font-bold text-slate-900 tracking-tight">{req.fullName}</h4>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase truncate max-w-[100px]">{req.branch || 'Unknown Branch'}</span>
+                              <span className="text-[10px] font-bold text-slate-500 bg-slate-200/50 px-2 py-0.5 rounded-full uppercase">{req.baptismStatus}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 w-full md:w-auto">
+                          {req.baptismStatus === 'Submitted to District' ? (
+                            <button 
+                              onClick={async () => {
+                                try {
+                                  await updateDoc(doc(db, req.refPath), {
+                                    baptismStatus: 'Submitted to HQ',
+                                    districtReviewedAt: serverTimestamp(),
+                                    districtReviewedBy: profile?.uid
+                                  });
+                                } catch (e) {
+                                  console.error(e);
+                                }
+                              }}
+                              className="flex-1 md:flex-none px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                            >
+                              Approve & Forward to HQ
+                              <ChevronRight size={14} />
+                            </button>
+                          ) : (
+                            <span className="text-xs font-bold text-slate-400 bg-slate-100 px-4 py-2 rounded-xl">Wait for HQ Final Approval</span>
+                          )}
+                          <button 
+                            onClick={() => navigate(`/members/edit/${req.memberId}?districtId=${req.districtId}&branchId=${req.branchId}`)}
+                            className="p-2 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-xl transition-all"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'security' && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-3 space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
@@ -966,8 +1240,26 @@ export default function DistrictDashboard() {
                 <p className="text-[10px] text-slate-500 mt-1.5 ml-1">Member must have an email address tied to their profile.</p>
               </div>
             ) : (
-              <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                <p className="text-xs text-blue-700 font-medium">A registration link will be generated. Send this link to the new administrator so they can securely set up their account and password.</p>
+              <div className="space-y-4">
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-2">
+                  <p className="text-xs text-blue-700 font-medium leading-relaxed">
+                    Provide the user's email below to <span className="font-bold underline">pre-authorize</span> their admin access. They will be able to start managing their branch immediately after setting their password.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Invitee Email (Optional)</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input 
+                      type="email" 
+                      value={inviteEmail}
+                      onChange={e => setInviteEmail(e.target.value)}
+                      placeholder="admin@example.com"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1.5 ml-1">If blank, they will need manual approval after registration.</p>
+                </div>
               </div>
             )}
 
@@ -1044,43 +1336,48 @@ const BranchRow: React.FC<{
   onView: () => void 
 }> = ({ name, location, capacity, onEdit, onDelete, onAssign, onView }) => {
   return (
-    <tr className="hover:bg-slate-50 transition-colors group">
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
+    <div className="bg-white hover:bg-slate-50 transition-colors group flex flex-col md:table-row border border-slate-100 md:border-none rounded-xl md:rounded-none p-3 md:p-0 h-full">
+      <div className="px-0 md:px-6 py-2 md:py-4 block md:table-cell min-w-0">
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs shrink-0">
             {name.charAt(0)}
           </div>
-          <span className="text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">{name}</span>
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-[11px] md:text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-all truncate">{name}</span>
+            <span className="text-[9px] text-slate-400 font-medium uppercase tracking-wider truncate block">{location}</span>
+          </div>
         </div>
-      </td>
-      <td className="px-6 py-4 text-sm text-slate-600">{location}</td>
-      <td className="px-6 py-4 text-sm font-bold text-emerald-600">{capacity}</td>
-      <td className="px-6 py-4 text-right">
-        <div className="flex items-center justify-end gap-2 text-slate-400">
-          <button 
-            onClick={onEdit}
-            className="p-2 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-            title="Edit Branch"
-          >
-            <Edit2 size={16} />
-          </button>
+      </div>
+      <div className="hidden md:table-cell px-6 py-4 text-sm text-slate-600">{location}</div>
+      <div className="hidden md:table-cell px-6 py-4 text-sm font-bold text-emerald-600">{capacity}</div>
+      <div className="px-0 md:px-6 py-2 md:py-3 text-right block md:table-cell mt-1 md:mt-0 border-t border-slate-50 md:border-none pt-2 md:pt-4">
+        <div className="flex items-center justify-between md:justify-end gap-1 md:gap-2">
+          <div className="flex gap-1 md:gap-2">
+            <button 
+              onClick={onEdit}
+              className="p-1.5 md:p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+              title="Edit Branch"
+            >
+              <Edit2 size={14} />
+            </button>
+            <button 
+              onClick={onAssign}
+              className="p-1.5 md:p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+              title="Provision Admin Access"
+            >
+              <UserPlus size={14} />
+            </button>
+          </div>
           <button 
             onClick={onDelete}
-            className="p-2 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+            className="p-1.5 md:p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
             title="Delete Branch"
           >
-            <Trash2 size={16} />
-          </button>
-          <button 
-            onClick={onAssign}
-            className="p-2 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-            title="Provision Admin Access"
-          >
-            <UserPlus size={16} />
+            <Trash2 size={14} />
           </button>
         </div>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import Cropper from 'react-easy-crop';
 import { 
@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { useRole } from '../components/Layout';
 import { useFirebase } from '../components/FirebaseProvider';
-import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc, query, collectionGroup, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc, query, collectionGroup, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface Child {
@@ -42,6 +42,7 @@ interface Child {
 export default function NewMember() {
   const navigate = useNavigate();
   const { memberId } = useParams();
+  const [searchParams] = useSearchParams();
   const { role } = useRole();
   const { profile, memberProfile: currentMember } = useFirebase();
   const [step, setStep] = useState(1);
@@ -58,25 +59,105 @@ export default function NewMember() {
   const [preview, setPreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+  const [districts, setDistricts] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [loadingDistricts, setLoadingDistricts] = useState(false);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const isLoadedRef = React.useRef(false);
+
+  const FORM_STORAGE_KEY = memberId ? `edit_member_${memberId}_form_data` : 'new_member_form_data';
+
+  // Load persistence
+  useEffect(() => {
+    const saved = localStorage.getItem(FORM_STORAGE_KEY);
+    if (saved) {
+      try {
+        const { formData: savedData, children: savedChildren, maritalStatus: savedMarital } = JSON.parse(saved);
+        setFormData(prev => ({ ...prev, ...savedData }));
+        setChildren(savedChildren || []);
+        setMaritalStatus(savedMarital || 'Single');
+      } catch (e) {
+        console.error("Failed to load saved form progress:", e);
+      }
+    }
+    // Small delay to ensure state updates are processed before we allow syncing/overwriting
+    const timer = setTimeout(() => setIsDraftLoaded(true), 100);
+    return () => clearTimeout(timer);
+  }, [FORM_STORAGE_KEY, memberId]);
+
+  // Sync to localStorage
+  useEffect(() => {
+    if (!saveSuccess && isDraftLoaded) {
+      localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify({
+        formData,
+        children,
+        maritalStatus
+      }));
+    }
+  }, [formData, children, maritalStatus, saveSuccess, FORM_STORAGE_KEY, isDraftLoaded]);
+
+  // Handle profile-based defaults
+  useEffect(() => {
+    if (profile && !isEdit && !formData.districtId) {
+      setFormData(prev => ({
+        ...prev,
+        districtId: profile.districtId || '',
+        branchId: profile.branchId || ''
+      }));
+    }
+  }, [profile, isEdit]);
+
+  // Fetch Districts (Superadmin Only)
+  useEffect(() => {
+    if (role === 'superadmin') {
+      const fetchDistricts = async () => {
+        setLoadingDistricts(true);
+        try {
+          const snap = await getDocs(collection(db, 'districts'));
+          setDistricts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (err) {
+          console.error("Failed to fetch districts:", err);
+        } finally {
+          setLoadingDistricts(false);
+        }
+      };
+      fetchDistricts();
+    }
+  }, [role]);
+
+  // Fetch Branches based on District
+  useEffect(() => {
+    const activeDistrictId = formData.districtId || (role === 'district' || role === 'admin' ? profile?.districtId : null);
+    if (!activeDistrictId) {
+      setBranches([]);
+      return;
+    }
+
+    const fetchBranches = async () => {
+      setLoadingBranches(true);
+      try {
+        const snap = await getDocs(collection(db, 'districts', activeDistrictId, 'branches'));
+        const branchList = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        setBranches(branchList);
+        
+        // If we have a branchId but no branch name, update it
+        if (formData.branchId && !formData.branch) {
+          const selected = branchList.find(b => b.id === formData.branchId);
+          if (selected) {
+            setFormData(prev => ({ ...prev, branch: selected.name }));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch branches:", err);
+      } finally {
+        setLoadingBranches(false);
+      }
+    };
+    fetchBranches();
+  }, [formData.districtId, profile?.districtId, role, formData.branchId, formData.branch]);
 
   const appendParams = (path: string) => path;
-
-  // Form State
-  const [formData, setFormData] = useState({
-    fullName: '',
-    dob: '',
-    gender: '',
-    phone: '',
-    email: '',
-    address: '',
-    emergencyContact: '',
-    branch: '',
-    isBaptised: false,
-    level: 'Convert',
-    username: '',
-    password: '',
-    confirmPassword: ''
-  });
 
   useEffect(() => {
     async function loadMember() {
@@ -87,19 +168,31 @@ export default function NewMember() {
         let memberData: any = null;
         let path: string | null = null;
 
+        // Try to get from query params first (districtId/branchId)
+        const qDistrictId = searchParams.get('districtId');
+        const qBranchId = searchParams.get('branchId');
+
         // If it's the current user's profile, we might have it already
-        if (currentMember && currentMember.id === memberId) {
+        if (currentMember && currentMember.uid === memberId) {
           memberData = currentMember;
           path = `districts/${currentMember.districtId}/branches/${currentMember.branchId}/members/${memberId}`;
-        } else {
-          // Find member by ID using collectionGroup
-          const q = query(collectionGroup(db, 'members'), where('__name__', '==', memberId));
+        } else if (qDistrictId && qBranchId) {
+          // Direct fetch if we have the parent IDs
+          const docRef = doc(db, 'districts', qDistrictId, 'branches', qBranchId, 'members', memberId);
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+            memberData = snap.data();
+            path = snap.ref.path;
+          }
+        }
+
+        // Fallback: Find member by ID field using collectionGroup (safer than __name__ for collection groups)
+        if (!memberData) {
+          const q = query(collectionGroup(db, 'members'), where('uid', '==', memberId));
           const snap = await getDocs(q);
           if (!snap.empty) {
             memberData = snap.docs[0].data();
-            // Infer path from parent references
-            const ref = snap.docs[0].ref;
-            path = ref.path;
+            path = snap.docs[0].ref.path;
           }
         }
 
@@ -112,9 +205,13 @@ export default function NewMember() {
             email: memberData.email || '',
             address: memberData.address || '',
             emergencyContact: memberData.emergencyContact || '',
-            branch: memberData.branchId || '',
+            branch: memberData.branch || '',
+            branchId: memberData.branchId || '',
+            districtId: memberData.districtId || '',
             isBaptised: memberData.isBaptised || false,
-            level: memberData.level || 'Convert',
+            level: memberData.level || 'Visitor',
+            status: memberData.status || 'Active',
+            baptismStatus: memberData.baptismStatus || 'Pending',
             username: memberData.username || '',
             password: '',
             confirmPassword: ''
@@ -232,9 +329,17 @@ export default function NewMember() {
     } else if (currentStep === 3) {
       if (!formData.branch) newErrors.branch = 'Branch assignment is required';
     } else if (currentStep === 5) {
-      if (!formData.username) newErrors.username = 'Username is required';
-      if (!formData.password) newErrors.password = 'Password is required';
-      if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+      // Step 5 (Credentials) is now optional for both new members and profile updates.
+      // Only validate if password or username were explicitly changed/started.
+      if (formData.password || formData.confirmPassword || (formData.username && formData.username !== formData.email)) {
+        if (!formData.username) newErrors.username = 'Username is required';
+        if (formData.password && formData.password !== formData.confirmPassword) {
+          newErrors.confirmPassword = 'Passwords do not match';
+        }
+        if (!formData.password && !isEdit) {
+           newErrors.password = 'Password is required to create credentials';
+        }
+      }
     }
 
     setErrors(newErrors);
@@ -242,8 +347,13 @@ export default function NewMember() {
   };
 
   const nextStep = () => {
+    // If going to step 5, default username to email if still empty
+    if (step === 4 && !formData.username) {
+      setFormData(prev => ({ ...prev, username: prev.email }));
+    }
+    
     if (validateStep(step)) {
-      setStep(prev => Math.min(prev + 1, 5));
+      setStep(prev => Math.min(prev + 1, 6)); // Step 6 is Final Review
     }
   };
 
@@ -290,19 +400,24 @@ export default function NewMember() {
       return;
     }
     
-    if (step === 5 && !validateStep(5) && !isEdit) return;
+    if (step === 5 && !validateStep(5)) return;
 
     setIsSaving(true);
     try {
-      const districtId = profile?.districtId || (isEdit && targetMemberPath ? targetMemberPath.split('/')[1] : 'default-district');
-      const branchId = formData.branch || profile?.branchId || (isEdit && targetMemberPath ? targetMemberPath.split('/')[3] : 'default-branch');
-      
+      const districtId = formData.districtId || profile?.districtId;
+      const branchId = formData.branchId || profile?.branchId;
+
+      if (!districtId || !branchId) {
+        throw new Error("Missing District or Branch assignment");
+      }
+
       const memberData: any = {
         fullName: formData.fullName,
         branchId: branchId,
+        branch: formData.branch,
         districtId: districtId,
         level: formData.level,
-        status: isEdit ? (currentMember?.status || 'Active') : 'Active',
+        status: formData.status || (isEdit ? (currentMember?.status || 'Active') : 'Active'),
         dob: formData.dob || null,
         gender: formData.gender,
         phone: formData.phone || null,
@@ -310,21 +425,35 @@ export default function NewMember() {
         address: formData.address || null,
         emergencyContact: formData.emergencyContact || null,
         isBaptised: formData.isBaptised,
-        username: formData.username || null,
+        baptismStatus: formData.baptismStatus,
+        username: formData.username || formData.email || null, // Default username to email
         maritalStatus,
         children: children.map(c => ({ name: c.name, dob: c.dob, gender: c.gender })),
         photoUrl: preview || '',
         updatedAt: serverTimestamp(),
-        isProfileComplete: true
+        isProfileComplete: true,
+        memberId: isEdit ? memberId : null
       };
+
+      // Only include password if it was entered
+      if (formData.password) {
+        memberData.password = formData.password;
+      }
 
       if (!isEdit) {
         memberData.createdAt = serverTimestamp();
-        const path = `/districts/${districtId}/branches/${branchId}/members`;
-        await addDoc(collection(db, path), memberData);
+        const path = `districts/${districtId}/branches/${branchId}/members`;
+        const docRef = await addDoc(collection(db, path), memberData);
+        // Add the memberId to the document itself for future querying
+        await updateDoc(docRef, { memberId: docRef.id, uid: docRef.id });
+        localStorage.removeItem(FORM_STORAGE_KEY);
       } else if (targetMemberPath) {
         await updateDoc(doc(db, targetMemberPath), memberData);
+        localStorage.removeItem(FORM_STORAGE_KEY);
       }
+      
+      // Clear persistence on success
+      localStorage.removeItem(FORM_STORAGE_KEY);
       
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -690,42 +819,45 @@ export default function NewMember() {
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Assign Branch *</label>
-                    <div className="relative">
-                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  {role === 'superadmin' && (
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-bold text-slate-700 mb-1.5">District *</label>
                       <select 
-                        disabled={role === 'admin'}
-                        value={formData.branch}
-                        onChange={(e) => setFormData({...formData, branch: e.target.value})}
-                        className={`w-full bg-slate-50 border rounded-xl p-3 pl-10 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none disabled:bg-slate-100 disabled:text-slate-500 ${
-                          errors.branch ? 'border-red-500' : 'border-slate-200'
-                        }`}
+                        value={formData.districtId}
+                        onChange={(e) => setFormData({...formData, districtId: e.target.value, branchId: '', branch: ''})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
                       >
-                        <option value="">Select Branch</option>
-                        {role === 'admin' ? (
-                          <option value="Main Campus">Main Campus (Your Branch)</option>
-                        ) : role === 'district' ? (
-                          <>
-                            <option value="Central Cathedral">Central Cathedral</option>
-                            <option value="Eastside Ministry">Eastside Ministry</option>
-                            <option value="Grace Chapel">Grace Chapel</option>
-                            <option value="North Point">North Point</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="Central Cathedral">Central Cathedral</option>
-                            <option value="Eastside Ministry">Eastside Ministry</option>
-                            <option value="Grace Chapel">Grace Chapel</option>
-                            <option value="North Point">North Point</option>
-                            <option value="South Valley">South Valley</option>
-                          </>
-                        )}
+                        <option value="">Select District</option>
+                        {districts.map(d => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
                       </select>
                     </div>
-                    {errors.branch && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.branch}</p>}
-                    {role === 'admin' && <p className="text-[10px] text-slate-400 mt-1 italic">As a Branch Admin, you can only add members to your assigned branch.</p>}
-                  </div>
+                  )}
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-bold text-slate-700 mb-1.5">Assign Branch *</label>
+                      <div className="relative">
+                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <select 
+                          value={formData.branchId}
+                          onChange={(e) => {
+                            const selectedBranch = branches.find(b => b.id === e.target.value);
+                            setFormData({...formData, branchId: e.target.value, branch: selectedBranch?.name || ''});
+                          }}
+                          className={`w-full bg-slate-50 border rounded-xl p-3 pl-10 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none disabled:bg-slate-100 disabled:text-slate-500 ${
+                            errors.branch ? 'border-red-500' : 'border-slate-200'
+                          }`}
+                        >
+                          <option value="">Select Branch</option>
+                          {branches.map(b => (
+                            <option key={b.id} value={b.id}>{b.name} {b.id === profile?.branchId ? '(Your Branch)' : ''}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {errors.branch && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.branch}</p>}
+                      {loadingBranches && <p className="text-[10px] text-blue-500 mt-1 flex items-center gap-1 animate-pulse">Loading branches...</p>}
+                    </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1.5">Date Joined</label>
                     <input 
@@ -760,33 +892,89 @@ export default function NewMember() {
                             type="radio" 
                             name="baptised" 
                             checked={!formData.isBaptised}
-                            onChange={() => setFormData({...formData, isBaptised: false, level: 'Convert'})}
+                            onChange={() => setFormData({...formData, isBaptised: false, level: 'Visitor'})}
                             className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-slate-300" 
                           />
                           <span className="text-sm font-medium text-slate-700 group-hover:text-blue-600 transition-colors">Not yet</span>
                         </label>
                       </div>
 
-                      {formData.isBaptised && (
-                        <motion.div 
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="flex items-center gap-2 flex-1 w-full sm:w-auto"
+                      <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
+                        <label className="text-sm font-bold text-slate-700 whitespace-nowrap">Level:</label>
+                        <select 
+                          value={formData.level}
+                          onChange={(e) => setFormData({...formData, level: e.target.value})}
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                         >
-                          <label className="text-sm font-bold text-slate-700 whitespace-nowrap">Level:</label>
-                          <select 
-                            value={formData.level}
-                            onChange={(e) => setFormData({...formData, level: e.target.value})}
-                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                          >
-                            <option value="Disciple">Disciple</option>
-                            <option value="Worker">Worker</option>
-                            <option value="Leader">Leader</option>
-                          </select>
-                        </motion.div>
-                      )}
+                          {formData.isBaptised ? (
+                            <>
+                              <option value="Disciple">Disciple</option>
+                              <option value="Worker">Worker</option>
+                              <option value="Leader">Leader</option>
+                            </>
+                          ) : (
+                            <>
+                              <option value="Visitor">Visitor</option>
+                              <option value="Convert">Convert</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
                     </div>
                   </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Member Status</label>
+                    <div className="flex flex-wrap gap-3">
+                      {['Active', 'Inactive', 'Deceased', 'Dismissed'].map((stat) => (
+                        <button
+                          key={stat}
+                          type="button"
+                          onClick={() => setFormData({...formData, status: stat})}
+                          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
+                            formData.status === stat
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-600/20'
+                              : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
+                          }`}
+                        >
+                          {stat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {!formData.isBaptised && formData.level === 'Convert' && (
+                    <div className="sm:col-span-2">
+                      <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
+                            <Baby size={20} />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-blue-900 leading-tight mb-1">Baptism Request</h4>
+                            <p className="text-xs text-blue-700 max-w-sm">This member is currently a Convert. Submit them to the District Headquarters for baptism interview and approval.</p>
+                          </div>
+                        </div>
+                        
+                        {formData.baptismStatus === 'Pending' ? (
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setFormData({...formData, baptismStatus: 'Submitted to District'});
+                            }}
+                            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-blue-700 transition-all whitespace-nowrap"
+                          >
+                            Submit for Baptism
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-blue-200 text-blue-600 text-xs font-bold">
+                            <Check size={14} />
+                            {formData.baptismStatus}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </motion.section>
             )}
@@ -851,7 +1039,7 @@ export default function NewMember() {
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Username *</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Username (Optional)</label>
                     <input 
                       type="text" 
                       value={formData.username}
@@ -861,10 +1049,11 @@ export default function NewMember() {
                         errors.username ? 'border-red-500' : 'border-slate-200'
                       }`}
                     />
+                    <p className="text-[10px] text-slate-500 mt-1">Leave blank to use email as username.</p>
                     {errors.username && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.username}</p>}
                   </div>
                   <div className="relative">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Password *</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Password (Optional)</label>
                     <input 
                       type={showPassword ? 'text' : 'password'} 
                       value={formData.password}
@@ -884,7 +1073,7 @@ export default function NewMember() {
                     {errors.password && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.password}</p>}
                   </div>
                   <div className="relative">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Confirm Password *</label>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Confirm Password</label>
                     <input 
                       type={showPassword ? 'text' : 'password'} 
                       value={formData.confirmPassword}

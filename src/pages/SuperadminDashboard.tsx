@@ -32,7 +32,7 @@ import {
   CartesianGrid, 
   Tooltip 
 } from 'recharts';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, collectionGroup, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 
@@ -53,7 +53,9 @@ export default function SuperadminDashboard() {
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
   const [districts, setDistricts] = useState<any[]>([]);
   const [adminRequests, setAdminRequests] = useState<any[]>([]);
+  const [baptismRequests, setBaptismRequests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'districts' | 'leadership' | 'baptism'>('overview');
   const [isCreating, setIsCreating] = useState(false);
   const [editingDistrictId, setEditingDistrictId] = useState<string | null>(null);
 
@@ -96,9 +98,26 @@ export default function SuperadminDashboard() {
       setAdminRequests(requests);
     });
 
+    // Listen to HQ baptism requests
+    const baptismQuery = query(
+      collectionGroup(db, 'members'),
+      where('baptismStatus', 'in', ['Submitted to HQ', 'Approved'])
+    );
+    const unsubscribeBaptism = onSnapshot(baptismQuery, (snapshot) => {
+      const results: any[] = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.baptismStatus === 'Submitted to HQ') {
+          results.push({ id: doc.id, refPath: doc.ref.path, ...data });
+        }
+      });
+      setBaptismRequests(results);
+    });
+
     return () => {
       unsubscribe();
       unsubscribeRequests();
+      unsubscribeBaptism();
     };
   }, []);
 
@@ -482,96 +501,178 @@ export default function SuperadminDashboard() {
         )}
       </Modal>
 
-      {/* Global Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <GlobalStatCard 
-          label="Total Global Members" 
-          value={totalMembers.toLocaleString()} 
-          trend={`${totalMembers > 0 ? '+5.2%' : 'No data'}`} 
-          icon={<Users className="text-blue-600" size={20} />}
-        />
-        <GlobalStatCard 
-          label="Active Branches" 
-          value={totalBranches.toString()} 
-          trend="Across all districts" 
-          icon={<Building2 className="text-emerald-600" size={20} />}
-        />
-        <GlobalStatCard 
-          label="Live Districts" 
-          value={totalDistrictsCount.toString()} 
-          trend="System-wide" 
-          icon={<Map className="text-purple-600" size={20} />}
-        />
-        <GlobalStatCard 
-          label="System Health" 
-          value="100%" 
-          trend="Stable" 
-          icon={<Activity className="text-orange-600" size={20} />}
-        />
+      {/* Navigation Tabs */}
+      <div className="flex border-b border-slate-200 gap-8">
+        {[
+          { id: 'overview', label: 'Global Overview', icon: <Globe size={18} /> },
+          { id: 'districts', label: 'Districts', icon: <Map size={18} /> },
+          { id: 'leadership', label: 'Leadership', icon: <Shield size={18} /> },
+          { id: 'baptism', label: 'Baptism Queue', icon: <div className="relative"><CheckCircle2 size={18} />{baptismRequests.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white">{baptismRequests.length}</span>}</div> }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center gap-2 py-4 text-sm font-bold transition-all relative ${
+              activeTab === tab.id ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+            {activeTab === tab.id && (
+              <motion.div 
+                layoutId="activeTabIndicator"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" 
+              />
+            )}
+          </button>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Global Growth Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-base font-bold text-slate-900">Global Growth Trends</h3>
-            <div className="flex gap-2">
-              <button className="text-xs font-bold text-blue-600">Members</button>
-              <button className="text-xs font-bold text-slate-400">Revenue</button>
+      {activeTab === 'overview' && (
+        <>
+          {/* Global Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <GlobalStatCard 
+              label="Total Global Members" 
+              value={totalMembers.toLocaleString()} 
+              trend={`${totalMembers > 0 ? '+5.2%' : 'No data'}`} 
+              icon={<Users className="text-blue-600" size={20} />}
+            />
+            <GlobalStatCard 
+              label="Active Branches" 
+              value={totalBranches.toString()} 
+              trend="Across all districts" 
+              icon={<Building2 className="text-emerald-600" size={20} />}
+            />
+            <GlobalStatCard 
+              label="Live Districts" 
+              value={totalDistrictsCount.toString()} 
+              trend="System-wide" 
+              icon={<Map className="text-purple-600" size={20} />}
+            />
+            <GlobalStatCard 
+              label="System Health" 
+              value="100%" 
+              trend="Stable" 
+              icon={<Activity className="text-orange-600" size={20} />}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Global Growth Chart */}
+            <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-base font-bold text-slate-900">Global Growth Trends</h3>
+                <div className="flex gap-2">
+                  <button className="text-xs font-bold text-blue-600">Members</button>
+                  <button className="text-xs font-bold text-slate-400">Revenue</button>
+                </div>
+              </div>
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={globalGrowthData}>
+                    <defs>
+                      <linearGradient id="colorGlobal" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0f172a" stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor="#0f172a" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="members" stroke="#0f172a" strokeWidth={2} fillOpacity={1} fill="url(#colorGlobal)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* System Alerts */}
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+              <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                <h3 className="text-base font-bold text-slate-900">System Alerts</h3>
+                <span className="bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">3 Critical</span>
+              </div>
+              <div className="p-4 space-y-4">
+                <AlertItem 
+                  title="Database Sync Lag" 
+                  desc="District 4 branches experiencing 5s delay." 
+                  type="critical" 
+                />
+                <AlertItem 
+                  title="New License Request" 
+                  desc="Lagos Central Branch awaiting activation." 
+                  type="info" 
+                />
+                <AlertItem 
+                  title="Transfer Queue High" 
+                  desc="150+ transfers pending Superadmin review." 
+                  type="warning" 
+                />
+              </div>
+              <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 mt-auto">
+                <button className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                  View All Alerts
+                  <ChevronRight size={14} />
+                </button>
+              </div>
             </div>
           </div>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={globalGrowthData}>
-                <defs>
-                  <linearGradient id="colorGlobal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0f172a" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#0f172a" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                <Tooltip />
-                <Area type="monotone" dataKey="members" stroke="#0f172a" strokeWidth={2} fillOpacity={1} fill="url(#colorGlobal)" />
-              </AreaChart>
-            </ResponsiveContainer>
+        </>
+      )}
+
+      {activeTab === 'districts' && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-slate-200">
+            <h3 className="text-base font-bold text-slate-900">District Performance</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">District Name</th>
+                  <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Branches</th>
+                  <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Members</th>
+                  <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Growth</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="animate-spin text-blue-600" size={24} />
+                        <span className="text-sm text-slate-500">Loading districts...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : districts.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-sm text-slate-500">
+                      No districts found. Create your first district to get started.
+                    </td>
+                  </tr>
+                ) : (
+                  districts.map((district) => (
+                    <DistrictRow 
+                      key={district.id}
+                      name={district.name} 
+                      branches={district.branchesCount || 0} 
+                      members={district.membersCount?.toLocaleString() || "0"} 
+                      growth={district.growth || "0%"} 
+                      onAssign={(name) => { setSelectedDistrict(name); setLeaderDistrictId(district.id); setIsLeadershipModalOpen(true); }}
+                      onEdit={() => handleEditClick(district)}
+                      onView={() => { navigate(`/district/${district.id}`); }} 
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
+      )}
 
-        {/* System Alerts */}
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
-          <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-            <h3 className="text-base font-bold text-slate-900">System Alerts</h3>
-            <span className="bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">3 Critical</span>
-          </div>
-          <div className="p-4 space-y-4">
-            <AlertItem 
-              title="Database Sync Lag" 
-              desc="District 4 branches experiencing 5s delay." 
-              type="critical" 
-            />
-            <AlertItem 
-              title="New License Request" 
-              desc="Lagos Central Branch awaiting activation." 
-              type="info" 
-            />
-            <AlertItem 
-              title="Transfer Queue High" 
-              desc="150+ transfers pending Superadmin review." 
-              type="warning" 
-            />
-          </div>
-          <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 mt-auto">
-            <button className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
-              View All Alerts
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {adminRequests.length > 0 && (
+      {activeTab === 'leadership' && adminRequests.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
             <h3 className="text-base font-bold text-slate-900">Pending Admin Approvals</h3>
@@ -622,55 +723,80 @@ export default function SuperadminDashboard() {
         </div>
       )}
 
-      {/* District Performance Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="px-6 py-4 border-b border-slate-200">
-          <h3 className="text-base font-bold text-slate-900">District Performance</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50">
-                <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">District Name</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Branches</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Members</th>
-                <th className="px-6 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Growth</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center">
-                    <div className="flex flex-col items-center gap-2">
-                      <Loader2 className="animate-spin text-blue-600" size={24} />
-                      <span className="text-sm text-slate-500">Loading districts...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : districts.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-sm text-slate-500">
-                    No districts found. Create your first district to get started.
-                  </td>
-                </tr>
+      {activeTab === 'baptism' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="px-6 py-5 border-b border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900">Final Baptism Approval</h3>
+              <p className="text-sm text-slate-500">Ministry-wide candidates awaiting final headquarters approval.</p>
+            </div>
+            
+            <div className="p-6">
+              {baptismRequests.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle2 size={32} className="text-slate-200" />
+                  </div>
+                  <p className="text-slate-500 font-medium">No candidates in final approval queue.</p>
+                </div>
               ) : (
-                districts.map((district) => (
-                  <DistrictRow 
-                    key={district.id}
-                    name={district.name} 
-                    branches={district.branchesCount || 0} 
-                    members={district.membersCount?.toLocaleString() || "0"} 
-                    growth={district.growth || "0%"} 
-                    onAssign={(name) => { setSelectedDistrict(name); setLeaderDistrictId(district.id); setIsLeadershipModalOpen(true); }}
-                    onEdit={() => handleEditClick(district)}
-                    onView={() => { navigate(`/district/${district.id}`); }} 
-                  />
-                ))
+                <div className="space-y-4">
+                  {baptismRequests.map(req => (
+                    <div key={req.id} className="group bg-slate-50 rounded-2xl border border-slate-100 p-4 hover:border-emerald-200 transition-all">
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div className="flex items-center gap-4">
+                          {req.photoUrl ? (
+                            <img src={req.photoUrl} alt="" className="w-12 h-12 rounded-xl object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400">
+                              <Users size={20} />
+                            </div>
+                          )}
+                          <div>
+                            <h4 className="font-bold text-slate-900 tracking-tight">{req.fullName}</h4>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase">{req.branch || 'Unknown Branch'}</span>
+                              <span className="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full uppercase">{req.districtId}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 w-full md:w-auto">
+                          <button 
+                            onClick={async () => {
+                              try {
+                                await updateDoc(doc(db, req.refPath), {
+                                  baptismStatus: 'Approved',
+                                  isBaptised: true,
+                                  level: 'Disciple', // Automatically elevate to Disciple upon baptism
+                                  hqApprovedAt: serverTimestamp(),
+                                  hqApprovedBy: profile?.uid
+                                });
+                              } catch (e) {
+                                console.error(e);
+                              }
+                            }}
+                            className="flex-1 md:flex-none px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-200"
+                          >
+                            <CheckCircle2 size={16} />
+                            Grant Final Approval
+                          </button>
+                          <button 
+                            onClick={() => navigate(`/members/edit/${req.memberId}?districtId=${req.districtId}&branchId=${req.branchId}`)}
+                            className="p-2.5 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-xl transition-all"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </motion.div>
   );
 }
