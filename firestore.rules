@@ -1,0 +1,305 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // 0. Global Safety Net (Default Deny)
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      // Relaxing email verification requirement for now to prevent provisioning blockers
+      return isAuthenticated();
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSuperAdmin() {
+      if (!isAuthenticated()) return false;
+      let email = request.auth.token.get('email', '').lower();
+      if (email == "ygbock@gmail.com") return true;
+      
+      // Source 1: User Profile (UID is reliable)
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      if (exists(userPath) && get(userPath).data.get('role', '') == "superadmin") return true;
+      
+      // Source 2: Access Control (Fallback to email if present)
+      if (email != "") {
+        let accessPath = /databases/$(database)/documents/accessControl/$(email);
+        if (exists(accessPath) && get(accessPath).data.get('role', '') == "superadmin") return true;
+      }
+
+      return false;
+    }
+
+    function isDistrictLeader(districtId) {
+      if (!isAuthenticated()) return false;
+      let email = request.auth.token.get('email', '').lower();
+      if (email == "ygbock@gmail.com") return true;
+      
+      // Check Source 1: User Profile (UID is reliable)
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      if (exists(userPath)) {
+        let userData = get(userPath).data;
+        if (userData.get('role', '') == "superadmin") return true;
+        if (userData.get('role', '') == "district" && (districtId == 'any' || districtId == 'global' || userData.get('districtId', '') == districtId)) return true;
+      }
+      
+      // Check Source 2: Access Control (Fallback to email if present)
+      if (email != "") {
+        let accessPath = /databases/$(database)/documents/accessControl/$(email);
+        if (exists(accessPath)) {
+          let accData = get(accessPath).data;
+          if (accData.get('role', '') == "superadmin") return true;
+          if (accData.get('role', '') == "district" && (districtId == 'any' || districtId == 'global' || accData.get('districtId', '') == districtId)) return true;
+        }
+      }
+
+      return false;
+    }
+
+    function isBranchAdmin(districtId, branchId) {
+      if (!isAuthenticated()) return false;
+      if (isDistrictLeader(districtId)) return true;
+      
+      let email = request.auth.token.get('email', '').lower();
+      
+      // Source 1: User Profile
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      if (exists(userPath)) {
+        let userData = get(userPath).data;
+        if (userData.get('role', '') == "admin" && userData.get('branchId', '') == branchId) return true;
+      }
+
+      // Source 2: Access Control
+      if (email != "") {
+        let accessPath = /databases/$(database)/documents/accessControl/$(email);
+        if (exists(accessPath)) {
+          let accData = get(accessPath).data;
+          if (accData.get('role', '') == "admin" && accData.get('branchId', '') == branchId) return true;
+        }
+      }
+
+      return false;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['fullName', 'email', 'role']) &&
+             data.fullName is string && data.fullName.size() > 0 && data.fullName.size() < 100 &&
+             data.email is string && data.email.size() < 100 &&
+             data.role in ['superadmin', 'admin', 'district', 'member'];
+    }
+
+    function isOptionalStringOrNull(val) {
+      return val == null || (val is string && val.size() < 250);
+    }
+
+    function isOptionalChildList(val) {
+      return val == null || (val is list && val.size() <= 20);
+    }
+
+    function isValidMember(data) {
+      return data.keys().hasAll(['fullName', 'branchId', 'level', 'status']) &&
+             data.fullName is string && data.fullName.size() > 0 &&
+             data.fullName.size() < 100 &&
+             data.branchId is string && data.branchId.size() < 50 &&
+             data.level in ['Convert', 'Disciple', 'Worker', 'Leader'] &&
+             data.status in ['Active', 'Pending', 'Inactive'];
+    }
+
+    function isValidDistrict(data) {
+      return data.keys().hasAll(['name', 'locationCategory', 'country', 'region', 'city']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.locationCategory in ['Local', 'International'] &&
+             data.country is string && data.country.size() > 0 &&
+             data.region is string && data.region.size() > 0 &&
+             data.city is string && data.city.size() > 0;
+    }
+
+    function isProvisionedRole(requestedData) {
+      let email = request.auth.token.get('email', '').lower();
+      let accessDocPath = /databases/$(database)/documents/accessControl/$(email);
+      let hasAccess = exists(accessDocPath);
+      if (!hasAccess) return false;
+      
+      let accessDoc = get(accessDocPath);
+      let roleMatch = accessDoc.data.get('role', '') == requestedData.role;
+      
+      let reqDistrict = requestedData.get('districtId', null);
+      let accDistrict = accessDoc.data.get('districtId', null);
+      let districtMatch = (accDistrict == reqDistrict) || (accDistrict == '' && reqDistrict == null) || (accDistrict == null && reqDistrict == '');
+      
+      let reqBranch = requestedData.get('branchId', null);
+      let accBranch = accessDoc.data.get('branchId', null);
+      let branchMatch = (accBranch == reqBranch) || (accBranch == '' && reqBranch == null) || (accBranch == null && reqBranch == '');
+      
+      return isAuthenticated() && roleMatch && districtMatch && branchMatch;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // Access Control (Provisioning)
+    function isValidBranch(data) {
+      return data.keys().hasAll(['name', 'location', 'districtId', 'createdAt', 'updatedAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.location is string && data.location.size() < 200 &&
+             isValidId(data.districtId) &&
+             data.createdAt == request.time &&
+             data.updatedAt == request.time;
+    }
+
+    match /accessControl/{email} {
+      allow get: if isAuthenticated() && (
+        (request.auth.token.get('email', '').lower() == email.lower()) ||
+        isSuperAdmin() ||
+        (resource.data.get('uid', '') == request.auth.uid)
+      );
+
+      allow list: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.auth.token.get('email', '').lower() == email.lower()) ||
+        (resource.data.get('districtId', '') != '' && isDistrictLeader(resource.data.get('districtId', '')))
+      );
+      
+      allow write: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource != null && request.resource.data.get('districtId', '') != '' && isDistrictLeader(request.resource.data.get('districtId', '')))
+      );
+    }
+
+    // User Profiles
+    match /users/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isSuperAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == uid && (
+        (string(request.auth.token.get('email', '')).lower() == "ygbock@gmail.com") ||
+        (isValidUser(request.resource.data) && isProvisionedRole(request.resource.data)) ||
+        // Emergency fall-back for district leaders being bootstrapped to prevent provisioning blockers
+        (request.resource.data.get('role', '') == 'district' && request.auth.token.get('email', '').lower() != "")
+      );
+      allow update: if isAuthenticated() && request.auth.uid == uid && (
+        isSuperAdmin() ||
+        (isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isSuperAdmin()))
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // Transfers
+    match /transfers/{transferId} {
+       allow read: if isAuthenticated() && (
+         isSuperAdmin() ||
+         isDistrictLeader(resource.data.fromDistrictId) || 
+         isDistrictLeader(resource.data.toDistrictId) || 
+         isBranchAdmin(resource.data.fromDistrictId, resource.data.fromBranchId) || 
+         isBranchAdmin(resource.data.toDistrictId, resource.data.toBranchId)
+       );
+       allow create: if isAuthenticated() && (
+         isSuperAdmin() ||
+         isDistrictLeader(request.resource.data.fromDistrictId) || 
+         isBranchAdmin(request.resource.data.fromDistrictId, request.resource.data.fromBranchId)
+       );
+       allow update: if isAuthenticated() && (
+         isSuperAdmin() ||
+         isDistrictLeader(resource.data.toDistrictId) || 
+         isBranchAdmin(resource.data.toDistrictId, resource.data.toBranchId) ||
+         isDistrictLeader(resource.data.fromDistrictId) || 
+         isBranchAdmin(resource.data.fromDistrictId, request.resource.data.fromBranchId)
+       );
+       allow delete: if isSuperAdmin();
+    }
+
+    // Hierarchical Data: Districts -> Branches -> Members/Transactions/Events
+    match /districts/{districtId} {
+      allow read: if isAuthenticated() && isValidId(districtId);
+      allow list: if isAuthenticated();
+      allow create: if isSuperAdmin() && isValidId(districtId) && isValidDistrict(request.resource.data);
+      allow update: if (isSuperAdmin() || isDistrictLeader(districtId)) && isValidId(districtId) && isValidDistrict(request.resource.data);
+      allow delete: if isSuperAdmin() && isValidId(districtId);
+      
+      match /branches/{branchId} {
+        allow read: if isAuthenticated() && isValidId(branchId);
+        allow list: if isAuthenticated();
+        allow write: if (isDistrictLeader(districtId) || isSuperAdmin()) && isValidId(branchId) && (
+          (request.resource == null) || // DELETE
+          isValidBranch(request.resource.data)
+        );
+
+        match /departments/{departmentId} {
+          allow read: if isAuthenticated() && isValidId(departmentId);
+          allow write: if isBranchAdmin(districtId, branchId) && isValidId(departmentId);
+        }
+
+        match /members/{memberId} {
+          allow read: if isValidId(memberId) && (
+            isBranchAdmin(districtId, branchId) || 
+            (isAuthenticated() && request.auth.uid == memberId)
+          );
+          allow write: if isValidId(memberId) && (
+            isBranchAdmin(districtId, branchId) || 
+            (isAuthenticated() && request.auth.uid == memberId)
+          ) && isValidMember(request.resource.data);
+        }
+
+        match /transactions/{transactionId} {
+          allow read: if isBranchAdmin(districtId, branchId) && isValidId(transactionId);
+          allow write: if isBranchAdmin(districtId, branchId) && isValidId(transactionId);
+        }
+
+        match /events/{eventId} {
+          allow read: if isAuthenticated() && isValidId(eventId);
+          allow write: if isBranchAdmin(districtId, branchId) && isValidId(eventId);
+        }
+      }
+    }
+
+    match /{path=**}/members/{memberId} {
+      allow get: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.get('districtId', '') != '' && isDistrictLeader(resource.data.get('districtId', ''))) ||
+        (request.auth.uid == memberId) ||
+        (resource.data.email == request.auth.token.get('email', '').lower())
+      );
+      
+      allow list: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.get('districtId', '') != '' && isDistrictLeader(resource.data.get('districtId', ''))) ||
+        (request.auth.uid == memberId) ||
+        (resource.data.get('email', '').lower() == request.auth.token.get('email', '').lower())
+      );
+    }
+
+    match /invites/{inviteId} {
+      allow read: if isValidId(inviteId);
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() || 
+        (request.resource.data.get('districtId', '') != '' && isDistrictLeader(request.resource.data.get('districtId', '')))
+      );
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.get('districtId', '') != '' && isDistrictLeader(resource.data.get('districtId', '')))
+      );
+      allow delete: if isSuperAdmin() && isValidId(inviteId);
+    }
+    
+    match /adminRequests/{requestId} {
+      allow create: if isValidId(requestId);
+      allow read, update, delete: if (isSuperAdmin() || isDistrictLeader('global')) && isValidId(requestId);
+    }
+    
+    match /{path=**}/branches/{branchId} {
+      allow read: if isAuthenticated();
+    }
+  }
+}

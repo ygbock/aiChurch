@@ -1,0 +1,150 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a user of the FaithFlow application (staff or admin).",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["superadmin", "admin", "district", "member"] },
+        "districtId": { "type": "string", "description": "Required if role is district" },
+        "branchId": { "type": "string", "description": "Required if role is admin or member" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fullName", "email", "role"]
+    },
+    "Member": {
+      "title": "Member",
+      "description": "Information about a congregation member.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "dob": { "type": "string", "format": "date" },
+        "gender": { "type": "string", "enum": ["Male", "Female"] },
+        "maritalStatus": { "type": "string", "enum": ["Single", "Married", "Widowed", "Divorced"] },
+        "address": { "type": "string" },
+        "branchId": { "type": "string" },
+        "level": { "type": "string", "enum": ["Convert", "Disciple", "Worker", "Leader"] },
+        "status": { "type": "string", "enum": ["Active", "Pending", "Inactive"] },
+        "photoUrl": { "type": "string" },
+        "isBaptised": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "branchId", "level", "status"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial records (tithes, offerings, expenses).",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "category": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "branchId": { "type": "string" },
+        "recordedBy": { "type": "string", "description": "UID of the admin who recorded it" }
+      },
+      "required": ["amount", "type", "category", "date", "branchId"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "Church services, conferences, and meetings.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "location": { "type": "string" },
+        "branchId": { "type": "string" },
+        "type": { "type": "string", "enum": ["service", "conference", "meeting", "youth"] }
+      },
+      "required": ["title", "date", "branchId"]
+    },
+    "Branch": {
+      "title": "Branch",
+      "description": "Church branch in a district.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "capacity": { "type": "number" },
+        "districtId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "districtId"]
+    },
+    "Department": {
+      "title": "Department",
+      "description": "Organizational unit or ministry within a branch.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "mission": { "type": "string" },
+        "headId": { "type": "string" },
+        "headName": { "type": "string" },
+        "branchId": { "type": "string" },
+        "isVisible": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "category", "branchId"]
+    },
+    "TransferRequest": {
+      "title": "Transfer Request",
+      "description": "A request to move a member from one branch to another.",
+      "type": "object",
+      "properties": {
+        "memberId": { "type": "string" },
+        "memberName": { "type": "string" },
+        "fromBranchId": { "type": "string" },
+        "fromBranchName": { "type": "string" },
+        "fromDistrictId": { "type": "string" },
+        "toBranchId": { "type": "string" },
+        "toBranchName": { "type": "string" },
+        "toDistrictId": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "requestedBy": { "type": "string" },
+        "requestedAt": { "type": "string", "format": "date-time" },
+        "resolvedBy": { "type": "string" },
+        "resolvedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["memberId", "fromBranchId", "toBranchId", "status", "requestedBy"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "Private user profiles."
+    },
+    "/transfers/{transferId}": {
+      "schema": "TransferRequest",
+      "description": "Member transfer requests."
+    },
+    "/districts/{districtId}/branches/{branchId}": {
+      "schema": "Branch",
+      "description": "Branch records scoped by district."
+    },
+    "/districts/{districtId}/branches/{branchId}/departments/{departmentId}": {
+      "schema": "Department",
+      "description": "Department records scoped by branch."
+    },
+    "/districts/{districtId}/branches/{branchId}/members/{memberId}": {
+      "schema": "Member",
+      "description": "Member records scoped by district and branch."
+    },
+    "/districts/{districtId}/branches/{branchId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Financial records scoped by branch."
+    },
+    "/districts/{districtId}/branches/{branchId}/events/{eventId}": {
+      "schema": "Event",
+      "description": "Events scoped by branch."
+    }
+  }
+}

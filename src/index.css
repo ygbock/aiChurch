@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Great+Vibes&family=Outfit:wght@400;600;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-script: "Great Vibes", cursive;
+  --font-display: "Outfit", sans-serif;
+}
+
+@utility bg-pattern {
+  background-color: #008be2;
+  background-image: radial-gradient(circle at center, #ffffff 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@layer components {
+  .geometric-pattern {
+    background-color: #008be2;
+    background-image: radial-gradient(circle at 100% 100%, #ffffff 0.5px, transparent 0.5px),
+                      radial-gradient(circle at 0% 0%, #ffffff0a 20%, transparent 20.5%),
+                      radial-gradient(circle at 100% 100%, #ffffff0a 20%, transparent 20.5%),
+                      radial-gradient(circle at 0% 100%, #ffffff0a 20%, transparent 20.5%),
+                      radial-gradient(circle at 100% 0%, #ffffff0a 20%, transparent 20.5%);
+    background-size: 80px 80px;
+  }
+}
