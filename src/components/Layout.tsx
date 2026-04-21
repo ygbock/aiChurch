@@ -29,7 +29,8 @@ import {
   ChevronDown,
   LayoutGrid,
   TrendingUp,
-  X
+  X,
+  Flame
 } from 'lucide-react';
 import { APP_MODULES, Role } from '../constants/modules';
 import { useFirebase } from './FirebaseProvider';

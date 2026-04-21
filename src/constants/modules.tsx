@@ -14,7 +14,7 @@ import {
   User
 } from 'lucide-react';
 
-export type Role = 'superadmin' | 'admin' | 'district' | 'member';
+export type Role = 'superadmin' | 'admin' | 'branch_admin' | 'district' | 'member';
 
 export interface AppModule {
   id: string;

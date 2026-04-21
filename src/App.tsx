@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import DashboardDispatcher from './pages/DashboardDispatcher';
-import Members from './pages/Members';
+import MemberManagementPage from './pages/members/MemberManagementPage';
 import MembersDashboard from './pages/MembersDashboard';
 import NewMember from './pages/NewMember';
 import Departments from './pages/Departments';
@@ -20,8 +20,13 @@ import Tasks from './pages/Tasks';
 import TransferManagement from './pages/TransferManagement';
 import SuperadminDashboard from './pages/SuperadminDashboard';
 import MemberPortal from './pages/MemberPortal';
+import MemberProfile from './pages/MemberProfile';
 import DistrictDashboard from './pages/DistrictDashboard';
 import AdminRegistration from './pages/AdminRegistration';
+import NewVisitor from './pages/NewVisitor';
+import EditVisitor from './pages/EditVisitor';
+import NewConvert from './pages/NewConvert';
+import EditConvert from './pages/EditConvert';
 import { FirebaseProvider } from './components/FirebaseProvider';
 
 // Placeholder components for other pages
@@ -41,8 +46,9 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardDispatcher />} />
-            <Route path="members" element={<MembersDashboard />} />
-            <Route path="members/registry" element={<Members />} />
+            <Route path="members" element={<MemberManagementPage />} />
+            <Route path="members/registry" element={<Navigate to="/members" replace />} />
+            <Route path="members/profile/:memberId" element={<MemberProfile />} />
             <Route path="members/new" element={<NewMember />} />
             <Route path="members/edit/:memberId" element={<NewMember />} />
             <Route path="ministries" element={<Ministries />} />

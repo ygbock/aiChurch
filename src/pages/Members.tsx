@@ -17,7 +17,8 @@ import {
   Square,
   Download,
   ShieldCheck,
-  Zap
+  Zap,
+  Eye
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useRole } from '../components/Layout';
@@ -344,7 +345,7 @@ export default function Members() {
       </div>
 
       {/* Members Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden min-h-[400px]">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-visible min-h-[400px]">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Loader2 className="animate-spin text-blue-600" size={32} />
@@ -367,49 +368,48 @@ export default function Members() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="pl-6 py-4 w-10">
-                    <input 
-                      type="checkbox" 
-                      onChange={handleSelectAll}
-                      checked={selectedIds.length === filteredMembers.length && filteredMembers.length > 0}
-                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+          <div className="flex flex-col">
+            {/* Table Header (Desktop Only) */}
+            <div className="hidden md:flex bg-slate-50 border-b border-slate-200 px-6 py-4">
+              <div className="w-10 flex-shrink-0 flex items-center pr-4">
+                <input 
+                  type="checkbox" 
+                  onChange={handleSelectAll}
+                  checked={selectedIds.length === filteredMembers.length && filteredMembers.length > 0}
+                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                />
+              </div>
+              <div className="flex-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Member</div>
+              <div className="w-48 xl:w-56 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Contact Info</div>
+              <div className="w-32 xl:w-40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                {isBranchAdmin ? 'Level' : 'Branch'}
+              </div>
+              <div className="w-36 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</div>
+              <div className="w-16 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</div>
+            </div>
+
+            {/* Member List */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-2 p-2 md:p-0 md:gap-0 divide-y-0 md:divide-y divide-slate-100">
+              <AnimatePresence mode="popLayout">
+                {filteredMembers.map((member: MemberData) => (
+                    <MemberTableRow 
+                      key={member.id}
+                      id={member.id}
+                      name={member.fullName || 'Unknown'} 
+                      email={member.email || 'N/A'} 
+                      phone={member.phone || 'N/A'} 
+                      branch={member.level || 'Convert'} 
+                      branchId={member.branchId}
+                      districtId={member.districtId}
+                      status={member.status || 'Pending'} 
+                      baptismStatus={member.baptismStatus}
+                      statusType={member.status === 'Active' ? 'success' : member.status === 'Pending' ? 'warning' : 'info'}
+                      isSelected={selectedIds.includes(member.id)}
+                      onToggleSelect={() => handleToggleSelect(member.id)}
                     />
-                  </th>
-                  <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Member</th>
-                  <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Contact Info</th>
-                  <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    {isBranchAdmin ? 'Level' : 'Branch'}
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 italic">
-                <AnimatePresence mode="popLayout">
-                  {filteredMembers.map((member: MemberData) => (
-                      <MemberTableRow 
-                        key={member.id}
-                        id={member.id}
-                        name={member.fullName || 'Unknown'} 
-                        email={member.email || 'N/A'} 
-                        phone={member.phone || 'N/A'} 
-                        branch={member.level || 'Convert'} 
-                        branchId={member.branchId}
-                        districtId={member.districtId}
-                        status={member.status || 'Pending'} 
-                        baptismStatus={member.baptismStatus}
-                        statusType={member.status === 'Active' ? 'success' : member.status === 'Pending' ? 'warning' : 'info'}
-                        isSelected={selectedIds.includes(member.id)}
-                        onToggleSelect={() => handleToggleSelect(member.id)}
-                      />
-                  ))}
-                </AnimatePresence>
-              </tbody>
-            </table>
+                ))}
+              </AnimatePresence>
+            </div>
           </div>
         )}
 
@@ -471,48 +471,128 @@ const MemberTableRow: React.FC<MemberTableRowProps> = ({
     navigate(url);
   };
 
+  const menuMarkup = (
+    <div className="relative">
+      <button 
+        onClick={() => setShowMenu(!showMenu)}
+        className="p-1.5 md:p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+      >
+        <MoreVertical size={18} />
+      </button>
+
+      <AnimatePresence>
+        {showMenu && (
+          <>
+            <div 
+              className="fixed inset-0 z-10" 
+              onClick={() => setShowMenu(false)}
+            ></div>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              className="absolute right-0 md:right-6 top-8 md:top-14 w-48 bg-white rounded-xl shadow-xl border border-slate-100 z-20 overflow-hidden"
+            >
+              <div className="py-1">
+                <button 
+                  onClick={() => {
+                    let url = `/members/profile/${id}`;
+                    if (districtId && branchId) {
+                      url += `?districtId=${districtId}&branchId=${branchId}`;
+                    }
+                    navigate(url);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                >
+                  <Eye size={14} className="text-slate-400" />
+                  View Profile
+                </button>
+                <button 
+                  onClick={handleEdit}
+                  className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                >
+                  <UserPlus size={14} className="text-slate-400" />
+                  Edit Member
+                </button>
+                <button className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2">
+                  <History size={14} className="text-slate-400" />
+                  View History
+                </button>
+                <button className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 border-t border-slate-50 mt-1">
+                  <MoreVertical size={14} className="text-red-400 rotate-90" />
+                  Archive Member
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+
   return (
-    <motion.tr 
+    <motion.div 
       layout
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className={`transition-colors group min-h-[64px] ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'hover:bg-slate-50'}`}
+      className={`transition-colors group min-h-[64px] border border-slate-100 rounded-xl md:border-none md:rounded-none p-3 md:p-0 flex flex-col md:flex-row md:items-center ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'bg-white hover:bg-slate-50'}`}
     >
-      <td className="pl-6 py-4">
+      <div className="hidden md:flex w-10 flex-shrink-0 items-center pl-6">
         <input 
           type="checkbox" 
           checked={isSelected}
           onChange={onToggleSelect}
           className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
         />
-      </td>
-      <td className="px-4 py-4">
+      </div>
+
+      <div className="flex items-center justify-between md:hidden mb-3 border-b border-slate-100 pb-2">
+        <div className="flex items-center gap-2">
+          <input 
+            type="checkbox" 
+            checked={isSelected}
+            onChange={onToggleSelect}
+            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+          />
+          <span className="text-[10px] font-bold text-slate-400">ID: {id.slice(0, 8).toUpperCase()}</span>
+        </div>
+        {menuMarkup}
+      </div>
+
+      <div className="flex-1 px-1 md:px-4 py-1 md:py-4 min-w-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm">
+          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm shrink-0">
             {name.charAt(0)}
           </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-900">{name}</p>
-            <p className="text-[10px] text-slate-400">ID: {id.slice(0, 8).toUpperCase()}</p>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-900 truncate">{name}</p>
+            <p className="hidden md:block text-[10px] text-slate-400 truncate">ID: {id.slice(0, 8).toUpperCase()}</p>
           </div>
         </div>
-      </td>
-      <td className="px-6 py-4">
+      </div>
+      
+      <div className="w-full md:w-48 xl:w-56 px-1 md:px-6 py-1 md:py-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs text-slate-600">
-            <Mail size={12} className="text-slate-400" />
-            {email}
+          <div className="flex items-center gap-2 text-xs text-slate-600 truncate">
+            <Mail size={12} className="text-slate-400 shrink-0" />
+            <span className="truncate">{email}</span>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-600">
-            <Phone size={12} className="text-slate-400" />
-            {phone}
+          <div className="flex items-center gap-2 text-xs text-slate-600 truncate">
+            <Phone size={12} className="text-slate-400 shrink-0" />
+            <span className="truncate">{phone}</span>
           </div>
         </div>
-      </td>
-      <td className="px-6 py-4 text-sm text-slate-600">{branch}</td>
-      <td className="px-6 py-4">
-        <div className="flex flex-col gap-1">
+      </div>
+      
+      <div className="w-full md:w-32 xl:w-40 px-1 md:px-6 py-1 md:py-4 flex items-center justify-between md:block">
+        <span className="md:hidden text-xs text-slate-400 font-bold uppercase">Role:</span>
+        <span className="text-sm text-slate-600 font-medium truncate">{branch}</span>
+      </div>
+      
+      <div className="w-full md:w-36 px-1 md:px-6 py-2 md:py-4 flex items-center justify-between md:block">
+        <span className="md:hidden text-xs text-slate-400 font-bold uppercase">Status:</span>
+        <div className="flex flex-col gap-1 items-end md:items-start">
           <span className={`w-fit px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusClasses[statusType]}`}>
             {status}
           </span>
@@ -522,50 +602,11 @@ const MemberTableRow: React.FC<MemberTableRowProps> = ({
             </span>
           )}
         </div>
-      </td>
-      <td className="px-6 py-4 text-right relative">
-        <button 
-          onClick={() => setShowMenu(!showMenu)}
-          className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-        >
-          <MoreVertical size={18} />
-        </button>
-
-        <AnimatePresence>
-          {showMenu && (
-            <>
-              <div 
-                className="fixed inset-0 z-10" 
-                onClick={() => setShowMenu(false)}
-              ></div>
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                className="absolute right-6 top-14 w-48 bg-white rounded-xl shadow-xl border border-slate-100 z-20 overflow-hidden"
-              >
-                <div className="py-1">
-                  <button 
-                    onClick={handleEdit}
-                    className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
-                  >
-                    <UserPlus size={14} className="text-slate-400" />
-                    Edit Member
-                  </button>
-                  <button className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2">
-                    <History size={14} className="text-slate-400" />
-                    View History
-                  </button>
-                  <button className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 border-t border-slate-50 mt-1">
-                    <MoreVertical size={14} className="text-red-400 rotate-90" />
-                    Archive Member
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-      </td>
-    </motion.tr>
+      </div>
+      
+      <div className="hidden md:flex w-16 px-6 py-4 justify-end relative">
+        {menuMarkup}
+      </div>
+    </motion.div>
   );
 };

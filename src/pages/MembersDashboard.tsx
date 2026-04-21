@@ -10,7 +10,8 @@ import {
   PieChart as PieChartIcon,
   Search,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Flame
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useRole } from '../components/Layout';
@@ -74,6 +75,20 @@ export default function MembersDashboard() {
           >
             <Users size={18} />
             Member Registry
+          </button>
+          <button 
+            onClick={() => navigate('/visitors')}
+            className="flex-1 lg:flex-none px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <UserPlus size={18} className="text-slate-400" />
+            Visitors
+          </button>
+          <button 
+            onClick={() => navigate('/converts')}
+            className="flex-1 lg:flex-none px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <Flame size={18} className="text-slate-400" />
+            Converts
           </button>
           {role !== 'member' && (
             <button 

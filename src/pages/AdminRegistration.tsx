@@ -77,12 +77,12 @@ export default function AdminRegistration() {
     e.preventDefault();
     setSubmitError(null);
 
-    if (formData.password !== formData.confirmPassword) {
+    if (formData.password && formData.password !== formData.confirmPassword) {
       setSubmitError("Passwords do not match.");
       return;
     }
 
-    if (formData.password.length < 6) {
+    if (formData.password && formData.password.length < 6) {
       setSubmitError("Password must be at least 6 characters long.");
       return;
     }
@@ -95,14 +95,21 @@ export default function AdminRegistration() {
 
     setSubmitting(true);
     try {
-      // 1. Create the Firebase Auth account
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-      const user = userCredential.user;
+      let user: any = null;
+      
+      // Only create Auth account if password is provided
+      if (formData.password) {
+        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+        user = userCredential.user;
+      }
 
       // 2. Create the user profile in Firestore
       const emailLower = formData.email.toLowerCase().trim();
-      await setDoc(doc(db, 'users', user.uid), {
-        uid: user.uid,
+      const uid = user ? user.uid : `pending_${Date.now()}`;
+
+      await setDoc(doc(db, 'users', uid), {
+        uid: uid,
+        authCreated: !!user,
         fullName: formData.fullName,
         email: emailLower,
         phone: formData.phone,
@@ -122,7 +129,7 @@ export default function AdminRegistration() {
 
       // 4. Submit the admin request for Superadmin approval (if not pre-authorized)
       const requestPayload = {
-        uid: user.uid,
+        uid: uid,
         fullName: formData.fullName,
         email: emailLower,
         phone: formData.phone,
@@ -141,7 +148,7 @@ export default function AdminRegistration() {
       if (preAuthorized) {
         await setDoc(accessRef, {
           ...accessSnap.data(),
-          uid: user.uid,
+          uid: uid,
           status: 'active',
           updatedAt: serverTimestamp()
         });
@@ -149,7 +156,7 @@ export default function AdminRegistration() {
       
       // Update invite status
       const inviteRef = doc(db, 'invites', inviteId);
-      await setDoc(inviteRef, { ...inviteData, status: 'used', usedAt: serverTimestamp(), usedBy: user.uid });
+      await setDoc(inviteRef, { ...inviteData, status: 'used', usedAt: serverTimestamp(), usedBy: uid });
 
       setSuccess(true);
     } catch (err: any) {
@@ -376,10 +383,9 @@ export default function AdminRegistration() {
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input 
                       type="password" 
-                      required
                       value={formData.password}
                       onChange={e => setFormData({...formData, password: e.target.value})}
-                      placeholder="••••••••" 
+                      placeholder="•••••••• (Optional)" 
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all" 
                     />
                   </div>
@@ -390,10 +396,9 @@ export default function AdminRegistration() {
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input 
                       type="password" 
-                      required
                       value={formData.confirmPassword}
                       onChange={e => setFormData({...formData, confirmPassword: e.target.value})}
-                      placeholder="••••••••" 
+                      placeholder="•••••••• (Optional)" 
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-11 pr-4 text-sm font-medium text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all" 
                     />
                   </div>

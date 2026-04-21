@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Map, 
   Building2, 
   Users, 
+  User,
   TrendingUp, 
   ChevronRight,
   ArrowUpRight,
@@ -29,7 +30,8 @@ import {
   Phone,
   Trash,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  MoreVertical
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import { useFirebase } from '../components/FirebaseProvider';
@@ -79,6 +81,7 @@ interface MemberData {
   districtId?: string;
   level: string;
   status: string;
+  isBaptised: boolean;
   photoUrl?: string;
   createdAt?: string;
 }
@@ -100,7 +103,7 @@ export default function DistrictDashboard() {
   const [leaders, setLeaders] = useState<any[]>([]);
   const [editingBranchId, setEditingBranchId] = useState<string | null>(null);
   const [isDistrictEditModalOpen, setIsDistrictEditModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'branches' | 'leadership' | 'members' | 'baptism'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'branches' | 'leadership' | 'members' | 'baptism' | 'security'>('overview');
   const [members, setMembers] = useState<MemberData[]>([]);
   const [baptismRequests, setBaptismRequests] = useState<any[]>([]);
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
@@ -711,21 +714,21 @@ export default function DistrictDashboard() {
                 <div className="hidden md:table-header-group">
                   <div className="md:table-row bg-slate-50/50">
                     <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Branch Details</div>
-                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Region</div>
-                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Growth</div>
+                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Location</div>
+                    <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Capacity</div>
                     <div className="md:table-cell px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">Actions</div>
                   </div>
                 </div>
-                <div className="md:table-row-group col-span-2 contents">
+                <div className="lg:table-row-group col-span-2 contents">
                   {branches.length === 0 ? (
-                    <div className="md:table-row col-span-2">
-                      <div className="md:table-cell px-6 py-12 text-center text-slate-400">
-                        <div className="flex flex-col items-center gap-2">
-                          <Building2 size={40} className="text-slate-200" />
-                          <p className="text-sm font-medium">No branches established in this district yet.</p>
-                          <button onClick={() => setIsBranchModalOpen(true)} className="text-blue-600 font-bold text-xs hover:underline">Create First Branch</button>
+                    <div className="lg:table-row col-span-2">
+                        <div className="lg:table-cell px-6 py-12 text-center text-slate-400">
+                          <div className="flex flex-col items-center gap-2">
+                            <Building2 size={40} className="text-slate-200" />
+                            <p className="text-sm font-medium">No branches established in this district yet.</p>
+                            <button onClick={() => setIsBranchModalOpen(true)} className="text-blue-600 font-bold text-xs hover:underline">Create First Branch</button>
+                          </div>
                         </div>
-                      </div>
                     </div>
                   ) : (
                     branches.filter(b => b.name.toLowerCase().includes(searchTerm.toLowerCase())).map(branch => (
@@ -737,7 +740,7 @@ export default function DistrictDashboard() {
                         onEdit={() => handleEditBranch(branch)}
                         onDelete={() => handleDeleteBranch(branch.id)}
                         onAssign={() => { setSelectedBranch(branch); setIsLeadershipModalOpen(true); }} 
-                        onView={() => navigate('/settings')} 
+                        onView={() => navigate(`/branches/${branch.id}`)} 
                       />
                     ))
                   )}
@@ -930,13 +933,12 @@ export default function DistrictDashboard() {
                               </div>
                             </div>
                           </div>
-                          <div className="hidden md:table-cell px-6 py-4 text-right">
-                            <button 
-                              onClick={() => navigate(`/members/edit/${member.id}`)}
-                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all"
-                            >
-                              <Edit2 size={16} />
-                            </button>
+                          <div className="relative md:table-cell px-6 py-4 text-right">
+                            <MemberActionDropdown 
+                              member={member} 
+                              onEdit={() => navigate(`/members/edit/${member.id}?districtId=${member.districtId || profile?.districtId}&branchId=${member.branchId}`)}
+                              onView={() => navigate(`/members/profile/${member.id}?districtId=${member.districtId || profile?.districtId}&branchId=${member.branchId}`)}
+                            />
                           </div>
                         </div>
                       ))
@@ -1336,47 +1338,120 @@ const BranchRow: React.FC<{
   onView: () => void 
 }> = ({ name, location, capacity, onEdit, onDelete, onAssign, onView }) => {
   return (
-    <div className="bg-white hover:bg-slate-50 transition-colors group flex flex-col md:table-row border border-slate-100 md:border-none rounded-xl md:rounded-none p-3 md:p-0 h-full">
+    <div className="bg-white hover:bg-slate-50 transition-colors group flex flex-col md:table-row border border-slate-100 md:border-none rounded-2xl md:rounded-none p-4 md:p-0 h-full overflow-hidden shadow-sm md:shadow-none">
       <div className="px-0 md:px-6 py-2 md:py-4 block md:table-cell min-w-0">
-        <div className="flex items-center gap-2 md:gap-3">
-          <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs shrink-0">
+        <div className="flex items-center gap-3 md:gap-3">
+          <div className="w-10 h-10 md:w-10 md:h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs shrink-0 border border-slate-200 shadow-sm">
             {name.charAt(0)}
           </div>
           <div className="flex flex-col min-w-0 flex-1">
-            <span className="text-[11px] md:text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-all truncate">{name}</span>
-            <span className="text-[9px] text-slate-400 font-medium uppercase tracking-wider truncate block">{location}</span>
+            <span className="text-sm md:text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-all truncate">{name}</span>
+            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider truncate block md:hidden">{location}</span>
           </div>
         </div>
       </div>
       <div className="hidden md:table-cell px-6 py-4 text-sm text-slate-600">{location}</div>
       <div className="hidden md:table-cell px-6 py-4 text-sm font-bold text-emerald-600">{capacity}</div>
-      <div className="px-0 md:px-6 py-2 md:py-3 text-right block md:table-cell mt-1 md:mt-0 border-t border-slate-50 md:border-none pt-2 md:pt-4">
-        <div className="flex items-center justify-between md:justify-end gap-1 md:gap-2">
-          <div className="flex gap-1 md:gap-2">
+      <div className="px-0 md:px-6 py-2 md:py-3 text-right block md:table-cell mt-3 md:mt-0 border-t border-slate-50 md:border-none pt-3 md:pt-4">
+        <div className="flex items-center justify-between md:justify-end gap-2">
+          <div className="md:hidden flex flex-col items-start gap-0.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Capacity</span>
+            <span className="text-sm font-bold text-emerald-600">{capacity}</span>
+          </div>
+          <div className="flex gap-2">
             <button 
               onClick={onEdit}
-              className="p-1.5 md:p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all border border-slate-100 bg-white shadow-sm md:border-none md:bg-transparent md:shadow-none"
               title="Edit Branch"
             >
-              <Edit2 size={14} />
+              <Edit2 size={16} />
             </button>
             <button 
               onClick={onAssign}
-              className="p-1.5 md:p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all border border-slate-100 bg-white shadow-sm md:border-none md:bg-transparent md:shadow-none"
               title="Provision Admin Access"
             >
-              <UserPlus size={14} />
+              <UserPlus size={16} />
+            </button>
+            <button 
+              onClick={onDelete}
+              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-slate-100 bg-white shadow-sm md:border-none md:bg-transparent md:shadow-none"
+              title="Delete Branch"
+            >
+              <Trash2 size={16} />
             </button>
           </div>
-          <button 
-            onClick={onDelete}
-            className="p-1.5 md:p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-            title="Delete Branch"
-          >
-            <Trash2 size={14} />
-          </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function MemberActionDropdown({ member, onEdit, onView }: { member: any, onEdit: () => void, onView: () => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative inline-block" ref={dropdownRef}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg transition-all"
+      >
+        <MoreVertical size={18} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden py-1"
+          >
+            <button
+              onClick={() => {
+                onView();
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+            >
+              <User size={14} className="text-blue-500" />
+              View Profile
+            </button>
+            <button
+              onClick={() => {
+                onEdit();
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+            >
+              <Edit2 size={14} className="text-slate-400" />
+              Edit Member
+            </button>
+            <div className="h-px bg-slate-100 my-1 mx-2" />
+            <button
+              onClick={() => {
+                // handle delete or other actions
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+            >
+              <Trash2 size={14} />
+              Remove Member
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -47,6 +47,25 @@ export default function NewMember() {
   const { profile, memberProfile: currentMember } = useFirebase();
   const [step, setStep] = useState(1);
   const [isEdit, setIsEdit] = useState(false);
+  const [formData, setFormData] = useState({
+    fullName: '',
+    dob: '',
+    gender: '',
+    phone: '',
+    email: '',
+    address: '',
+    emergencyContact: '',
+    branch: '',
+    branchId: '',
+    districtId: '',
+    isBaptised: false,
+    level: searchParams.get('level') || 'Convert',
+    status: 'Active',
+    baptismStatus: 'Pending',
+    username: '',
+    password: '',
+    confirmPassword: ''
+  });
   const [targetMemberPath, setTargetMemberPath] = useState<string | null>(null);
   const [maritalStatus, setMaritalStatus] = useState('Single');
   const [children, setChildren] = useState<Child[]>([]);
@@ -60,6 +79,7 @@ export default function NewMember() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
   const [districts, setDistricts] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [loadingDistricts, setLoadingDistricts] = useState(false);
@@ -73,10 +93,12 @@ export default function NewMember() {
     const saved = localStorage.getItem(FORM_STORAGE_KEY);
     if (saved) {
       try {
-        const { formData: savedData, children: savedChildren, maritalStatus: savedMarital } = JSON.parse(saved);
+        const { formData: savedData, children: savedChildren, maritalStatus: savedMarital, step: savedStep } = JSON.parse(saved);
         setFormData(prev => ({ ...prev, ...savedData }));
         setChildren(savedChildren || []);
         setMaritalStatus(savedMarital || 'Single');
+        if (savedStep) setStep(savedStep);
+        setHasDraft(true);
       } catch (e) {
         console.error("Failed to load saved form progress:", e);
       }
@@ -92,10 +114,11 @@ export default function NewMember() {
       localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify({
         formData,
         children,
-        maritalStatus
+        maritalStatus,
+        step
       }));
     }
-  }, [formData, children, maritalStatus, saveSuccess, FORM_STORAGE_KEY, isDraftLoaded]);
+  }, [formData, children, maritalStatus, step, saveSuccess, FORM_STORAGE_KEY, isDraftLoaded]);
 
   // Handle profile-based defaults
   useEffect(() => {
@@ -164,6 +187,10 @@ export default function NewMember() {
       if (!memberId) return;
       setIsEdit(true);
       
+      // If we already loaded a draft from localStorage, don't overwrite it with DB data
+      // unless we want to reset. A good approach is to let the user keep their draft.
+      if (hasDraft) return;
+
       try {
         let memberData: any = null;
         let path: string | null = null;
@@ -330,14 +357,9 @@ export default function NewMember() {
       if (!formData.branch) newErrors.branch = 'Branch assignment is required';
     } else if (currentStep === 5) {
       // Step 5 (Credentials) is now optional for both new members and profile updates.
-      // Only validate if password or username were explicitly changed/started.
-      if (formData.password || formData.confirmPassword || (formData.username && formData.username !== formData.email)) {
-        if (!formData.username) newErrors.username = 'Username is required';
-        if (formData.password && formData.password !== formData.confirmPassword) {
+      if (formData.password || formData.confirmPassword) {
+        if (formData.password !== formData.confirmPassword) {
           newErrors.confirmPassword = 'Passwords do not match';
-        }
-        if (!formData.password && !isEdit) {
-           newErrors.password = 'Password is required to create credentials';
         }
       }
     }
@@ -347,11 +369,6 @@ export default function NewMember() {
   };
 
   const nextStep = () => {
-    // If going to step 5, default username to email if still empty
-    if (step === 4 && !formData.username) {
-      setFormData(prev => ({ ...prev, username: prev.email }));
-    }
-    
     if (validateStep(step)) {
       setStep(prev => Math.min(prev + 1, 6)); // Step 6 is Final Review
     }
@@ -380,8 +397,12 @@ export default function NewMember() {
       address: '',
       emergencyContact: '',
       branch: role === 'admin' ? 'Main Campus' : '',
+      branchId: '',
+      districtId: '',
       isBaptised: false,
       level: 'Convert',
+      status: 'Active',
+      baptismStatus: 'Pending',
       username: '',
       password: '',
       confirmPassword: ''
@@ -510,17 +531,17 @@ export default function NewMember() {
       <div className="mb-12 flex flex-col md:flex-row justify-between items-start md:items-end gap-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
         <div className="flex-1">
           <button 
-            onClick={() => navigate(appendParams('/members/registry'))}
+            onClick={() => navigate(appendParams('/members'))}
             className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-blue-600 mb-6 transition-colors uppercase tracking-widest"
           >
             <ChevronLeft size={14} />
-            Back to Registry
+            Back to Members
           </button>
           <div className="flex items-center gap-4 mb-2">
             <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-xl">
               <UserPlus size={24} />
             </div>
-            <h2 className="text-4xl font-extrabold tracking-tighter text-slate-900 uppercase">New Member</h2>
+            <h2 className="text-4xl font-extrabold tracking-tighter text-slate-900 uppercase">{isEdit ? 'Edit' : 'New'} {formData.level}</h2>
           </div>
           <p className="text-slate-500 max-w-md font-medium text-sm">Official registration portal. Data captured here will be used for pastoral oversight and ministry growth analytics.</p>
         </div>
