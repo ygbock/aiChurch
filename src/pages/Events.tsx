@@ -16,6 +16,7 @@ import { useRole } from '../components/Layout';
 import { useFirebase } from '../components/FirebaseProvider';
 import { collection, addDoc, onSnapshot, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { getScheduledEvents, ChurchEvent } from '../lib/churchSchedule';
 
 interface EventData {
   id: string;
@@ -32,9 +33,23 @@ export default function Events() {
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
-  const currentMonth = "October 2023";
+  const daysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay();
+
+  const totalDays = daysInMonth(currentDate.getMonth(), currentDate.getFullYear());
+  const offset = firstDayOfMonth(currentDate.getMonth(), currentDate.getFullYear());
+  
+  const prevMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  };
+
+  const nextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
 
   // Event Form State
   const [newEvent, setNewEvent] = useState({
@@ -50,7 +65,7 @@ export default function Events() {
   useEffect(() => {
     const districtId = profile?.districtId || 'default-district';
     const branchId = profile?.branchId || 'default-branch';
-    const path = `/districts/${districtId}/branches/${branchId}/events`;
+    const path = `districts/${districtId}/branches/${branchId}/events`;
     
     const q = query(collection(db, path), orderBy('date', 'asc'), limit(30));
 
@@ -77,7 +92,7 @@ export default function Events() {
     try {
       const districtId = profile?.districtId || 'default-district';
       const branchId = profile?.branchId || 'default-branch';
-      const path = `/districts/${districtId}/branches/${branchId}/events`;
+      const path = `districts/${districtId}/branches/${branchId}/events`;
       
       const eventDateTime = new Date(`${newEvent.date}T${newEvent.time}`);
 
@@ -100,14 +115,27 @@ export default function Events() {
     }
   };
 
-  const getDayEvents = (dayIndex: number) => {
-    // A simplistic filter for our hardcoded "October 2023" UI mock
-    // For a real app, you'd match the exact year/month/day
-    return events.filter(e => {
+  const calendarDays = [];
+  for (let i = 0; i < offset; i++) calendarDays.push(null);
+  for (let i = 1; i <= totalDays; i++) calendarDays.push(i);
+
+  const getDayContent = (day: number) => {
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    const recurring = getScheduledEvents(date);
+    const custom = events.filter(e => {
       if (!e.date?.seconds) return false;
       const d = new Date(e.date.seconds * 1000);
-      return d.getDate() === dayIndex;
+      return d.getDate() === day && d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear();
     });
+
+    return { recurring, custom };
+  };
+
+  const isToday = (day: number) => {
+    const today = new Date();
+    return today.getDate() === day && 
+           today.getMonth() === currentDate.getMonth() && 
+           today.getFullYear() === currentDate.getFullYear();
   };
 
   return (
@@ -127,7 +155,7 @@ export default function Events() {
         </div>
         <button 
           onClick={() => setShowModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
         >
           <Plus size={18} />
           Create Event
@@ -138,15 +166,24 @@ export default function Events() {
         {/* Calendar View */}
         <div className="lg:col-span-3 bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
           <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-            <h3 className="text-base font-bold text-slate-900">{currentMonth}</h3>
+            <h3 className="text-base font-bold text-slate-900">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</h3>
             <div className="flex items-center gap-2">
-              <button className="p-1.5 hover:bg-white rounded-md border border-slate-200 text-slate-600 transition-colors">
+              <button 
+                onClick={prevMonth}
+                className="p-1.5 hover:bg-white rounded-md border border-slate-200 text-slate-600 transition-colors"
+              >
                 <ChevronLeft size={18} />
               </button>
-              <button className="px-3 py-1.5 hover:bg-white rounded-md border border-slate-200 text-xs font-bold text-slate-600 transition-colors">
+              <button 
+                onClick={() => setCurrentDate(new Date())}
+                className="px-3 py-1.5 hover:bg-white rounded-md border border-slate-200 text-xs font-bold text-slate-600 transition-colors"
+              >
                 Today
               </button>
-              <button className="p-1.5 hover:bg-white rounded-md border border-slate-200 text-slate-600 transition-colors">
+              <button 
+                onClick={nextMonth}
+                className="p-1.5 hover:bg-white rounded-md border border-slate-200 text-slate-600 transition-colors"
+              >
                 <ChevronRight size={18} />
               </button>
             </div>
@@ -161,24 +198,33 @@ export default function Events() {
           </div>
           
           <div className="grid grid-cols-7 flex-1">
-            {/* Empty days for start of month placeholder */}
-            <div className="aspect-square border-r border-b border-slate-100 bg-slate-50/50"></div>
-            <div className="aspect-square border-r border-b border-slate-100 bg-slate-50/50"></div>
-            
-            {days.map(day => {
-              const dayEvents = getDayEvents(day);
-              const hasEvents = dayEvents.length > 0;
+            {calendarDays.map((day, i) => {
+              if (day === null) return <div key={`empty-${i}`} className="aspect-square border-r border-b border-slate-100 bg-slate-50/50"></div>;
+              
+              const { recurring, custom } = getDayContent(day);
+              const hasEvents = recurring.length > 0 || custom.length > 0;
+              const today = isToday(day);
+
               return (
                 <div key={day} className="aspect-square border-r border-b border-slate-100 p-2 hover:bg-slate-50 transition-colors group relative cursor-pointer">
-                  <span className={`text-xs font-bold ${hasEvents ? 'bg-blue-600 text-white w-6 h-6 flex items-center justify-center rounded-full' : 'text-slate-600'}`}>
+                  <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
+                    today ? 'bg-blue-600 text-white' : hasEvents ? 'text-blue-600' : 'text-slate-600'
+                  }`}>
                     {day}
                   </span>
                   
                   <div className="mt-1 space-y-1">
-                    {dayEvents.map(e => (
+                    {recurring.map((e, idx) => (
+                      <div 
+                        key={`rec-${idx}`} 
+                        className="h-1 rounded-full w-full bg-blue-400/50"
+                        title={e.title}
+                      ></div>
+                    ))}
+                    {custom.map(e => (
                       <div 
                         key={e.id} 
-                        className={`h-1.5 rounded-full w-full ${e.type === 'youth' ? 'bg-emerald-200' : e.type === 'conference' ? 'bg-purple-200' : 'bg-blue-200'}`}
+                        className={`h-1 rounded-full w-full ${e.type === 'youth' ? 'bg-emerald-400' : e.type === 'conference' ? 'bg-purple-400' : 'bg-amber-400'}`}
                         title={e.title}
                       ></div>
                     ))}
@@ -186,10 +232,6 @@ export default function Events() {
                 </div>
               );
             })}
-            
-            {/* Empty days for end of month */}
-            <div className="aspect-square border-r border-b border-slate-100 bg-slate-50/50"></div>
-            <div className="aspect-square border-r border-b border-slate-100 bg-slate-50/50"></div>
           </div>
         </div>
 
@@ -198,22 +240,35 @@ export default function Events() {
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
               <Clock size={16} className="text-blue-600" />
-              Today's Schedule
+              Upcoming Schedule
             </h3>
             <div className="space-y-4">
               {loading ? (
                 <div className="flex justify-center p-4"><Loader2 className="animate-spin text-slate-400" /></div>
-              ) : events.length === 0 ? (
-                <p className="text-xs text-slate-400">No events scheduled.</p>
               ) : (
-                events.slice(0, 5).map(e => (
-                  <ScheduleItem 
-                    key={e.id}
-                    time={e.date?.seconds ? new Date(e.date.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'} 
-                    title={e.title} 
-                    color={e.type === 'youth' ? 'bg-emerald-500' : e.type === 'conference' ? 'bg-purple-500' : 'bg-blue-600'} 
-                  />
-                ))
+                <>
+                  {/* Today's Recurring */}
+                  {getScheduledEvents(new Date()).map((e, i) => (
+                    <ScheduleItem 
+                      key={`rec-today-${i}`}
+                      time={e.time} 
+                      title={e.title} 
+                      color="bg-blue-600" 
+                    />
+                  ))}
+                  {/* Plus custom events */}
+                  {events.slice(0, 3).map(e => (
+                    <ScheduleItem 
+                      key={e.id}
+                      time={e.date?.seconds ? new Date(e.date.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'} 
+                      title={e.title} 
+                      color={e.type === 'youth' ? 'bg-emerald-500' : e.type === 'conference' ? 'bg-purple-500' : 'bg-amber-500'} 
+                    />
+                  ))}
+                  {getScheduledEvents(new Date()).length === 0 && events.length === 0 && (
+                    <p className="text-xs text-slate-400">No events scheduled.</p>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -226,9 +281,8 @@ export default function Events() {
             <div className="space-y-2">
               <CategoryToggle label="Main Services" color="bg-blue-600" checked={true} />
               <CategoryToggle label="Youth Events" color="bg-emerald-500" checked={true} />
-              <CategoryToggle label="Bible Studies" color="bg-purple-500" checked={true} />
-              <CategoryToggle label="Outreach" color="bg-orange-400" checked={false} />
-              <CategoryToggle label="Administrative" color="bg-slate-400" checked={false} />
+              <CategoryToggle label="Conference" color="bg-purple-500" checked={true} />
+              <CategoryToggle label="Recurring Schedule" color="bg-slate-300" checked={true} />
             </div>
           </div>
         </div>

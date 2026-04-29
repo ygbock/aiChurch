@@ -7,7 +7,8 @@ export function useMemberFilters(members: MemberData[]) {
   const [filters, setFilters] = useState({
     status: 'All',
     baptism: 'All',
-    category: 'All'
+    category: 'All',
+    level: 'All'
   });
 
   const filteredMembers = useMemo(() => {
@@ -36,6 +37,9 @@ export function useMemberFilters(members: MemberData[]) {
 
       // Category filter (Adult/Youth/etc)
       if (filters.category !== 'All' && member.category !== filters.category) return false;
+
+      // Level filter
+      if (filters.level !== 'All' && member.baptizedSubLevel !== filters.level.toLowerCase()) return false;
 
       return true;
     });

@@ -31,9 +31,11 @@ import {
   Trash,
   AlertCircle,
   ArrowRight,
-  MoreVertical
+  MoreVertical,
+  LayoutGrid
 } from 'lucide-react';
 import Modal from '../components/Modal';
+import CollapsibleSection from '../components/CollapsibleSection';
 import { useFirebase } from '../components/FirebaseProvider';
 import { collection, addDoc, onSnapshot, doc, setDoc, query, orderBy, updateDoc, deleteDoc, where, limit, collectionGroup, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -564,34 +566,36 @@ export default function DistrictDashboard() {
       </div>
 
       {activeTab === 'overview' && (
-        <>
-          {/* District Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <DistrictStatCard 
-              label="Total District Members" 
-              value={districtData?.membersCount?.toLocaleString() || "0"} 
-              trend="+12%" 
-              icon={<Users className="text-blue-600" size={20} />}
-            />
-            <DistrictStatCard 
-              label="Active Branches" 
-              value={branches.length.toString()} 
-              trend="Live" 
-              icon={<Building2 className="text-emerald-600" size={20} />}
-            />
-            <DistrictStatCard 
-              label="Engagement Rate" 
-              value="84%" 
-              trend="+2.4%" 
-              icon={<Activity className="text-purple-600" size={20} />}
-            />
-            <DistrictStatCard 
-              label="Quarterly Revenue" 
-              value="$124.5k" 
-              trend="Target: 105%" 
-              icon={<CreditCard className="text-orange-600" size={20} />}
-            />
-          </div>
+        <div className="space-y-8">
+          {/* District Stats Grid - Collapsible */}
+          <CollapsibleSection title="District Key Metrics" icon={<LayoutGrid size={20} />}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <DistrictStatCard 
+                label="Total District Members" 
+                value={districtData?.membersCount?.toLocaleString() || "0"} 
+                trend="+12%" 
+                icon={<Users className="text-blue-600" size={20} />}
+              />
+              <DistrictStatCard 
+                label="Active Branches" 
+                value={branches.length.toString()} 
+                trend="Live" 
+                icon={<Building2 className="text-emerald-600" size={20} />}
+              />
+              <DistrictStatCard 
+                label="Engagement Rate" 
+                value="84%" 
+                trend="+2.4%" 
+                icon={<Activity className="text-purple-600" size={20} />}
+              />
+              <DistrictStatCard 
+                label="Quarterly Revenue" 
+                value="$124.5k" 
+                trend="Target: 105%" 
+                icon={<CreditCard className="text-orange-600" size={20} />}
+              />
+            </div>
+          </CollapsibleSection>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -681,7 +685,7 @@ export default function DistrictDashboard() {
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {activeTab === 'branches' && (

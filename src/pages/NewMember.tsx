@@ -1,1282 +1,1274 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useDropzone } from 'react-dropzone';
-import Cropper from 'react-easy-crop';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm, useFieldArray } from 'react-hook-form';
+import * as z from 'zod';
 import { 
-  UserPlus, 
-  Camera, 
-  Lightbulb, 
   User, 
-  Phone, 
-  History, 
-  Network, 
-  X, 
-  ArrowRight,
-  ChevronLeft,
+  Plus, 
+  Trash2, 
+  Shield, 
+  Key, 
+  FileText, 
+  Sparkles,
+  Loader2,
   CheckCircle2,
-  Plus,
-  Baby,
-  Lock,
-  Eye,
-  EyeOff,
-  AlertCircle,
   Upload,
+  ChevronLeft,
+  ArrowRight,
+  Camera,
+  RotateCcw,
   Check,
   Building2,
-  Loader2,
-  Save
+  Lock,
+  Calendar,
+  X
 } from 'lucide-react';
-import { useRole } from '../components/Layout';
-import { useFirebase } from '../components/FirebaseProvider';
-import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc, query, collectionGroup, where, getDocs, orderBy, onSnapshot } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { motion, AnimatePresence } from 'motion/react';
 
-interface Child {
+// UI Components
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import { Textarea } from '../components/ui/textarea';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '../components/ui/form';
+import { Checkbox } from '../components/ui/checkbox';
+import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import { cn } from '../lib/utils';
+
+// Firebase
+import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { useFirebase } from '../components/FirebaseProvider';
+import { useRole } from '../components/Layout';
+
+// Zod Schema based on user snippet
+interface ChildData {
   id: string;
   name: string;
-  dob: string;
-  gender: string;
+  dateOfBirth: string;
+  gender: 'male' | 'female';
+  notes: string;
 }
+
+interface MemberFormData {
+  fullName: string;
+  photoUrl: string;
+  dateOfBirth: string;
+  gender: 'male' | 'female';
+  maritalStatus: 'single' | 'married' | 'widowed' | 'divorced';
+  spouseName: string;
+  numberOfChildren: number;
+  children: ChildData[];
+  email: string;
+  phone: string;
+  community: string;
+  area: string;
+  street: string;
+  publicLandmark: string;
+  branchId: string;
+  membershipLevel: 'baptized' | 'convert' | 'visitor';
+  baptizedSubLevel?: 'leader' | 'worker' | 'disciple';
+  leaderRole?: 'pastor' | 'assistant_pastor' | 'department_head' | 'ministry_head';
+  baptismDate: string;
+  joinDate: string;
+  baptismOfficiator: string;
+  spiritualMentor: string;
+  assignedDepartment: string;
+  status: 'active' | 'inactive' | 'suspended' | 'transferred';
+  prayerNeeds: string;
+  pastoralNotes: string;
+  createAccount: boolean;
+  username: string;
+  password: string;
+}
+
+const childSchema = z.object({
+  id: z.string(),
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  gender: z.enum(['male', 'female']),
+  notes: z.string(),
+});
+
+const memberSchema = z.object({
+  fullName: z.string().min(2, 'Name must be at least 2 characters'),
+  photoUrl: z.string().default(''),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  gender: z.enum(['male', 'female']),
+  maritalStatus: z.enum(['single', 'married', 'widowed', 'divorced']),
+  spouseName: z.string(),
+  numberOfChildren: z.number().min(0),
+  children: z.array(childSchema),
+  email: z.string(),
+  phone: z.string().min(7, 'Phone number must be at least 7 characters'),
+  community: z.string().min(1, 'Community is required'),
+  area: z.string().min(1, 'Area is required'),
+  street: z.string().min(1, 'Street is required'),
+  publicLandmark: z.string(),
+  branchId: z.string().min(1, 'Branch is required'),
+  membershipLevel: z.enum(['baptized', 'convert', 'visitor']),
+  baptizedSubLevel: z.enum(['leader', 'worker', 'disciple']).optional(),
+  leaderRole: z.enum(['pastor', 'assistant_pastor', 'department_head', 'ministry_head']).optional(),
+  baptismDate: z.string(),
+  joinDate: z.string().min(1, 'Join date is required'),
+  baptismOfficiator: z.string(),
+  spiritualMentor: z.string(),
+  assignedDepartment: z.string(),
+  status: z.enum(['active', 'inactive', 'suspended', 'transferred']),
+  prayerNeeds: z.string(),
+  pastoralNotes: z.string(),
+  createAccount: z.boolean(),
+  username: z.string(),
+  password: z.string(),
+});
 
 export default function NewMember() {
   const navigate = useNavigate();
-  const { memberId } = useParams();
   const [searchParams] = useSearchParams();
+  const { memberId } = useParams();
+  const districtIdParam = searchParams.get('districtId');
+  const branchIdParam = searchParams.get('branchId');
+  
+  const { profile } = useFirebase();
   const { role } = useRole();
-  const { profile, memberProfile: currentMember } = useFirebase();
-  const [step, setStep] = useState(1);
-  const [isEdit, setIsEdit] = useState(false);
-  const [formData, setFormData] = useState({
-    fullName: '',
-    dob: '',
-    gender: '',
-    phone: '',
-    email: '',
-    address: '',
-    emergencyContact: '',
-    branch: '',
-    branchId: '',
-    districtId: '',
-    isBaptised: false,
-    level: searchParams.get('level') || 'Convert',
-    status: 'Active',
-    baptismStatus: 'Pending',
-    username: '',
-    password: '',
-    confirmPassword: ''
-  });
-  const [targetMemberPath, setTargetMemberPath] = useState<string | null>(null);
-  const [maritalStatus, setMaritalStatus] = useState('Single');
-  const [children, setChildren] = useState<Child[]>([]);
-  const [showPassword, setShowPassword] = useState(false);
-  const [image, setImage] = useState<string | null>(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-  const [isCropping, setIsCropping] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
-  const [hasDraft, setHasDraft] = useState(false);
-  const [districts, setDistricts] = useState<any[]>([]);
-  const [branches, setBranches] = useState<any[]>([]);
-  const [loadingDistricts, setLoadingDistricts] = useState(false);
-  const [loadingBranches, setLoadingBranches] = useState(false);
-  const isLoadedRef = React.useRef(false);
+  const [activeTab, setActiveTab] = useState('personal');
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [showCamera, setShowCamera] = useState(false);
+  const [showChildDialog, setShowChildDialog] = useState(false);
+  const [editingChildIndex, setEditingChildIndex] = useState<number | null>(null);
+  const [tempChild, setTempChild] = useState<Omit<ChildData, 'id'>>({ name: '', dateOfBirth: '', gender: 'male', notes: '' });
+  
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
 
-  const FORM_STORAGE_KEY = memberId ? `edit_member_${memberId}_form_data` : 'new_member_form_data';
+  const startCamera = async () => {
+    try {
+      setShowCamera(true);
+      // Wait for dialog to open and video ref to be available
+      setTimeout(async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+    } catch (err) {
+      console.error("Camera access denied:", err);
+      let errorMessage = "Could not access camera.";
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        errorMessage = "Camera permission denied. Please allow camera access in your browser settings and try again.";
+      } else if (err instanceof DOMException && err.name === 'NotFoundError') {
+        errorMessage = "No camera found on this device.";
+      }
+      toast.error(errorMessage);
+      setShowCamera(false);
+    }
+  };
 
-  // Load persistence
-  useEffect(() => {
-    const saved = localStorage.getItem(FORM_STORAGE_KEY);
-    if (saved) {
-      try {
-        const { formData: savedData, children: savedChildren, maritalStatus: savedMarital, step: savedStep } = JSON.parse(saved);
-        setFormData(prev => ({ ...prev, ...savedData }));
-        setChildren(savedChildren || []);
-        setMaritalStatus(savedMarital || 'Single');
-        if (savedStep) setStep(savedStep);
-        setHasDraft(true);
-      } catch (e) {
-        console.error("Failed to load saved form progress:", e);
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setShowCamera(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg');
+        form.setValue('photoUrl', dataUrl);
+        stopCamera();
       }
     }
-    // Small delay to ensure state updates are processed before we allow syncing/overwriting
-    const timer = setTimeout(() => setIsDraftLoaded(true), 100);
-    return () => clearTimeout(timer);
-  }, [FORM_STORAGE_KEY, memberId]);
+  };
 
-  // Sync to localStorage
-  useEffect(() => {
-    if (!saveSuccess && isDraftLoaded) {
-      localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify({
-        formData,
-        children,
-        maritalStatus,
-        step
-      }));
-    }
-  }, [formData, children, maritalStatus, step, saveSuccess, FORM_STORAGE_KEY, isDraftLoaded]);
-
-  // Handle profile-based defaults
-  useEffect(() => {
-    if (profile && !isEdit && !formData.districtId) {
-      setFormData(prev => ({
-        ...prev,
-        districtId: profile.districtId || '',
-        branchId: profile.branchId || ''
-      }));
-    }
-  }, [profile, isEdit]);
-
-  // Fetch Districts (Superadmin Only)
-  useEffect(() => {
-    if (role === 'superadmin') {
-      const fetchDistricts = async () => {
-        setLoadingDistricts(true);
-        try {
-          const snap = await getDocs(collection(db, 'districts'));
-          setDistricts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (err) {
-          console.error("Failed to fetch districts:", err);
-        } finally {
-          setLoadingDistricts(false);
-        }
-      };
-      fetchDistricts();
-    }
-  }, [role]);
-
-  // Fetch Branches based on District
-  useEffect(() => {
-    const activeDistrictId = formData.districtId || (role === 'district' || role === 'admin' ? profile?.districtId : null);
-    if (!activeDistrictId) {
-      setBranches([]);
-      return;
-    }
-
-    const fetchBranches = async () => {
-      setLoadingBranches(true);
-      try {
-        const snap = await getDocs(collection(db, 'districts', activeDistrictId, 'branches'));
-        const branchList = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
-        setBranches(branchList);
-        
-        // If we have a branchId but no branch name, update it
-        if (formData.branchId && !formData.branch) {
-          const selected = branchList.find(b => b.id === formData.branchId);
-          if (selected) {
-            setFormData(prev => ({ ...prev, branch: selected.name }));
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch branches:", err);
-      } finally {
-        setLoadingBranches(false);
-      }
-    };
-    fetchBranches();
-  }, [formData.districtId, profile?.districtId, role, formData.branchId, formData.branch]);
-
-  const appendParams = (path: string) => path;
-
-  useEffect(() => {
-    async function loadMember() {
-      if (!memberId) return;
-      setIsEdit(true);
-      
-      // If we already loaded a draft from localStorage, don't overwrite it with DB data
-      // unless we want to reset. A good approach is to let the user keep their draft.
-      if (hasDraft) return;
-
-      try {
-        let memberData: any = null;
-        let path: string | null = null;
-
-        // Try to get from query params first (districtId/branchId)
-        const qDistrictId = searchParams.get('districtId');
-        const qBranchId = searchParams.get('branchId');
-
-        // If it's the current user's profile, we might have it already
-        if (currentMember && currentMember.uid === memberId) {
-          memberData = currentMember;
-          path = `districts/${currentMember.districtId}/branches/${currentMember.branchId}/members/${memberId}`;
-        } else if (qDistrictId && qBranchId) {
-          // Direct fetch if we have the parent IDs
-          const docRef = doc(db, 'districts', qDistrictId, 'branches', qBranchId, 'members', memberId);
-          const snap = await getDoc(docRef);
-          if (snap.exists()) {
-            memberData = snap.data();
-            path = snap.ref.path;
-          }
-        }
-
-        // Fallback: Find member by ID field using collectionGroup (safer than __name__ for collection groups)
-        if (!memberData) {
-          const q = query(collectionGroup(db, 'members'), where('uid', '==', memberId));
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            memberData = snap.docs[0].data();
-            path = snap.docs[0].ref.path;
-          }
-        }
-
-        if (memberData) {
-          setFormData({
-            fullName: memberData.fullName || '',
-            dob: memberData.dob || '',
-            gender: memberData.gender || '',
-            phone: memberData.phone || '',
-            email: memberData.email || '',
-            address: memberData.address || '',
-            emergencyContact: memberData.emergencyContact || '',
-            branch: memberData.branch || '',
-            branchId: memberData.branchId || '',
-            districtId: memberData.districtId || '',
-            isBaptised: memberData.isBaptised || false,
-            level: memberData.level || 'Visitor',
-            status: memberData.status || 'Active',
-            baptismStatus: memberData.baptismStatus || 'Pending',
-            username: memberData.username || '',
-            password: '',
-            confirmPassword: ''
-          });
-          setMaritalStatus(memberData.maritalStatus || 'Single');
-          if (memberData.children) {
-            setChildren(memberData.children.map((c: any) => ({ ...c, id: Math.random().toString(36).substr(2, 9) })));
-          }
-          if (memberData.photoUrl) {
-            setPreview(memberData.photoUrl);
-          }
-          setTargetMemberPath(path);
-        }
-      } catch (err) {
-        console.error("Failed to load member for edit:", err);
-      }
-    }
-    loadMember();
-  }, [memberId, currentMember]);
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const file = acceptedFiles[0];
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = () => {
-        setImage(reader.result as string);
-        setIsCropping(true);
+      reader.onloadend = () => {
+        form.setValue('photoUrl', reader.result as string);
       };
       reader.readAsDataURL(file);
     }
-  }, []);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'image/jpeg': [],
-      'image/png': [],
-      'image/webp': []
-    },
-    multiple: false
-  } as any);
-
-  const onCropComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
-
-  const handleCropSave = async () => {
-    try {
-      if (!image || !croppedAreaPixels) return;
-      
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      const img = new Image();
-      img.src = image;
-      await new Promise((resolve) => {
-        img.onload = resolve;
-      });
-
-      canvas.width = (croppedAreaPixels as any).width;
-      canvas.height = (croppedAreaPixels as any).height;
-
-      ctx.drawImage(
-        img,
-        (croppedAreaPixels as any).x,
-        (croppedAreaPixels as any).y,
-        (croppedAreaPixels as any).width,
-        (croppedAreaPixels as any).height,
-        0,
-        0,
-        (croppedAreaPixels as any).width,
-        (croppedAreaPixels as any).height
-      );
-
-      const croppedImage = canvas.toDataURL('image/jpeg');
-      setPreview(croppedImage);
-      setIsCropping(false);
-    } catch (e) {
-      console.error(e);
-      // Fallback
-      setPreview(image);
-      setIsCropping(false);
-    }
   };
 
-  const addChild = () => {
-    setChildren([...children, { id: Math.random().toString(36).substr(2, 9), name: '', dob: '', gender: '' }]);
-  };
-
-  const removeChild = (id: string) => {
-    setChildren(children.filter(c => c.id !== id));
-  };
-
-  const updateChild = (id: string, field: keyof Child, value: string) => {
-    setChildren(children.map(c => c.id === id ? { ...c, [field]: value } : c));
-  };
-
-  const validateStep = (currentStep: number) => {
-    const newErrors: Record<string, string> = {};
-    
-    if (currentStep === 1) {
-      if (!formData.fullName) newErrors.fullName = 'Full Name is required';
-      if (!formData.dob) newErrors.dob = 'Date of Birth is required';
-      if (!formData.gender || formData.gender === 'Select Gender') newErrors.gender = 'Gender is required';
-    } else if (currentStep === 2) {
-      if (!formData.phone) newErrors.phone = 'Phone Number is required';
-      if (!formData.email) {
-        newErrors.email = 'Email Address is required';
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-        newErrors.email = 'Invalid email format';
-      }
-    } else if (currentStep === 3) {
-      if (!formData.branch) newErrors.branch = 'Branch assignment is required';
-    } else if (currentStep === 5) {
-      // Step 5 (Credentials) is now optional for both new members and profile updates.
-      if (formData.password || formData.confirmPassword) {
-        if (formData.password !== formData.confirmPassword) {
-          newErrors.confirmPassword = 'Passwords do not match';
-        }
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const nextStep = () => {
-    if (validateStep(step)) {
-      setStep(prev => Math.min(prev + 1, 6)); // Step 6 is Final Review
-    }
-  };
-
-  const goToStep = (s: number) => {
-    // Only allow jumping back or to the next immediate step if valid
-    if (s < step) {
-      setStep(s);
-    } else if (s === step + 1) {
-      nextStep();
-    }
-  };
-
-  const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
-
-  const progress = (step / 6) * 100;
-
-  const resetForm = () => {
-    setFormData({
+  const form = useForm<MemberFormData>({
+    resolver: zodResolver(memberSchema) as any,
+    defaultValues: {
       fullName: '',
-      dob: '',
-      gender: '',
-      phone: '',
+      photoUrl: '',
+      dateOfBirth: '',
+      gender: 'male',
+      maritalStatus: 'single',
+      spouseName: '',
+      numberOfChildren: 0,
+      children: [],
       email: '',
-      address: '',
-      emergencyContact: '',
-      branch: role === 'admin' ? 'Main Campus' : '',
-      branchId: '',
-      districtId: '',
-      isBaptised: false,
-      level: 'Convert',
-      status: 'Active',
-      baptismStatus: 'Pending',
+      phone: '',
+      community: '',
+      area: '',
+      street: '',
+      publicLandmark: '',
+      branchId: branchIdParam || profile?.branchId || '',
+      membershipLevel: 'baptized',
+      joinDate: new Date().toISOString().split('T')[0],
+      baptizedSubLevel: 'disciple',
+      leaderRole: 'department_head',
+      baptismDate: '',
+      baptismOfficiator: '',
+      spiritualMentor: '',
+      assignedDepartment: '',
+      status: 'active',
+      prayerNeeds: '',
+      pastoralNotes: '',
+      createAccount: false,
       username: '',
       password: '',
-      confirmPassword: ''
-    });
-    setChildren([]);
-    setPreview(null);
-    setImage(null);
-    setStep(1);
-    setErrors({});
-    setMaritalStatus('Single');
-  };
+    },
+    mode: "onBlur",
+  });
 
-  const handleSaveMember = async (shouldNavigate = true) => {
-    if (step < 5 && !isEdit) {
-      nextStep();
-      return;
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'children',
+  });
+
+  // Fetch Member Data if in Edit Mode
+  useEffect(() => {
+    if (memberId && districtIdParam && branchIdParam) {
+      const fetchMember = async () => {
+        try {
+          console.log(`Fetching member: ${memberId} in ${districtIdParam}/${branchIdParam}`);
+          const docRef = doc(db, 'districts', districtIdParam, 'branches', branchIdParam, 'members', memberId);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            console.log("Member data fetched:", data);
+            
+            // Map legacy 'level' to 'membershipLevel' if needed
+            let membershipLevel = data.membershipLevel;
+            if (!membershipLevel && data.level) {
+              const levelMap: Record<string, 'baptized' | 'convert' | 'visitor'> = {
+                'Member': 'baptized',
+                'Visitor': 'visitor',
+                'Convert': 'convert'
+              };
+              membershipLevel = levelMap[data.level] || 'baptized';
+            }
+
+            // Ensure all mandatory fields have at least default values
+            const formattedData = {
+              ...form.getValues(), // Use defaults for any missing fields
+              ...data,
+              membershipLevel: membershipLevel || 'baptized',
+              children: data.children || [],
+              dateOfBirth: data.dateOfBirth || '',
+              joinDate: data.joinDate || new Date().toISOString().split('T')[0],
+              baptismDate: data.baptismDate || '',
+            };
+
+            form.reset(formattedData as any);
+          } else {
+            console.warn("No such document!");
+            toast.error("Member record not found");
+            navigate('/members');
+          }
+        } catch (err) {
+          console.error("Failed to fetch member:", err);
+          toast.error("Error loading member data");
+        }
+      };
+      fetchMember();
     }
-    
-    if (step === 5 && !validateStep(5)) return;
+  }, [memberId, districtIdParam, branchIdParam, form, navigate]);
 
+  // Fetch Branches
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const districtId = districtIdParam || profile?.districtId;
+        if (!districtId) return;
+        const snap = await getDocs(collection(db, 'districts', districtId, 'branches'));
+        setBranches(snap.docs.map(d => ({ id: d.id, name: d.data().name })));
+      } catch (err) {
+        console.error("Failed to fetch branches:", err);
+      }
+    };
+    fetchBranches();
+  }, [profile?.districtId, districtIdParam]);
+
+  // Fetch Departments when branch changes
+  const watchedBranchId = form.watch('branchId');
+  useEffect(() => {
+    const districtId = districtIdParam || profile?.districtId;
+    if (watchedBranchId && districtId) {
+      const fetchDepts = async () => {
+        try {
+          const snap = await getDocs(collection(db, 'districts', districtId, 'branches', watchedBranchId, 'departments'));
+          setDepartments(snap.docs.map(d => ({ id: d.id, name: d.data().name })));
+        } catch (err) {
+          console.error("Failed to fetch departments:", err);
+        }
+      };
+      fetchDepts();
+    }
+  }, [watchedBranchId, profile?.districtId, districtIdParam]);
+
+  const onSubmit = async (data: MemberFormData) => {
     setIsSaving(true);
     try {
-      const districtId = formData.districtId || profile?.districtId;
-      const branchId = formData.branchId || profile?.branchId;
+      const districtId = districtIdParam || profile?.districtId;
+      if (!districtId || !data.branchId) throw new Error("Missing district or branch configuration");
 
-      if (!districtId || !branchId) {
-        throw new Error("Missing District or Branch assignment");
-      }
-
-      const memberData: any = {
-        fullName: formData.fullName,
-        branchId: branchId,
-        branch: formData.branch,
-        districtId: districtId,
-        level: formData.level,
-        status: formData.status || (isEdit ? (currentMember?.status || 'Active') : 'Active'),
-        dob: formData.dob || null,
-        gender: formData.gender,
-        phone: formData.phone || null,
-        email: formData.email || null,
-        address: formData.address || null,
-        emergencyContact: formData.emergencyContact || null,
-        isBaptised: formData.isBaptised,
-        baptismStatus: formData.baptismStatus,
-        username: formData.username || formData.email || null, // Default username to email
-        maritalStatus,
-        children: children.map(c => ({ name: c.name, dob: c.dob, gender: c.gender })),
-        photoUrl: preview || '',
+      const memberData = {
+        ...data,
+        districtId,
         updatedAt: serverTimestamp(),
-        isProfileComplete: true,
-        memberId: isEdit ? memberId : null
       };
 
-      // Only include password if it was entered
-      if (formData.password) {
-        memberData.password = formData.password;
+      if (!memberId) {
+        (memberData as any).createdAt = serverTimestamp();
+        const path = `districts/${districtId}/branches/${data.branchId}/members`;
+        await addDoc(collection(db, path), memberData);
+        toast.success('Member identity initialized successfully');
+      } else {
+        const docRef = doc(db, 'districts', districtId, 'branches', data.branchId, 'members', memberId);
+        await updateDoc(docRef, memberData as any);
+        toast.success('Member record updated successfully');
       }
-
-      if (!isEdit) {
-        memberData.createdAt = serverTimestamp();
-        const path = `districts/${districtId}/branches/${branchId}/members`;
-        const docRef = await addDoc(collection(db, path), memberData);
-        // Add the memberId to the document itself for future querying
-        await updateDoc(docRef, { memberId: docRef.id, uid: docRef.id });
-        localStorage.removeItem(FORM_STORAGE_KEY);
-      } else if (targetMemberPath) {
-        await updateDoc(doc(db, targetMemberPath), memberData);
-        localStorage.removeItem(FORM_STORAGE_KEY);
-      }
-      
-      // Clear persistence on success
-      localStorage.removeItem(FORM_STORAGE_KEY);
       
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-
-      if (shouldNavigate) {
-        navigate(appendParams('/members/registry'));
-      } else {
-        resetForm();
-      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'members');
+      console.error(error);
+      toast.error(memberId ? 'Failed to update member record' : 'Failed to create member record');
     } finally {
       setIsSaving(false);
     }
   };
 
+  const watchedMembershipLevel = form.watch('membershipLevel');
+  const watchedMaritalStatus = form.watch('maritalStatus');
+  const watchedBaptizedSubLevel = form.watch('baptizedSubLevel');
+  const watchedCreateAccount = form.watch('createAccount');
+
   if (saveSuccess) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-8">
-        <motion.div 
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6"
-        >
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-8 bg-white border border-slate-200 rounded-[2rem]">
+        <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6">
           <CheckCircle2 size={40} />
-        </motion.div>
-        <h2 className="text-3xl font-bold text-slate-900 mb-2">Registration Successful</h2>
-        <p className="text-slate-500 mb-8 max-w-sm">The member has been officially added to the database and assigned to the branch.</p>
-        <div className="flex gap-4">
-          <button 
-            onClick={() => navigate(appendParams('/members/registry'))}
-            className="px-8 py-3 bg-slate-900 text-white font-bold rounded-xl shadow-lg hover:bg-slate-800 transition-all"
-          >
-            Go to Registry
-          </button>
-          <button 
-            onClick={() => setSaveSuccess(false)}
-            className="px-8 py-3 bg-white text-slate-600 font-bold rounded-xl border border-slate-200 hover:bg-slate-50 transition-all"
-          >
-            Add Another
-          </button>
         </div>
+        <h2 className="text-3xl font-black text-slate-900 mb-2 uppercase tracking-tight">
+          {memberId ? 'Update Complete' : 'Onboarding Complete'}
+        </h2>
+        <p className="text-slate-500 mb-8 max-w-sm">
+          The member record has been successfully {memberId ? 'synchronized' : 'created'} with the registry.
+        </p>
+        <Button onClick={() => navigate('/members')} size="lg" className="px-12 py-6 rounded-2xl font-bold uppercase tracking-widest">
+          Return to Registry
+        </Button>
       </div>
     );
   }
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="max-w-5xl mx-auto pb-12"
-    >
-      {/* Progress Header */}
-      <div className="mb-12 flex flex-col md:flex-row justify-between items-start md:items-end gap-8 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-        <div className="flex-1">
-          <button 
-            onClick={() => navigate(appendParams('/members'))}
-            className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-blue-600 mb-6 transition-colors uppercase tracking-widest"
-          >
-            <ChevronLeft size={14} />
-            Back to Members
-          </button>
-          <div className="flex items-center gap-4 mb-2">
-            <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-xl">
-              <UserPlus size={24} />
-            </div>
-            <h2 className="text-4xl font-extrabold tracking-tighter text-slate-900 uppercase">{isEdit ? 'Edit' : 'New'} {formData.level}</h2>
+    <div className="w-full mx-auto pb-20 px-2 sm:px-6">
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 md:mb-10 md:flex-row md:items-center md:gap-6">
+        <div className="space-y-1">
+          <div className="mb-2 flex w-fit items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-indigo-600">
+             <Building2 size={14} />
+             <span className="text-[10px] font-black uppercase tracking-widest">Repository Ingestion</span>
           </div>
-          <p className="text-slate-500 max-w-md font-medium text-sm">Official registration portal. Data captured here will be used for pastoral oversight and ministry growth analytics.</p>
+          <h1 className="text-2xl font-black leading-none tracking-tight text-slate-900 md:text-4xl">
+            {memberId ? 'Edit Profile' : 'Member Registration'}
+          </h1>
+          <p className="max-w-xl font-medium text-slate-500 text-sm md:text-base">
+            {memberId ? 'Updating secure identity records and ecclesiastical profiles.' : 'Initializing secure identity records and ecclesiastical dispersion profiles.'}
+          </p>
         </div>
+        <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:gap-4">
+          <Button variant="outline" onClick={() => navigate(-1)} className="h-12 w-full rounded-[2rem] border-slate-200 px-8 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 md:w-auto">
+            <ChevronLeft className="mr-2" size={16} /> Back
+          </Button>
+          <Button 
+            onClick={form.handleSubmit(onSubmit)} 
+            disabled={isSaving}
+            className="h-12 w-full rounded-[2rem] bg-slate-900 px-10 text-[10px] font-black uppercase tracking-widest text-white shadow-xl transition-all gap-3 hover:bg-slate-800 active:scale-95 md:w-auto"
+          >
+            {isSaving ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+            Commit
+          </Button>
+        </div>
+      </div>
 
-        <div className="w-full md:w-auto">
-          <div className="flex gap-2 mb-4">
-            {[1, 2, 3, 4, 5, 6].map((s) => (
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 md:space-y-10">
+          {/* Mobile-only Progress Indicator & Desktop Tab Selector */}
+          <div className="flex gap-1 overflow-x-auto rounded-[2rem] border border-slate-200 bg-white p-1.5 shadow-sm no-scrollbar">
+            {[
+              { id: 'personal', icon: <User size={14} />, label: 'Personal' },
+              { id: 'church', icon: <Building2 size={14} />, label: 'Church' },
+              { id: 'account', icon: <Lock size={14} />, label: 'Access' },
+              { id: 'notes', icon: <FileText size={14} />, label: 'Notes' }
+            ].map((tab, idx) => (
               <button
-                key={s}
-                onClick={() => goToStep(s)}
-                className={`h-2 rounded-full transition-all flex-1 md:w-8 ${
-                  step === s ? 'bg-blue-600 w-12' : (step > s ? 'bg-emerald-500' : 'bg-slate-200')
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex flex-col items-center justify-center gap-1 min-w-[80px] flex-1 py-3 md:flex-row md:gap-3 md:min-w-[160px] md:py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest transition-all ${
+                  activeTab === tab.id 
+                    ? 'bg-slate-900 text-white shadow-lg' 
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                 }`}
-              />
+              >
+                {tab.icon}
+                <span className="hidden md:inline">{tab.label}</span>
+                <span className="md:hidden">{idx + 1}</span>
+              </button>
             ))}
           </div>
-          <div className="flex justify-between md:justify-end items-center gap-4">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Registration Pipeline</span>
-            <span className="bg-blue-50 text-blue-600 text-[10px] font-bold px-3 py-1 rounded-lg border border-blue-100">STEP {step} / 6</span>
-          </div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
-        {/* Sidebar: Identification & Status */}
-        <div className="lg:col-span-3 space-y-6">
-          {/* Passport Photo Card */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm text-center">
-            <div 
-              {...getRootProps()}
-              className={`w-28 h-36 mx-auto rounded-xl flex flex-col items-center justify-center border-2 border-dashed mb-4 group transition-all cursor-pointer overflow-hidden relative ${
-                isDragActive ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-slate-50 hover:border-blue-400'
-              }`}
+          {/* Floating Navigation (Mobile Only) */}
+          <div className="md:hidden fixed bottom-6 left-6 right-6 flex items-center justify-between gap-4 z-50">
+            <Button 
+               type="button" 
+               variant="secondary"
+               onClick={() => {
+                 const tabs = ['personal', 'church', 'account', 'notes'];
+                 const currentIndex = tabs.indexOf(activeTab);
+                 if (currentIndex > 0) setActiveTab(tabs[currentIndex - 1]);
+               }}
+               disabled={activeTab === 'personal'}
+               className="rounded-full shadow-2xl px-8"
             >
-              <input {...getInputProps()} />
-              {preview ? (
-                <img src={preview} alt="Preview" className="w-full h-full object-cover" />
-              ) : (
-                <>
-                  <Camera size={28} className={`mb-2 transition-colors ${isDragActive ? 'text-blue-500' : 'text-slate-300 group-hover:text-blue-500'}`} />
-                  <p className={`text-[9px] font-bold uppercase tracking-wider ${isDragActive ? 'text-blue-500' : 'text-slate-400 group-hover:text-blue-500'}`}>
-                    {isDragActive ? 'Drop here' : 'Upload Photo'}
-                  </p>
-                </>
-              )}
-              {preview && (
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <p className="text-white text-[9px] font-bold uppercase">Change</p>
-                </div>
-              )}
-            </div>
-            <h3 className="text-sm font-bold text-slate-900 mb-1">Member Portrait</h3>
-            <p className="text-[10px] text-slate-500 leading-tight">Required for identification. (Max 2MB)</p>
+              Back
+            </Button>
+            <Button 
+               type="button" 
+               onClick={() => {
+                 const tabs = ['personal', 'church', 'account', 'notes'];
+                 const currentIndex = tabs.indexOf(activeTab);
+                 if (currentIndex < tabs.length - 1) setActiveTab(tabs[currentIndex + 1]);
+               }}
+               disabled={activeTab === 'notes'}
+               className="rounded-full shadow-2xl px-8 bg-slate-900 text-white"
+            >
+              Next
+            </Button>
           </div>
 
-          {/* Info Tip Card */}
-          <div className="bg-slate-900 p-6 rounded-2xl text-white overflow-hidden relative shadow-xl">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/20 rounded-full blur-2xl"></div>
-            <Lightbulb className="text-blue-400 mb-4" size={24} />
-            <h4 className="font-bold text-lg mb-2">Privacy Assurance</h4>
-            <p className="text-sm text-slate-400 leading-relaxed">Member data is encrypted and strictly used for internal ministry outreach and pastoral care only.</p>
-          </div>
-        </div>
-
-        {/* Main Form Sections */}
-        <div className="lg:col-span-9">
-          <AnimatePresence mode="wait">
-            {step === 1 && (
-              <motion.section 
-                key="step1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm space-y-6 md:space-y-8"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                    <User size={20} />
-                  </div>
-                  <h3 className="font-bold text-xl tracking-tight text-slate-900">Personal Information</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Full Name *</label>
-                    <input 
-                      type="text" 
-                      value={formData.fullName}
-                      onChange={(e) => setFormData({...formData, fullName: e.target.value})}
-                      placeholder="John Doe" 
-                      className={`w-full bg-slate-50 border rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 ${
-                        errors.fullName ? 'border-red-500' : 'border-slate-200'
-                      }`}
-                    />
-                    {errors.fullName && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.fullName}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Date of Birth *</label>
-                    <input 
-                      type="date" 
-                      value={formData.dob}
-                      onChange={(e) => setFormData({...formData, dob: e.target.value})}
-                      className={`w-full bg-slate-50 border rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all ${
-                        errors.dob ? 'border-red-500' : 'border-slate-200'
-                      }`}
-                    />
-                    {errors.dob && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.dob}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Gender *</label>
-                    <select 
-                      value={formData.gender}
-                      onChange={(e) => setFormData({...formData, gender: e.target.value})}
-                      className={`w-full bg-slate-50 border rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none ${
-                        errors.gender ? 'border-red-500' : 'border-slate-200'
-                      }`}
-                    >
-                      <option>Select Gender</option>
-                      <option>Male</option>
-                      <option>Female</option>
-                      <option>Other</option>
-                    </select>
-                    {errors.gender && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.gender}</p>}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Marital Status</label>
-                    <div className="flex flex-wrap gap-2">
-                      {['Single', 'Married', 'Divorced', 'Widowed'].map((status) => (
-                        <button
-                          key={status}
-                          type="button"
-                          onClick={() => setMaritalStatus(status)}
-                          className={`px-4 py-2 rounded-full text-[10px] font-bold transition-all border ${
-                            maritalStatus === status 
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20' 
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-blue-300'
-                          }`}
-                        >
-                          {status}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Children Section */}
-                  <div className="col-span-2 pt-4 border-t border-slate-100">
-                    <div className="flex justify-between items-center mb-4">
-                      <div className="flex items-center gap-2">
-                        <Baby size={18} className="text-slate-400" />
-                        <h4 className="text-sm font-bold text-slate-900">Children Information</h4>
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={addChild}
-                        className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                      >
-                        <Plus size={14} /> Add Child
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      {children.map((child, index) => (
-                        <motion.div 
-                          key={child.id}
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-xl relative group"
-                        >
-                          <button 
-                            onClick={() => removeChild(child.id)}
-                            className="absolute -top-2 -right-2 w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X size={12} />
-                          </button>
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Child's Name</label>
-                            <input 
-                              type="text" 
-                              value={child.name}
-                              onChange={(e) => updateChild(child.id, 'name', e.target.value)}
-                              placeholder="Child Name"
-                              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Date of Birth</label>
-                            <input 
-                              type="date" 
-                              value={child.dob}
-                              onChange={(e) => updateChild(child.id, 'dob', e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Gender</label>
-                            <select 
-                              value={child.gender}
-                              onChange={(e) => updateChild(child.id, 'gender', e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
-                            >
-                              <option>Select</option>
-                              <option>Male</option>
-                              <option>Female</option>
-                            </select>
-                          </div>
-                        </motion.div>
-                      ))}
-                      {children.length === 0 && (
-                        <p className="text-xs text-slate-400 italic text-center py-4 border-2 border-dashed border-slate-100 rounded-xl">No children added yet.</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </motion.section>
-            )}
-
-            {step === 2 && (
-              <motion.section 
-                key="step2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm space-y-6 md:space-y-8"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                    <Phone size={20} />
-                  </div>
-                  <h3 className="font-bold text-xl tracking-tight text-slate-900">Contact Details</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Phone Number *</label>
-                    <input 
-                      type="tel" 
-                      value={formData.phone}
-                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                      placeholder="+1 (555) 000-0000" 
-                      className={`w-full bg-slate-50 border rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all ${
-                        errors.phone ? 'border-red-500' : 'border-slate-200'
-                      }`}
-                    />
-                    {errors.phone && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.phone}</p>}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Email Address *</label>
-                    <input 
-                      type="email" 
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      placeholder="john@example.com" 
-                      className={`w-full bg-slate-50 border rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all ${
-                        errors.email ? 'border-red-500' : 'border-slate-200'
-                      }`}
-                    />
-                    {errors.email && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.email}</p>}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Residential Address</label>
-                    <textarea 
-                      value={formData.address}
-                      onChange={(e) => setFormData({...formData, address: e.target.value})}
-                      placeholder="123 Faith Avenue, Grace City..." 
-                      rows={2}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none"
-                    ></textarea>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Emergency Contact (Name & Phone)</label>
-                    <input 
-                      type="text" 
-                      value={formData.emergencyContact}
-                      onChange={(e) => setFormData({...formData, emergencyContact: e.target.value})}
-                      placeholder="Jane Doe - +1 (555) 111-2222" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                    />
-                  </div>
-                </div>
-              </motion.section>
-            )}
-
-            {step === 3 && (
-              <motion.section 
-                key="step3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm space-y-6 md:space-y-8"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600">
-                    <History size={20} />
-                  </div>
-                  <h3 className="font-bold text-xl tracking-tight text-slate-900">Church History</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-                  {role === 'superadmin' && (
-                    <div className="sm:col-span-2">
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">District *</label>
-                      <select 
-                        value={formData.districtId}
-                        onChange={(e) => setFormData({...formData, districtId: e.target.value, branchId: '', branch: ''})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-                      >
-                        <option value="">Select District</option>
-                        {districts.map(d => (
-                          <option key={d.id} value={d.id}>{d.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                    <div className="sm:col-span-2">
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">Assign Branch *</label>
-                      <div className="relative">
-                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <select 
-                          value={formData.branchId}
-                          onChange={(e) => {
-                            const selectedBranch = branches.find(b => b.id === e.target.value);
-                            setFormData({...formData, branchId: e.target.value, branch: selectedBranch?.name || ''});
-                          }}
-                          className={`w-full bg-slate-50 border rounded-xl p-3 pl-10 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none disabled:bg-slate-100 disabled:text-slate-500 ${
-                            errors.branch ? 'border-red-500' : 'border-slate-200'
-                          }`}
-                        >
-                          <option value="">Select Branch</option>
-                          {branches.map(b => (
-                            <option key={b.id} value={b.id}>{b.name} {b.id === profile?.branchId ? '(Your Branch)' : ''}</option>
-                          ))}
-                        </select>
-                      </div>
-                      {errors.branch && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.branch}</p>}
-                      {loadingBranches && <p className="text-[10px] text-blue-500 mt-1 flex items-center gap-1 animate-pulse">Loading branches...</p>}
-                    </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Date Joined</label>
-                    <input 
-                      type="date" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Previous Church</label>
-                    <input 
-                      type="text" 
-                      placeholder="Bethel Ministry (optional)" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Baptism Status</label>
-                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                      <div className="flex gap-4">
-                        <label className="flex items-center gap-2 cursor-pointer group">
-                          <input 
-                            type="radio" 
-                            name="baptised" 
-                            checked={formData.isBaptised}
-                            onChange={() => setFormData({...formData, isBaptised: true, level: 'Disciple'})}
-                            className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-slate-300" 
-                          />
-                          <span className="text-sm font-medium text-slate-700 group-hover:text-blue-600 transition-colors">Yes, Baptised</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer group">
-                          <input 
-                            type="radio" 
-                            name="baptised" 
-                            checked={!formData.isBaptised}
-                            onChange={() => setFormData({...formData, isBaptised: false, level: 'Visitor'})}
-                            className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-slate-300" 
-                          />
-                          <span className="text-sm font-medium text-slate-700 group-hover:text-blue-600 transition-colors">Not yet</span>
-                        </label>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
-                        <label className="text-sm font-bold text-slate-700 whitespace-nowrap">Level:</label>
-                        <select 
-                          value={formData.level}
-                          onChange={(e) => setFormData({...formData, level: e.target.value})}
-                          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                        >
-                          {formData.isBaptised ? (
-                            <>
-                              <option value="Disciple">Disciple</option>
-                              <option value="Worker">Worker</option>
-                              <option value="Leader">Leader</option>
-                            </>
+          <div className="min-h-[500px] rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm md:rounded-[3rem] md:p-10">
+            <AnimatePresence mode="wait">
+              {activeTab === 'personal' && (
+                <motion.div
+                  key="personal"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="space-y-12"
+                >
+                  <div className="flex flex-col lg:flex-row gap-16">
+                    {/* Photo Acquisition Block */}
+                    <div className="lg:w-1/3 xl:w-1/4 space-y-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Identification Matrix</Label>
+                          <div className="h-px flex-1 bg-slate-100" />
+                        </div>
+                        <div className="relative aspect-square rounded-[3rem] bg-slate-50 border-4 border-slate-100 overflow-hidden shadow-inner group flex items-center justify-center">
+                          {form.watch('photoUrl') ? (
+                            <img src={form.watch('photoUrl')} alt="Member" className="w-full h-full object-cover" />
                           ) : (
-                            <>
-                              <option value="Visitor">Visitor</option>
-                              <option value="Convert">Convert</option>
-                            </>
+                            <div className="text-center p-8 text-slate-200">
+                              <User size={64} className="mx-auto mb-4 opacity-10" />
+                              <p className="text-[10px] font-black uppercase tracking-widest leading-tight opacity-40">Null Photo Data</p>
+                            </div>
                           )}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
+                          
+                          {form.watch('photoUrl') && (
+                            <button
+                              type="button"
+                              onClick={() => form.setValue('photoUrl', '')}
+                              className="absolute top-6 right-6 bg-white/90 backdrop-blur p-3 rounded-2xl text-slate-400 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100 shadow-2xl"
+                            >
+                              <RotateCcw size={18} />
+                            </button>
+                          )}
+                        </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Member Status</label>
-                    <div className="flex flex-wrap gap-3">
-                      {['Active', 'Inactive', 'Deceased', 'Dismissed'].map((stat) => (
-                        <button
-                          key={stat}
-                          type="button"
-                          onClick={() => setFormData({...formData, status: stat})}
-                          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
-                            formData.status === stat
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-600/20'
-                              : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'
-                          }`}
-                        >
-                          {stat}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {!formData.isBaptised && formData.level === 'Convert' && (
-                    <div className="sm:col-span-2">
-                      <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex flex-col md:flex-row items-center justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0">
-                            <Baby size={20} />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-bold text-blue-900 leading-tight mb-1">Baptism Request</h4>
-                            <p className="text-xs text-blue-700 max-w-sm">This member is currently a Convert. Submit them to the District Headquarters for baptism interview and approval.</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Button
+                            type="button"
+                            onClick={startCamera}
+                            variant="outline"
+                            className="rounded-2xl border-slate-200 gap-2 h-14 text-[10px] font-black uppercase tracking-widest hover:border-indigo-600 transition-all group"
+                          >
+                            <Camera size={16} className="group-hover:text-indigo-600" /> Acquisition
+                          </Button>
+                          
+                          <div className="relative h-14">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleFileUpload}
+                              className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full rounded-2xl border-slate-200 gap-2 h-14 text-[10px] font-black uppercase tracking-widest hover:border-emerald-600 transition-all group"
+                            >
+                              <Upload size={16} className="group-hover:text-emerald-600" /> Upload
+                            </Button>
                           </div>
                         </div>
-                        
-                        {formData.baptismStatus === 'Pending' ? (
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setFormData({...formData, baptismStatus: 'Submitted to District'});
-                            }}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-blue-700 transition-all whitespace-nowrap"
-                          >
-                            Submit for Baptism
-                          </button>
-                        ) : (
-                          <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-blue-200 text-blue-600 text-xs font-bold">
-                            <Check size={14} />
-                            {formData.baptismStatus}
-                          </div>
-                        )}
+
+                        {/* Camera Dialog */}
+                        <Dialog open={showCamera} onOpenChange={(open) => !open && stopCamera()}>
+                          <DialogContent className="w-[95vw] sm:max-w-md rounded-[2.5rem] p-0 border-0 bg-slate-900 overflow-hidden">
+                            <div className="relative aspect-video bg-black flex items-center justify-center">
+                              <video 
+                                ref={videoRef} 
+                                autoPlay 
+                                playsInline 
+                                muted
+                                className="w-full h-full object-cover -scale-x-100" 
+                              />
+                              <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none">
+                                <div className="w-full h-full border border-white/20 rounded-2xl" />
+                              </div>
+                            </div>
+                            <div className="p-8 flex items-center justify-between gap-4">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={stopCamera}
+                                className="text-white hover:bg-white/10 rounded-xl"
+                              >
+                                Disconnect
+                              </Button>
+                              <Button
+                                type="button"
+                                onClick={capturePhoto}
+                                size="lg"
+                                className="rounded-full w-16 h-16 bg-white text-slate-900 hover:bg-slate-100 p-0 shadow-2xl active:scale-95 transition-all"
+                              >
+                                <div className="w-12 h-12 rounded-full border-2 border-slate-900 flex items-center justify-center">
+                                  <div className="w-8 h-8 rounded-full bg-slate-900" />
+                                </div>
+                              </Button>
+                              <div className="w-[100px]" /> {/* Spacer */}
+                            </div>
+                            <canvas ref={canvasRef} className="hidden" />
+                          </DialogContent>
+                        </Dialog>
                       </div>
+                      
+                      <div className="p-6 bg-slate-50 border border-slate-100 rounded-[2rem]">
+                         <div className="flex gap-4">
+                            <Sparkles className="text-indigo-600 flex-shrink-0" size={20} />
+                            <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-widest">Facade acquisition is essential for neural identity verification protocols.</p>
+                         </div>
+                      </div>
+                    </div>
+
+                    {/* Logic Fields Block */}
+                    <div className="flex-1 space-y-12">
+                      <div className="space-y-6">
+                        <div className="flex items-center gap-2">
+                           <h3 className="text-xl font-bold text-slate-900 uppercase tracking-tight">Personal Information</h3>
+                           <div className="h-px flex-1 bg-slate-100" />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <FormField
+                            control={form.control}
+                            name="fullName"
+                            render={({ field }) => (
+                              <FormItem className="md:col-span-2">
+                                <FormLabel className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Full Name *</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter full name" {...field} className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="dateOfBirth"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Date of Birth *</FormLabel>
+                                <FormControl>
+                                  <Input type="date" {...field} className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="gender"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Gender *</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold">
+                                      <SelectValue placeholder="Select gender" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent className="rounded-2xl">
+                                    <SelectItem value="male">Male</SelectItem>
+                                    <SelectItem value="female">Female</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="maritalStatus"
+                            render={({ field }) => (
+                              <FormItem className={watchedMaritalStatus === 'married' ? '' : 'md:col-span-2'}>
+                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Social Status *</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold">
+                                      <SelectValue placeholder="Select Status" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent className="rounded-2xl">
+                                    <SelectItem value="single">Single</SelectItem>
+                                    <SelectItem value="married">Married</SelectItem>
+                                    <SelectItem value="widowed">Widowed</SelectItem>
+                                    <SelectItem value="divorced">Divorced</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {watchedMaritalStatus === 'married' && (
+                            <FormField
+                              control={form.control}
+                              name="spouseName"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Relational Partner</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Spouse full name" {...field} className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="flex items-center gap-2">
+                           <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Geographic & Sync</h3>
+                           <div className="h-px flex-1 bg-slate-100" />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <FormField
+                            control={form.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Email Address</FormLabel>
+                                <FormControl>
+                                  <Input type="email" placeholder="email@example.com" {...field} className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="phone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Phone Number *</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="+1234567890" {...field} className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="community"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Community *</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter community" {...field} className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="area"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Area / Region *</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter area or region" {...field} className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="street"
+                            render={({ field }) => (
+                              <FormItem className="md:col-span-2">
+                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Street Address *</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="House No. and Street Name" {...field} className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-12 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-8">
+                      <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 font-black">
+                           {fields.length}
+                         </div>
+                         <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Kinship Descendants</h3>
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => {
+                          setEditingChildIndex(null);
+                          setTempChild({ name: '', dateOfBirth: '', gender: 'male', notes: '' });
+                          setShowChildDialog(true);
+                        }}
+                        className="rounded-xl border-slate-200 h-10 px-6 text-[10px] font-black uppercase tracking-widest hover:border-slate-900"
+                      >
+                        Add Node
+                      </Button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {fields.length === 0 && (
+                        <div className="p-12 text-center border-2 border-dashed border-slate-100 rounded-[2.5rem]">
+                           <User className="mx-auto text-slate-200 mb-4 opacity-50" size={32} />
+                           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No descendant records initialized</p>
+                        </div>
+                      )}
+                      {fields.map((field, index) => (
+                        <div key={field.id} className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 group hover:border-indigo-100 hover:bg-white transition-all shadow-sm">
+                          <div className="flex items-center gap-6 mb-4 md:mb-0">
+                            <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs uppercase">
+                               {field.gender === 'male' ? 'M' : 'F'}
+                            </div>
+                            <div className="space-y-1">
+                               <h4 className="font-black text-slate-900 uppercase tracking-tight">{field.name || 'Unnamed Record'}</h4>
+                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                  <Calendar size={10} /> {field.dateOfBirth || 'Date Pending'}
+                               </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 w-full md:w-auto">
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              onClick={() => {
+                                const current = fields[index] as ChildData;
+                                setEditingChildIndex(index);
+                                setTempChild({ 
+                                  name: current.name, 
+                                  dateOfBirth: current.dateOfBirth, 
+                                  gender: current.gender,
+                                  notes: current.notes
+                                });
+                                setShowChildDialog(true);
+                              }}
+                              className="rounded-xl h-10 px-4 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-600 flex-1 md:flex-none"
+                            >
+                              Edit
+                            </Button>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              onClick={() => remove(index)}
+                              className="rounded-xl h-10 px-4 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-500 flex-1 md:flex-none"
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Child Editor Dialog */}
+                    <Dialog open={showChildDialog} onOpenChange={setShowChildDialog}>
+                      <DialogContent className="sm:max-w-lg rounded-[2.5rem] p-8 border-slate-200 md:max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle className="text-2xl font-black text-slate-900 uppercase tracking-tight">Kinship Record</DialogTitle>
+                          <DialogDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Define biographic parameters for the descendant entity.</DialogDescription>
+                        </DialogHeader>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-8">
+                          <div className="space-y-4">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Identity Name</Label>
+                            <Input 
+                              placeholder="Full Name" 
+                              value={tempChild.name}
+                              onChange={(e) => setTempChild({ ...tempChild, name: e.target.value })}
+                              className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold shadow-inner"
+                            />
+                          </div>
+                          <div className="space-y-4">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Biological Matrix</Label>
+                            <Select 
+                              value={tempChild.gender}
+                              onValueChange={(val) => setTempChild({ ...tempChild, gender: val as 'male' | 'female' })}
+                            >
+                              <SelectTrigger className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold shadow-inner">
+                                <SelectValue placeholder="Vector" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-2xl">
+                                <SelectItem value="male">Male Vector</SelectItem>
+                                <SelectItem value="female">Female Vector</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-4 md:col-span-2">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Temporal Origin</Label>
+                            <Input 
+                              type="date"
+                              value={tempChild.dateOfBirth}
+                              onChange={(e) => setTempChild({ ...tempChild, dateOfBirth: e.target.value })}
+                              className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold shadow-inner"
+                            />
+                          </div>
+                        </div>
+
+                        <DialogFooter className="gap-3 mt-4">
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            onClick={() => setShowChildDialog(false)}
+                            className="rounded-2xl h-14 px-8 text-[10px] font-black uppercase tracking-widest text-slate-500"
+                          >
+                            Discard
+                          </Button>
+                          <Button 
+                            type="button" 
+                            onClick={() => {
+                              if (editingChildIndex === null) {
+                                append({ id: Date.now().toString(), ...tempChild });
+                              } else {
+                                form.setValue(`children.${editingChildIndex}`, { id: fields[editingChildIndex].id, ...tempChild });
+                              }
+                              setShowChildDialog(false);
+                            }}
+                            className="rounded-2xl h-14 px-10 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-slate-200"
+                          >
+                            Complete Ingestion
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'church' && (
+                <motion.div
+                  key="church"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="space-y-12"
+                >
+                  <div className="flex flex-col lg:flex-row gap-16">
+                    <div className="lg:w-1/3 xl:w-1/4 space-y-6">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ecclesiastical Context</Label>
+                        <div className="h-px flex-1 bg-slate-100" />
+                      </div>
+                      <div className="p-8 bg-slate-50 rounded-[2.5rem] space-y-8">
+                         <div className="space-y-2">
+                            <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">Organization</h4>
+                            <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-wider">Assign the entity to a validated branch and define their membership hierarchy.</p>
+                         </div>
+                         <div className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-100 rounded-2xl">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                               <Building2 size={16} />
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Sync Status: Online</span>
+                         </div>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 space-y-12">
+                      <div className="space-y-8">
+                        <div className="flex items-center gap-2">
+                           <h3 className="text-xl font-bold text-slate-900 uppercase tracking-tight">Church Information</h3>
+                           <div className="h-px flex-1 bg-slate-100" />
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <FormField
+                            control={form.control}
+                            name="branchId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Assigned Branch *</FormLabel>
+                                <Select 
+                                  onValueChange={field.onChange} 
+                                  value={field.value}
+                                  disabled={!(role === 'superadmin' || role === 'district')}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold">
+                                      <SelectValue placeholder="Select branch" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent className="rounded-2xl">
+                                    {branches.map(b => (
+                                      <SelectItem key={b.id} value={b.id} className="font-bold">{b.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                                {!(role === 'superadmin' || role === 'district') && (
+                                  <p className="text-[9px] text-amber-600 font-bold uppercase tracking-widest mt-1">
+                                    Defaulted to your assigned branch
+                                  </p>
+                                )}
+                              </FormItem>
+                            )}
+                          />
+
+
+
+                          <FormField
+                            control={form.control}
+                            name="joinDate"
+                            render={({ field }) => (
+                              <FormItem className="md:col-span-2">
+                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Membership Date *</FormLabel>
+                                <FormControl>
+                                  <Input type="date" {...field} className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-8 p-10 bg-indigo-50/30 border border-indigo-100 rounded-[2.5rem]">
+                          <div className="flex items-center gap-2">
+                             <h3 className="text-xl font-bold text-indigo-900 uppercase tracking-tight">Baptism & Department</h3>
+                             <div className="h-px flex-1 bg-indigo-100" />
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <FormField
+                              control={form.control}
+                              name="baptizedSubLevel"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Member Classification *</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger className="h-14 rounded-2xl border-indigo-200 bg-white text-sm font-bold">
+                                        <SelectValue placeholder="Select Role" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent className="rounded-2xl">
+                                      <SelectItem value="disciple" className="font-bold">Disciple</SelectItem>
+                                      <SelectItem value="worker" className="font-bold">Worker</SelectItem>
+                                      <SelectItem value="leader" className="font-bold">Leader</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </FormItem>
+                              )}
+                            />
+
+                            {watchedBaptizedSubLevel === 'leader' && (
+                              <FormField
+                                control={form.control}
+                                name="leaderRole"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Leadership Role *</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                      <FormControl>
+                                        <SelectTrigger className="h-14 rounded-2xl border-indigo-200 bg-white text-sm font-bold">
+                                          <SelectValue placeholder="Role" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent className="rounded-2xl">
+                                        <SelectItem value="pastor" className="font-bold text-indigo-600">Pastor</SelectItem>
+                                        <SelectItem value="assistant_pastor" className="font-bold">Assistant Pastor</SelectItem>
+                                        <SelectItem value="department_head" className="font-bold">Department Head</SelectItem>
+                                        <SelectItem value="ministry_head" className="font-bold">Ministry Head</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            <FormField
+                              control={form.control}
+                              name="baptismDate"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Baptism Date</FormLabel>
+                                  <FormControl>
+                                    <Input type="date" {...field} className="h-14 rounded-2xl border-indigo-200 bg-white text-sm font-bold" />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="assignedDepartment"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Department Assignment</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger className="h-14 rounded-2xl border-indigo-200 bg-white text-sm font-bold">
+                                        <SelectValue placeholder="Select department" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent className="rounded-2xl">
+                                      <SelectItem value="_none">None</SelectItem>
+                                      {departments.map(d => (
+                                        <SelectItem key={d.id} value={d.id} className="font-bold">{d.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'account' && (
+                <motion.div
+                  key="account"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="space-y-12"
+                >
+                  {watchedMembershipLevel !== 'baptized' ? (
+                    <div className="flex flex-col items-center justify-center p-20 text-center bg-slate-50 border-2 border-dashed border-slate-100 rounded-[3rem]">
+                      <div className="w-24 h-24 bg-white rounded-[2rem] shadow-xl flex items-center justify-center text-slate-200 mb-8">
+                        <Lock size={48} />
+                      </div>
+                      <h4 className="text-3xl font-black text-slate-900 uppercase tracking-tight mb-4">Access Restricted</h4>
+                      <p className="text-slate-500 font-medium max-w-md mx-auto leading-relaxed">Network portal access is reserved for validated Baptized entities. Elevate membership status to proceed with credential initialization.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-10">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Security Credentials</h3>
+                        <div className="h-px flex-1 bg-slate-100" />
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="createAccount"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center space-x-6 space-y-0 p-10 bg-slate-900 rounded-[3rem] text-white shadow-2xl">
+                            <FormControl>
+                              <div className="flex items-center transition-transform active:scale-95">
+                                <Checkbox 
+                                  checked={field.value} 
+                                  onCheckedChange={field.onChange}
+                                  className="w-8 h-8 rounded-xl border-white/20 bg-white/10 text-indigo-500 focus:ring-white/20"
+                                />
+                              </div>
+                            </FormControl>
+                            <div className="space-y-1">
+                              <FormLabel className="text-2xl font-black uppercase tracking-tight cursor-pointer">Initialize Portal Access</FormLabel>
+                              <p className="text-sm text-slate-400 font-medium leading-none">Generate secure login parameters for the ecclesiastical portal.</p>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+
+                      {watchedCreateAccount && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 p-10 border border-slate-100 rounded-[3rem] animate-in fade-in slide-in-from-top-6 duration-500 bg-slate-50/50">
+                          <FormField
+                            control={form.control}
+                            name="username"
+                            render={({ field }) => (
+                              <FormItem className="space-y-4">
+                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                  <User size={12} /> Username Matrix
+                                </FormLabel>
+                                <FormControl>
+                                  <Input type="email" placeholder="identity@registry.com" {...field} className="h-14 rounded-2xl border-slate-200 bg-white text-sm font-bold shadow-sm" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="password"
+                            render={({ field }) => (
+                              <FormItem className="space-y-4">
+                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                  <Lock size={12} /> Access Passphrase
+                                </FormLabel>
+                                <FormControl>
+                                  <Input type="password" placeholder="System generated or manual" {...field} className="h-14 rounded-2xl border-slate-200 bg-white text-sm font-bold shadow-sm" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-              </motion.section>
-            )}
+                </motion.div>
+              )}
 
-            {step === 4 && (
-              <motion.section 
-                key="step4"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm space-y-6 md:space-y-8"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
-                    <Network size={20} />
-                  </div>
-                  <h3 className="font-bold text-xl tracking-tight text-slate-900">Ministry Assignment</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-4 md:gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Primary Department</label>
-                    <select className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none">
-                      <option>Unassigned</option>
-                      <option>Choir</option>
-                      <option>Ushering</option>
-                      <option>Technical/Media</option>
-                      <option>Sunday School Teachers</option>
-                      <option>Hospitality</option>
-                    </select>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Active Ministry Chips</p>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full flex items-center gap-2 border border-blue-100">
-                        New Believer 
-                        <button className="hover:text-red-500 transition-colors"><X size={12} /></button>
-                      </span>
-                      <button className="px-3 py-1.5 bg-slate-50 text-slate-500 text-xs font-bold rounded-full flex items-center gap-2 border border-slate-200 hover:bg-slate-100 transition-colors">
-                        + Add Tag
-                      </button>
+              {activeTab === 'notes' && (
+                <motion.div
+                  key="notes"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="space-y-12"
+                >
+                  <div className="space-y-10">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Qualitative Analysis</h3>
+                      <div className="h-px flex-1 bg-slate-100" />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                      <FormField
+                        control={form.control}
+                        name="prayerNeeds"
+                        render={({ field }) => (
+                          <FormItem className="space-y-4">
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Prayer Requests & Needs</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Detail specific prayer needs or requests..." 
+                                className="min-h-[220px] rounded-[2rem] border-slate-200 p-8 text-sm font-medium bg-slate-50 focus:bg-white transition-all shadow-inner" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="pastoralNotes"
+                        render={({ field }) => (
+                          <FormItem className="space-y-4">
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest text-rose-400">Confidential Pastoral Notes</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Confidential observations or records..." 
+                                className="min-h-[220px] rounded-[2rem] border-rose-100 bg-rose-50/20 p-8 text-sm font-medium focus:bg-white transition-all shadow-inner" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   </div>
-                </div>
-              </motion.section>
-            )}
-
-            {step === 5 && (
-              <motion.section 
-                key="step5"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm space-y-6 md:space-y-8"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                    <Lock size={20} />
-                  </div>
-                  <h3 className="font-bold text-xl tracking-tight text-slate-900">Account Credentials</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Username (Optional)</label>
-                    <input 
-                      type="text" 
-                      value={formData.username}
-                      onChange={(e) => setFormData({...formData, username: e.target.value})}
-                      placeholder="johndoe_faith" 
-                      className={`w-full bg-slate-50 border rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all ${
-                        errors.username ? 'border-red-500' : 'border-slate-200'
-                      }`}
-                    />
-                    <p className="text-[10px] text-slate-500 mt-1">Leave blank to use email as username.</p>
-                    {errors.username && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.username}</p>}
-                  </div>
-                  <div className="relative">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Password (Optional)</label>
-                    <input 
-                      type={showPassword ? 'text' : 'password'} 
-                      value={formData.password}
-                      onChange={(e) => setFormData({...formData, password: e.target.value})}
-                      placeholder="••••••••" 
-                      className={`w-full bg-slate-50 border rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all pr-12 ${
-                        errors.password ? 'border-red-500' : 'border-slate-200'
-                      }`}
-                    />
-                    <button 
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-[38px] text-slate-400 hover:text-slate-600"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                    {errors.password && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.password}</p>}
-                  </div>
-                  <div className="relative">
-                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Confirm Password</label>
-                    <input 
-                      type={showPassword ? 'text' : 'password'} 
-                      value={formData.confirmPassword}
-                      onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                      placeholder="••••••••" 
-                      className={`w-full bg-slate-50 border rounded-xl p-3 text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all pr-12 ${
-                        errors.confirmPassword ? 'border-red-500' : 'border-slate-200'
-                      }`}
-                    />
-                    {errors.confirmPassword && <p className="text-red-500 text-[10px] mt-1 font-bold flex items-center gap-1"><AlertCircle size={10} /> {errors.confirmPassword}</p>}
-                  </div>
-                </div>
-              </motion.section>
-            )}
-            {step === 6 && (
-              <motion.section 
-                key="step6"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="bg-white rounded-2xl p-6 md:p-8 border border-slate-200 shadow-sm space-y-8"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                    <CheckCircle2 size={20} />
-                  </div>
-                  <h3 className="font-bold text-xl tracking-tight text-slate-900">Final Review</h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b pb-2">Identity Summary</h4>
-                    <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                      {preview ? (
-                        <img src={preview} alt="" className="w-16 h-20 rounded-xl object-cover shadow-md" />
-                      ) : (
-                        <div className="w-16 h-20 bg-slate-200 rounded-xl animate-pulse" />
-                      )}
-                      <div>
-                        <p className="text-lg font-bold text-slate-900 leading-tight">{formData.fullName}</p>
-                        <p className="text-sm text-slate-500">{formData.email}</p>
-                        <p className="text-[10px] font-mono text-blue-600 mt-1 uppercase">{formData.branchId}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b pb-2">Ministry Assignment</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500 font-medium tracking-tight">Access Role</span>
-                        <span className="text-slate-900 font-bold uppercase text-[11px] tracking-wide bg-blue-100 px-2 py-0.5 rounded">Standard Member</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500 font-medium tracking-tight">Status</span>
-                        <span className="text-emerald-600 font-bold uppercase text-[11px] tracking-wide">Ready for Provision</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-6 bg-slate-900 rounded-3xl text-white flex items-center justify-between">
-                  <div>
-                    <h5 className="font-bold text-sm">Member Credentials</h5>
-                    <p className="text-slate-400 text-xs mt-1">Username: <span className="font-mono text-emerald-400">{formData.username}</span></p>
-                  </div>
-                  <Lock className="text-slate-700" size={32} />
-                </div>
-              </motion.section>
-            )}
-          </AnimatePresence>
-
-          {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-4 pt-8">
-            {step > 1 && (
-              <button 
-                onClick={prevStep}
-                className="px-8 py-4 bg-white text-slate-600 font-bold rounded-2xl border border-slate-200 hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                <ChevronLeft size={20} />
-                Previous Step
-              </button>
-            )}
-            
-            {step < 6 ? (
-              <button 
-                onClick={nextStep}
-                className="flex-1 px-8 py-4 bg-blue-600 text-white font-bold rounded-2xl shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                Next Step
-                <ArrowRight size={20} />
-              </button>
-            ) : (
-              <button 
-                disabled={isSaving}
-                onClick={() => handleSaveMember(true)}
-                className="flex-1 px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl shadow-xl shadow-emerald-600/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSaving ? (
-                  <Loader2 className="animate-spin" size={20} />
-                ) : (
-                  <CheckCircle2 size={20} />
-                )}
-                Complete Registration
-              </button>
-            )}
-
-            {step === 6 && (
-              <button 
-                disabled={isSaving}
-                onClick={() => handleSaveMember(false)}
-                className="px-8 py-4 bg-white text-blue-600 font-bold rounded-2xl border border-slate-200 hover:bg-slate-50 active:scale-95 transition-all disabled:opacity-50"
-              >
-                {isSaving ? 'Processing...' : 'Save and Add Another'}
-              </button>
-            )}
-
-            <button 
-              onClick={() => navigate(appendParams('/members/registry'))}
-              className="px-6 py-4 text-slate-400 font-bold hover:text-red-500 transition-colors"
-            >
-              Cancel
-            </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </div>
-      </div>
 
-      {/* Cropping Modal */}
-      {isCropping && (
-        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl"
-          >
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-bold text-xl">Crop Member Portrait</h3>
-              <button onClick={() => setIsCropping(false)} className="text-slate-400 hover:text-slate-600"><X /></button>
-            </div>
-            <div className="relative h-96 bg-slate-900">
-              <Cropper
-                image={image!}
-                crop={crop}
-                zoom={zoom}
-                aspect={3/4}
-                onCropChange={setCrop}
-                onCropComplete={onCropComplete}
-                onZoomChange={setZoom}
-              />
-            </div>
-            <div className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Zoom Level</label>
-                <input
-                  type="range"
-                  value={zoom}
-                  min={1}
-                  max={3}
-                  step={0.1}
-                  onChange={(e) => setZoom(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                />
-              </div>
-              <div className="flex gap-4">
-                <button 
-                  onClick={() => setIsCropping(false)}
-                  className="flex-1 py-4 bg-slate-50 text-slate-600 font-bold rounded-2xl hover:bg-slate-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleCropSave}
-                  className="flex-1 py-4 bg-blue-600 text-white font-bold rounded-2xl shadow-xl shadow-blue-600/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
-                >
-                  <Check size={20} />
-                  Save Portrait
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </motion.div>
+          <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-900/5">
+            <Button type="button" variant="ghost" onClick={() => navigate(-1)} className="font-bold uppercase tracking-widest text-xs">
+              Abort Registration
+            </Button>
+            <Button type="submit" disabled={isSaving} className="bg-slate-900 text-white px-12 h-12 rounded-xl font-bold uppercase tracking-widest shadow-lg shadow-black/10 active:scale-95 disabled:opacity-50">
+              {isSaving ? <Loader2 className="animate-spin mr-2" size={18} /> : <CheckCircle2 className="mr-2" size={18} />}
+              {memberId ? 'Update Record' : 'Initialize Identity'}
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
   );
 }

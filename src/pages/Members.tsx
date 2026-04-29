@@ -6,19 +6,25 @@ import {
   UserPlus, 
   MoreVertical, 
   Mail, 
-  Phone,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  Users as UsersIcon,
-  History,
-  Check,
-  CheckSquare,
-  Square,
-  Download,
-  ShieldCheck,
-  Zap,
-  Eye
+  Phone, 
+  ChevronLeft, 
+  ChevronRight, 
+  Loader2, 
+  Users as UsersIcon, 
+  History, 
+  Check, 
+  CheckSquare, 
+  Square, 
+  Download, 
+  ShieldCheck, 
+  Zap, 
+  Eye,
+  Target,
+  Globe,
+  Award,
+  Shield,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useRole } from '../components/Layout';
@@ -51,6 +57,7 @@ export default function Members() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   
   const isBranchAdmin = role === 'admin';
   const isSuperAdmin = role === 'superadmin';
@@ -58,7 +65,6 @@ export default function Members() {
   useEffect(() => {
     let q;
     if (isSuperAdmin) {
-      // Superadmins see everything via collectionGroup
       q = query(
         collectionGroup(db, 'members'),
         orderBy('createdAt', 'desc'),
@@ -130,9 +136,6 @@ export default function Members() {
     setIsBulkUpdating(true);
     try {
       const batch = writeBatch(db);
-      
-      // We need to find the full path for each member
-      // Since they are from snapshot, we can find them in the 'members' array
       for (const id of selectedIds) {
         const member = members.find(m => m.id === id);
         if (member) {
@@ -140,10 +143,8 @@ export default function Members() {
           batch.update(doc(db, path), { [field]: value, updatedAt: new Date() });
         }
       }
-      
       await batch.commit();
       setSelectedIds([]);
-      // Success toast would be nice here, but we'll stick to basic state update
     } catch (error) {
       console.error("Bulk update failed:", error);
     } finally {
@@ -153,7 +154,6 @@ export default function Members() {
 
   const handleExport = () => {
     if (selectedIds.length === 0) return;
-    
     const selectedMembers = members.filter(m => selectedIds.includes(m.id));
     const headers = ['FullName', 'Email', 'Phone', 'Level', 'Status', 'Baptised', 'BaptismStatus'];
     const csvContent = [
@@ -180,162 +180,136 @@ export default function Members() {
     document.body.removeChild(link);
   };
 
-  const appendParams = (path: string) => path;
-
   const canAddMember = ['admin', 'district', 'superadmin'].includes(role);
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
+      className="space-y-10 pb-12"
     >
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div>
-          <button 
-            onClick={() => window.history.length > 1 ? window.history.back() : window.location.href = '/'}
-            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-blue-600 mb-2 transition-colors"
-          >
-            <ChevronLeft size={16} />
-            Back
-          </button>
-          <h2 className="text-2xl font-bold text-slate-900">Member Directory</h2>
-          <p className="text-slate-500 text-sm max-w-xl">
-            {role === 'admin' ? 'Manage members in Main Campus branch.' : 
-             role === 'district' ? 'Manage members across North America District.' :
-             'Manage and view all registered members across branches.'}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full w-fit mb-2">
+             <Globe size={14} />
+             <span className="text-[10px] font-black uppercase tracking-widest">Global Repository</span>
+          </div>
+          <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Member Directory</h2>
+          <p className="text-slate-500 font-medium max-w-xl">
+            {role === 'admin' ? 'Synchronizing Main Campus stakeholder directory.' : 
+             role === 'district' ? 'Analyzing stakeholder dispersion across North America District.' :
+             'Unified interface for global church stakeholder management.'}
           </p>
         </div>
         {canAddMember && (
           <button 
-            onClick={() => navigate(appendParams('/members/new'))}
-            className="w-full lg:w-auto bg-blue-600 text-white px-6 py-3 lg:py-2 rounded-xl lg:rounded-lg font-bold lg:font-medium text-sm hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-md lg:shadow-sm active:scale-95"
+            onClick={() => navigate('/members/new')}
+            className="group flex items-center gap-3 bg-slate-900 text-white px-8 py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10 active:scale-95"
           >
-            <UserPlus size={18} />
-            Add New Member
+            <UserPlus size={18} className="group-hover:scale-110 transition-transform" />
+            Ingest New Entry
           </button>
         )}
       </div>
 
-      {/* Filters & Search */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col gap-4">
-        <div className="flex flex-col lg:flex-row gap-4 items-center">
-          <div className="relative flex-1 w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+      {/* Control Panel */}
+      <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
+        <div className="flex flex-col lg:flex-row gap-6 items-center">
+          <div className="relative flex-1 w-full group">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
             <input 
               type="text" 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by name, email, or phone..." 
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 text-sm focus:ring-1 focus:ring-blue-600 focus:border-blue-600 transition-all outline-none"
+              placeholder="Search by Identity, Communication, or Terminal ID..." 
+              className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold focus:ring-2 focus:ring-indigo-50 hover:bg-white transition-all outline-none"
             />
           </div>
-          <div className="flex flex-wrap gap-2 w-full lg:w-auto">
-            <div className="relative flex-1 lg:flex-none min-w-[140px]">
-              <select 
-                value={levelFilter}
-                onChange={(e) => setLevelFilter(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 outline-none focus:ring-1 focus:ring-blue-600 appearance-none"
-              >
-                <option value="all">All Levels</option>
-                <option value="Convert">Convert</option>
-                <option value="Disciple">Disciple</option>
-                <option value="Worker">Worker</option>
-                <option value="Leader">Leader</option>
-              </select>
-              <Filter className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-            </div>
-
-            <div className="relative flex-1 lg:flex-none min-w-[160px]">
-              <select 
-                value={baptismFilter}
-                onChange={(e) => setBaptismFilter(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 outline-none focus:ring-1 focus:ring-blue-600 appearance-none"
-              >
-                <option value="all">Baptism Status</option>
-                <option value="baptised">Baptised</option>
-                <option value="awaiting">Awaiting Baptism</option>
-                <option value="pending">Pending Approval</option>
-              </select>
-              <Filter className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-            </div>
-
-            <div className="relative flex-1 lg:flex-none min-w-[120px]">
-              <select 
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm font-medium text-slate-600 outline-none focus:ring-1 focus:ring-blue-600 appearance-none"
-              >
-                <option value="all">Status</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Archived">Archived</option>
-              </select>
-              <Filter className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-            </div>
+          
+          <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+             <ModernFilterSelect 
+                value={levelFilter} 
+                onChange={setLevelFilter} 
+                options={[
+                  { label: 'All Protocols', value: 'all' },
+                  { label: 'Convert', value: 'Convert' },
+                  { label: 'Disciple', value: 'Disciple' },
+                  { label: 'Worker', value: 'Worker' },
+                  { label: 'Leader', value: 'Leader' },
+                ]} 
+             />
+             <ModernFilterSelect 
+                value={baptismFilter} 
+                onChange={setBaptismFilter} 
+                options={[
+                  { label: 'Baptism Matrix', value: 'all' },
+                  { label: 'Validated', value: 'baptised' },
+                  { label: 'Awaiting Sync', value: 'awaiting' },
+                  { label: 'Pending Validation', value: 'pending' },
+                ]} 
+             />
+             <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  <List size={18} />
+                </button>
+                <button 
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  <LayoutGrid size={18} />
+                </button>
+             </div>
           </div>
         </div>
 
-        {/* Bulk Action Bar */}
+        {/* Bulk Action Protocols */}
         <AnimatePresence>
           {selectedIds.length > 0 && (
             <motion.div 
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
+              initial={{ height: 0, opacity: 0, scale: 0.95 }}
+              animate={{ height: 'auto', opacity: 1, scale: 1 }}
+              exit={{ height: 0, opacity: 0, scale: 0.95 }}
               className="overflow-hidden"
             >
-              <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-600 text-white w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-6 p-6 bg-slate-900 rounded-[2rem] text-white shadow-2xl">
+                <div className="flex items-center gap-4">
+                  <div className="bg-indigo-500 text-white w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs shadow-lg">
                     {selectedIds.length}
                   </div>
-                  <span className="text-sm font-bold text-blue-900">Members Selected</span>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest block opacity-60">Selection Active</span>
+                    <span className="text-sm font-bold font-mono">Members Highlighted</span>
+                  </div>
                 </div>
                 
-                <div className="flex flex-wrap gap-2">
-                  <div className="relative">
-                    <select 
-                      onChange={(e) => handleBulkUpdate('level', e.target.value)}
-                      className="bg-white border border-blue-200 rounded-lg px-4 py-2 text-xs font-bold text-blue-700 outline-none hover:bg-blue-100 transition-colors cursor-pointer appearance-none pr-8"
-                      defaultValue=""
-                    >
-                      <option value="" disabled>Assign Level</option>
-                      <option value="Convert">Convert</option>
-                      <option value="Disciple">Disciple</option>
-                      <option value="Worker">Worker</option>
-                      <option value="Leader">Leader</option>
-                    </select>
-                    <ShieldCheck className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blue-400 pointer-events-none" size={14} />
-                  </div>
-
-                  <div className="relative">
-                    <select 
-                      onChange={(e) => handleBulkUpdate('status', e.target.value)}
-                      className="bg-white border border-blue-200 rounded-lg px-4 py-2 text-xs font-bold text-blue-700 outline-none hover:bg-blue-100 transition-colors cursor-pointer appearance-none pr-8"
-                      defaultValue=""
-                    >
-                      <option value="" disabled>Change Status</option>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                      <option value="Archived">Archived</option>
-                    </select>
-                    <Zap className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blue-400 pointer-events-none" size={14} />
-                  </div>
-
+                <div className="flex flex-wrap gap-3">
+                  <ModernBulkSelect 
+                    icon={<Award />} 
+                    onChange={(val) => handleBulkUpdate('level', val)} 
+                    label="Assign Protocol"
+                    options={['Convert', 'Disciple', 'Worker', 'Leader']}
+                  />
+                  <ModernBulkSelect 
+                    icon={<Zap />} 
+                    onChange={(val) => handleBulkUpdate('status', val)} 
+                    label="Change State"
+                    options={['Active', 'Inactive', 'Archived']}
+                  />
                   <button 
                     onClick={handleExport}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-blue-200 rounded-lg text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors"
+                    className="flex items-center gap-3 px-6 py-3 bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all border border-white/10"
                   >
                     <Download size={14} />
                     Export CSV
                   </button>
-                  
                   <button 
                     onClick={() => setSelectedIds([])}
-                    className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors"
+                    className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors"
                   >
-                    Clear
+                    Clear Selection
                   </button>
                 </div>
               </div>
@@ -344,91 +318,93 @@ export default function Members() {
         </AnimatePresence>
       </div>
 
-      {/* Members Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-visible min-h-[400px]">
+      {/* Directory Grid/List */}
+      <div className="space-y-4">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="animate-spin text-blue-600" size={32} />
-            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Initialising Directory...</p>
-          </div>
-        ) : members.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mb-4 border border-slate-100">
-              <UsersIcon size={32} />
+          <div className="flex flex-col items-center justify-center py-32 gap-6 bg-white rounded-[3rem] border border-slate-100">
+            <div className="relative">
+               <Loader2 className="animate-spin text-indigo-600" size={48} />
+               <UsersIcon size={20} className="absolute inset-0 m-auto text-indigo-100" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900">No Members Found</h3>
-            <p className="text-slate-500 text-sm max-w-sm mt-1 mb-6">There are no registered members for this branch yet. Get started by adding your first congregant.</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest animate-pulse">Initialising Stakeholder Cache...</p>
+          </div>
+        ) : filteredMembers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-32 text-center px-10 bg-white rounded-[3rem] border border-slate-100 shadow-sm">
+            <div className="w-24 h-24 bg-slate-50 rounded-[2rem] flex items-center justify-center text-slate-200 mb-8 border border-slate-50">
+              <UsersIcon size={48} />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 mb-2">Null Repository Response</h3>
+            <p className="text-slate-500 font-medium text-sm max-w-sm mx-auto leading-relaxed">No existing identities matched your current telemetry filters. Adjust your parameters to find broader results.</p>
             {canAddMember && (
               <button 
-                onClick={() => navigate(appendParams('/members/new'))}
-                className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all"
+                onClick={() => navigate('/members/new')}
+                className="mt-10 px-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-slate-900/10 hover:bg-slate-800 transition-all"
               >
-                Register First Member
+                Register First Stakeholder
               </button>
             )}
           </div>
-        ) : (
-          <div className="flex flex-col">
-            {/* Table Header (Desktop Only) */}
-            <div className="hidden md:flex bg-slate-50 border-b border-slate-200 px-6 py-4">
-              <div className="w-10 flex-shrink-0 flex items-center pr-4">
-                <input 
-                  type="checkbox" 
-                  onChange={handleSelectAll}
-                  checked={selectedIds.length === filteredMembers.length && filteredMembers.length > 0}
-                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
-                />
-              </div>
-              <div className="flex-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Member</div>
-              <div className="w-48 xl:w-56 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Contact Info</div>
-              <div className="w-32 xl:w-40 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                {isBranchAdmin ? 'Level' : 'Branch'}
-              </div>
-              <div className="w-36 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</div>
-              <div className="w-16 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</div>
-            </div>
-
-            {/* Member List */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-2 p-2 md:p-0 md:gap-0 divide-y-0 md:divide-y divide-slate-100">
-              <AnimatePresence mode="popLayout">
-                {filteredMembers.map((member: MemberData) => (
-                    <MemberTableRow 
-                      key={member.id}
-                      id={member.id}
-                      name={member.fullName || 'Unknown'} 
-                      email={member.email || 'N/A'} 
-                      phone={member.phone || 'N/A'} 
-                      branch={member.level || 'Convert'} 
-                      branchId={member.branchId}
-                      districtId={member.districtId}
-                      status={member.status || 'Pending'} 
-                      baptismStatus={member.baptismStatus}
-                      statusType={member.status === 'Active' ? 'success' : member.status === 'Pending' ? 'warning' : 'info'}
-                      isSelected={selectedIds.includes(member.id)}
-                      onToggleSelect={() => handleToggleSelect(member.id)}
+        ) : viewMode === 'list' ? (
+           <div className="space-y-4">
+              <div className="flex items-center px-10 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                 <div className="w-12 px-2">
+                    <input 
+                      type="checkbox" 
+                      onChange={handleSelectAll}
+                      checked={selectedIds.length === filteredMembers.length && filteredMembers.length > 0}
+                      className="w-5 h-5 text-indigo-600 rounded-lg border-slate-200 focus:ring-indigo-500 cursor-pointer shadow-sm"
                     />
-                ))}
+                 </div>
+                 <div className="flex-1 px-4">Entity Identity</div>
+                 <div className="w-64 px-4">Protocol Status</div>
+                 <div className="w-48 px-4">Contact Matrix</div>
+                 <div className="w-24 px-4 text-right">Actions</div>
+              </div>
+              <div className="space-y-3">
+                 <AnimatePresence mode="popLayout">
+                   {filteredMembers.map((member) => (
+                      <ModernMemberListItem 
+                         key={member.id}
+                         member={member}
+                         isSelected={selectedIds.includes(member.id)}
+                         onSelect={() => handleToggleSelect(member.id)}
+                      />
+                   ))}
+                 </AnimatePresence>
+              </div>
+           </div>
+        ) : (
+           <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-6">
+              <AnimatePresence mode="popLayout">
+                 {filteredMembers.map((member) => (
+                    <ModernMemberGridCard 
+                       key={member.id}
+                       member={member}
+                       isSelected={selectedIds.includes(member.id)}
+                       onSelect={() => handleToggleSelect(member.id)}
+                    />
+                 ))}
               </AnimatePresence>
-            </div>
-          </div>
+           </div>
         )}
 
-        {/* Pagination */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-          <p className="text-xs text-slate-500 font-medium">Showing 1 to 5 of 1,248 members</p>
+        {/* Pagination Console */}
+        <div className="px-10 py-6 bg-white rounded-[2.5rem] border border-slate-200 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-10">
+             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Paging Protocol</p>
+             <p className="text-sm font-bold text-slate-900">1 <span className="opacity-30">of</span> 250</p>
+          </div>
           <div className="flex items-center gap-2">
-            <button className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-50" disabled>
-              <ChevronLeft size={20} />
+            <button className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-300 flex items-center justify-center transition-all" disabled>
+              <ChevronLeft size={18} />
             </button>
-            <div className="flex items-center gap-1">
-              <button className="w-8 h-8 rounded-lg bg-blue-600 text-white text-xs font-bold">1</button>
-              <button className="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-600 text-xs font-bold">2</button>
-              <button className="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-600 text-xs font-bold">3</button>
-              <span className="text-slate-400 px-1">...</span>
-              <button className="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-600 text-xs font-bold">250</button>
+            <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-100">
+              <button className="w-10 h-10 rounded-xl bg-white shadow-sm text-indigo-600 text-xs font-black">1</button>
+              <button className="w-10 h-10 rounded-xl hover:bg-white text-slate-400 text-xs font-bold transition-all">2</button>
+              <button className="w-10 h-10 rounded-xl hover:bg-white text-slate-400 text-xs font-bold transition-all">3</button>
             </div>
-            <button className="p-1 text-slate-400 hover:text-slate-600">
-              <ChevronRight size={20} />
+            <button className="w-12 h-12 rounded-2xl bg-white border border-slate-100 text-slate-400 flex items-center justify-center hover:bg-slate-50 transition-all hover:text-indigo-600 shadow-sm">
+              <ChevronRight size={18} />
             </button>
           </div>
         </div>
@@ -437,176 +413,163 @@ export default function Members() {
   );
 }
 
-interface MemberTableRowProps {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  branch: string;
-  branchId?: string;
-  districtId?: string;
-  status: string;
-  baptismStatus?: string;
-  statusType: 'success' | 'warning' | 'info';
-  isSelected: boolean;
-  onToggleSelect: () => void;
-}
-
-const MemberTableRow: React.FC<MemberTableRowProps> = ({ 
-  id, name, email, phone, branch, branchId, districtId, status, baptismStatus, statusType, isSelected, onToggleSelect 
-}) => {
-  const navigate = useNavigate();
-  const [showMenu, setShowMenu] = useState(false);
-  const statusClasses = {
-    success: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    warning: 'bg-orange-50 text-orange-700 border-orange-100',
-    info: 'bg-slate-100 text-slate-600 border-slate-200'
-  };
-
-  const handleEdit = () => {
-    let url = `/members/edit/${id}`;
-    if (districtId && branchId) {
-      url += `?districtId=${districtId}&branchId=${branchId}`;
-    }
-    navigate(url);
-  };
-
-  const menuMarkup = (
+function ModernFilterSelect({ value, onChange, options }: any) {
+  return (
     <div className="relative">
-      <button 
-        onClick={() => setShowMenu(!showMenu)}
-        className="p-1.5 md:p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-      >
-        <MoreVertical size={18} />
-      </button>
-
-      <AnimatePresence>
-        {showMenu && (
-          <>
-            <div 
-              className="fixed inset-0 z-10" 
-              onClick={() => setShowMenu(false)}
-            ></div>
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: -10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -10 }}
-              className="absolute right-0 md:right-6 top-8 md:top-14 w-48 bg-white rounded-xl shadow-xl border border-slate-100 z-20 overflow-hidden"
-            >
-              <div className="py-1">
-                <button 
-                  onClick={() => {
-                    let url = `/members/profile/${id}`;
-                    if (districtId && branchId) {
-                      url += `?districtId=${districtId}&branchId=${branchId}`;
-                    }
-                    navigate(url);
-                  }}
-                  className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
-                >
-                  <Eye size={14} className="text-slate-400" />
-                  View Profile
-                </button>
-                <button 
-                  onClick={handleEdit}
-                  className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
-                >
-                  <UserPlus size={14} className="text-slate-400" />
-                  Edit Member
-                </button>
-                <button className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2">
-                  <History size={14} className="text-slate-400" />
-                  View History
-                </button>
-                <button className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2 border-t border-slate-50 mt-1">
-                  <MoreVertical size={14} className="text-red-400 rotate-90" />
-                  Archive Member
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+       <select 
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 pr-12 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-indigo-50 appearance-none cursor-pointer hover:bg-white transition-all shadow-sm"
+        >
+          {options.map((opt: any) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+        <Filter className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={12} />
     </div>
   );
+}
+
+function ModernBulkSelect({ icon, onChange, label, options }: any) {
+  return (
+    <div className="relative group">
+       <select 
+          onChange={(e) => onChange(e.target.value)}
+          className="bg-white/10 border border-white/10 rounded-xl px-10 py-3 text-[10px] font-black uppercase tracking-widest text-white outline-none appearance-none cursor-pointer hover:bg-white/20 transition-all pr-10"
+          defaultValue=""
+        >
+          <option value="" disabled>{label}</option>
+          {options.map((opt: any) => (
+             <option key={opt} value={opt} className="text-slate-900">{opt}</option>
+          ))}
+        </select>
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none transition-colors group-hover:text-white">
+          {React.cloneElement(icon, { size: 14 })}
+        </div>
+        <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 rotate-90 pointer-events-none transition-colors group-hover:text-white" size={12} />
+    </div>
+  );
+}
+
+function ModernMemberListItem({ member, isSelected, onSelect }: any) {
+  const navigate = useNavigate();
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Active': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
+      case 'Inactive': return 'text-rose-600 bg-rose-50 border-rose-100';
+      default: return 'text-slate-500 bg-slate-50 border-slate-100';
+    }
+  };
 
   return (
     <motion.div 
       layout
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className={`transition-colors group min-h-[64px] border border-slate-100 rounded-xl md:border-none md:rounded-none p-3 md:p-0 flex flex-col md:flex-row md:items-center ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50' : 'bg-white hover:bg-slate-50'}`}
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      whileHover={{ y: -2 }}
+      className={`group flex items-center p-4 rounded-[2.5rem] border border-slate-200 transition-all duration-300 ${isSelected ? 'bg-indigo-50 border-indigo-200 shadow-xl shadow-indigo-100' : 'bg-white hover:border-indigo-100 hover:shadow-2xl hover:shadow-slate-100'}`}
     >
-      <div className="hidden md:flex w-10 flex-shrink-0 items-center pl-6">
+      <div className="w-12 flex-shrink-0 flex items-center justify-center">
         <input 
           type="checkbox" 
           checked={isSelected}
-          onChange={onToggleSelect}
-          className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+          onChange={onSelect}
+          className="w-5 h-5 text-indigo-600 rounded-lg border-slate-200 focus:ring-indigo-500 cursor-pointer shadow-sm"
         />
       </div>
 
-      <div className="flex items-center justify-between md:hidden mb-3 border-b border-slate-100 pb-2">
-        <div className="flex items-center gap-2">
-          <input 
-            type="checkbox" 
-            checked={isSelected}
-            onChange={onToggleSelect}
-            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
-          />
-          <span className="text-[10px] font-bold text-slate-400">ID: {id.slice(0, 8).toUpperCase()}</span>
+      <div className="flex-1 px-4 flex items-center gap-6 min-w-0">
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-lg shadow-inner transition-transform group-hover:scale-110 ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
+          {member.fullName?.charAt(0)}
         </div>
-        {menuMarkup}
+        <div className="min-w-0">
+          <h4 className="text-base font-black text-slate-900 tracking-tight truncate leading-tight">{member.fullName}</h4>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">ID: {member.id.substring(0, 8).toUpperCase()}</p>
+        </div>
       </div>
 
-      <div className="flex-1 px-1 md:px-4 py-1 md:py-4 min-w-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm shrink-0">
-            {name.charAt(0)}
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900 truncate">{name}</p>
-            <p className="hidden md:block text-[10px] text-slate-400 truncate">ID: {id.slice(0, 8).toUpperCase()}</p>
-          </div>
-        </div>
+      <div className="w-64 px-4 flex items-center gap-3">
+         <div className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest ${getStatusColor(member.status)}`}>
+            {member.status || 'Active'}
+         </div>
+         <div className="px-4 py-2 rounded-xl bg-slate-50 border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500">
+            {member.level || 'Convert'}
+         </div>
       </div>
-      
-      <div className="w-full md:w-48 xl:w-56 px-1 md:px-6 py-1 md:py-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs text-slate-600 truncate">
-            <Mail size={12} className="text-slate-400 shrink-0" />
-            <span className="truncate">{email}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-600 truncate">
-            <Phone size={12} className="text-slate-400 shrink-0" />
-            <span className="truncate">{phone}</span>
-          </div>
-        </div>
+
+      <div className="w-48 px-4 flex flex-col gap-1">
+         <div className="flex items-center gap-2 text-xs font-bold text-slate-500 truncate">
+            <Mail size={12} className="text-slate-300" />
+            <span className="truncate">{member.email}</span>
+         </div>
+         <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+            <Phone size={12} className="text-slate-300" />
+            <span>{member.phone}</span>
+         </div>
       </div>
-      
-      <div className="w-full md:w-32 xl:w-40 px-1 md:px-6 py-1 md:py-4 flex items-center justify-between md:block">
-        <span className="md:hidden text-xs text-slate-400 font-bold uppercase">Role:</span>
-        <span className="text-sm text-slate-600 font-medium truncate">{branch}</span>
-      </div>
-      
-      <div className="w-full md:w-36 px-1 md:px-6 py-2 md:py-4 flex items-center justify-between md:block">
-        <span className="md:hidden text-xs text-slate-400 font-bold uppercase">Status:</span>
-        <div className="flex flex-col gap-1 items-end md:items-start">
-          <span className={`w-fit px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusClasses[statusType]}`}>
-            {status}
-          </span>
-          {baptismStatus && baptismStatus !== 'Approved' && (
-            <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-tighter">
-              Baptism: {baptismStatus}
-            </span>
-          )}
-        </div>
-      </div>
-      
-      <div className="hidden md:flex w-16 px-6 py-4 justify-end relative">
-        {menuMarkup}
+
+      <div className="w-24 px-4 flex justify-end relative">
+         <button 
+           onClick={() => navigate(`/members/profile/${member.id}?districtId=${member.districtId}&branchId=${member.branchId}`)}
+           className="p-3 bg-slate-50 rounded-2xl text-slate-400 hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+         >
+           <Eye size={18} />
+         </button>
       </div>
     </motion.div>
   );
-};
+}
+
+function ModernMemberGridCard({ member, isSelected, onSelect }: any) {
+  const navigate = useNavigate();
+
+  return (
+    <motion.div 
+      layout
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      whileHover={{ y: -8 }}
+      onClick={() => navigate(`/members/profile/${member.id}?districtId=${member.districtId}&branchId=${member.branchId}`)}
+      className={`relative group p-4 sm:p-8 rounded-2xl sm:rounded-[3rem] border border-slate-200 transition-all duration-300 flex flex-col items-center text-center cursor-pointer ${isSelected ? 'bg-indigo-50 border-indigo-200 shadow-2xl shadow-indigo-100' : 'bg-white hover:border-indigo-100 hover:shadow-2xl hover:shadow-slate-100'}`}
+    >
+       <div className="absolute top-3 left-3 sm:top-6 sm:left-6" onClick={(e) => e.stopPropagation()}>
+          <input 
+            type="checkbox" 
+            checked={isSelected}
+            onChange={onSelect}
+            className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 rounded-lg border-slate-200 focus:ring-indigo-500 cursor-pointer shadow-sm"
+          />
+       </div>
+
+       <div className={`w-16 h-16 sm:w-28 sm:h-28 rounded-xl sm:rounded-[2.5rem] mb-3 sm:mb-6 flex items-center justify-center font-black text-xl sm:text-3xl shadow-inner transition-transform group-hover:scale-110 group-hover:-rotate-3 overflow-hidden ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-300 border border-slate-50'}`}>
+          {member.photoUrl ? (
+            <img src={member.photoUrl} alt={member.fullName} className="w-full h-full object-cover" />
+          ) : (
+            member.fullName?.charAt(0)
+          )}
+       </div>
+
+       <h4 className="text-sm sm:text-xl font-black text-slate-900 tracking-tight mb-1 sm:mb-2 leading-tight px-1 sm:px-4 truncate w-full">{member.fullName}</h4>
+       <div className="flex flex-wrap justify-center gap-1 sm:gap-2 mb-3 sm:mb-6">
+          <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg bg-indigo-50 text-indigo-600 text-[8px] sm:text-[9px] font-black uppercase tracking-widest border border-indigo-100">
+             {member.level || 'Convert'}
+          </span>
+       </div>
+
+       <div className="space-y-0.5 sm:space-y-1 mb-4 sm:mb-8 hidden sm:block">
+          <p className="text-[10px] sm:text-xs font-bold text-slate-400 truncate w-full max-w-[200px]">{member.email}</p>
+          <p className="text-[10px] sm:text-xs font-bold text-slate-400">{member.phone}</p>
+       </div>
+
+       <button 
+         onClick={() => navigate(`/members/profile/${member.id}?districtId=${member.districtId}&branchId=${member.branchId}`)}
+         className="w-full py-2.5 sm:py-4 bg-slate-900 text-white rounded-xl sm:rounded-2xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest transition-all shadow-xl shadow-slate-900/10 hover:bg-slate-800 active:scale-95"
+       >
+         View Dossier
+       </button>
+    </motion.div>
+  );
+}

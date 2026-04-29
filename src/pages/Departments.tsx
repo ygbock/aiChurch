@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Building2, 
   Plus, 
@@ -33,6 +34,7 @@ interface DepartmentData {
 
 export default function Departments() {
   const { profile } = useFirebase();
+  const navigate = useNavigate();
   const [showNewForm, setShowNewForm] = useState(false);
   const [departments, setDepartments] = useState<DepartmentData[]>([]);
 
@@ -107,6 +109,7 @@ export default function Departments() {
               category={dept.category} 
               members={0} 
               head={dept.headName || 'Not Assigned'} 
+              onDashboardClick={() => navigate(`/departments/${dept.id}`)}
               icon={
                 dept.category === 'Worship' ? <Music className="text-blue-600" /> :
                 dept.category === 'Administration' ? <Banknote className="text-orange-600" /> :
@@ -144,15 +147,31 @@ function StatCard({ label, value, icon, trend }: { label: string, value: string,
   );
 }
 
-const DepartmentCard: React.FC<{ title: string, category: string, members: number, head: string, icon: React.ReactNode, color: string }> = ({ title, category, members, head, icon, color }) => {
+const DepartmentCard: React.FC<{ 
+  title: string, 
+  category: string, 
+  members: number, 
+  head: string, 
+  icon: React.ReactNode, 
+  color: string,
+  onDashboardClick: () => void 
+}> = ({ title, category, members, head, icon, color, onDashboardClick }) => {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:border-blue-200 transition-all group cursor-pointer">
+    <div 
+      onClick={onDashboardClick}
+      className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:border-blue-200 transition-all group cursor-pointer"
+    >
       <div className="p-6">
         <div className="flex justify-between items-start mb-4">
           <div className={`p-3 rounded-xl ${color} group-hover:scale-110 transition-transform`}>
             {icon}
           </div>
-          <button className="text-slate-400 hover:text-slate-600">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            className="text-slate-400 hover:text-slate-600"
+          >
             <MoreVertical size={18} />
           </button>
         </div>
@@ -177,8 +196,14 @@ const DepartmentCard: React.FC<{ title: string, category: string, members: numbe
         </div>
       </div>
       <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-        <span className="text-[10px] font-bold text-emerald-600 uppercase">Active</span>
-        <button className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+        <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Active</span>
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            onDashboardClick();
+          }}
+          className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+        >
           Dashboard
           <ChevronRight size={14} />
         </button>

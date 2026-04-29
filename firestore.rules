@@ -115,12 +115,10 @@ service cloud.firestore {
 
     // Collection Group Helpers
     match /{path=**}/members/{memberId} {
-      allow read: if isSignedIn() && (
-        isSuperAdmin() || 
-        isDistrictLeader(resource.data.get('districtId', 'any')) ||
-        request.auth.uid == memberId ||
-        getEmail() == resource.data.get('email', '').lower()
-      );
+      allow read: if isSignedIn();
+    }
+    match /{path=**}/members {
+      allow list: if isSignedIn();
     }
     
     match /{path=**}/events/{eventId} {

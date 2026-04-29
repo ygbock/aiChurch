@@ -5,9 +5,14 @@ import DashboardDispatcher from './pages/DashboardDispatcher';
 import MemberManagementPage from './pages/members/MemberManagementPage';
 import MembersDashboard from './pages/MembersDashboard';
 import NewMember from './pages/NewMember';
+import NewConvert from './pages/NewConvert';
+import NewFirstTimer from './pages/NewFirstTimer';
 import Departments from './pages/Departments';
+import DepartmentDashboard from './pages/DepartmentDashboard';
 import Financials from './pages/Financials';
 import Ministries from './pages/Ministries';
+import MinistryDashboard from './pages/MinistryDashboard';
+import CommitteeWorkspace from './pages/CommitteeWorkspace';
 import Reports from './pages/Reports';
 import Events from './pages/Events';
 import LiveStreaming from './pages/LiveStreaming';
@@ -22,12 +27,11 @@ import SuperadminDashboard from './pages/SuperadminDashboard';
 import MemberPortal from './pages/MemberPortal';
 import MemberProfile from './pages/MemberProfile';
 import DistrictDashboard from './pages/DistrictDashboard';
+import DepartmentMemberProfile from './pages/DepartmentMemberProfile';
 import AdminRegistration from './pages/AdminRegistration';
-import NewVisitor from './pages/NewVisitor';
-import EditVisitor from './pages/EditVisitor';
-import NewConvert from './pages/NewConvert';
-import EditConvert from './pages/EditConvert';
+import ProgramDashboard from './pages/ProgramDashboard';
 import { FirebaseProvider } from './components/FirebaseProvider';
+import { Toaster } from 'sonner';
 
 // Placeholder components for other pages
 const Help = () => (
@@ -41,6 +45,7 @@ export default function App() {
   return (
     <FirebaseProvider>
       <BrowserRouter>
+        <Toaster position="top-right" richColors />
         <Routes>
           <Route path="/register" element={<AdminRegistration />} />
           <Route path="/" element={<Layout />}>
@@ -50,9 +55,16 @@ export default function App() {
             <Route path="members/registry" element={<Navigate to="/members" replace />} />
             <Route path="members/profile/:memberId" element={<MemberProfile />} />
             <Route path="members/new" element={<NewMember />} />
+            <Route path="members/new-convert" element={<NewConvert />} />
+            <Route path="members/new-first-timer" element={<NewFirstTimer />} />
             <Route path="members/edit/:memberId" element={<NewMember />} />
             <Route path="ministries" element={<Ministries />} />
+            <Route path="ministries/:ministryId" element={<MinistryDashboard />} />
+            <Route path="ministries/:ministryId/committees/:committeeId" element={<CommitteeWorkspace />} />
+            <Route path="programs/:programId" element={<ProgramDashboard />} />
             <Route path="departments" element={<Departments />} />
+            <Route path="departments/:departmentId" element={<DepartmentDashboard />} />
+            <Route path="departments/:departmentId/members/:memberId" element={<DepartmentMemberProfile />} />
             <Route path="financials" element={<Financials />} />
             <Route path="reports" element={<Reports />} />
             <Route path="events" element={<Events />} />

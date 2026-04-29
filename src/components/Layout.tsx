@@ -59,6 +59,7 @@ export default function Layout() {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const roles: { [key: string]: { label: string; icon: React.ReactNode } } = {
     'admin': { label: 'Branch Admin', icon: <Building2 size={14} /> },
@@ -112,91 +113,112 @@ export default function Layout() {
 
         {/* Sidebar */}
         <aside className={`
-          fixed inset-y-0 left-0 z-50 w-[260px] bg-white flex flex-col h-screen border-r border-slate-200 transition-transform duration-300 lg:translate-x-0 lg:static lg:block
+          fixed inset-y-0 left-0 z-50 bg-white flex flex-col h-screen border-r border-slate-200 transition-all duration-300 lg:translate-x-0 lg:sticky lg:top-0 
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          ${isCollapsed ? 'lg:w-[80px]' : 'lg:w-[260px]'}
+          ${!isSidebarOpen && !isCollapsed ? 'w-[260px]' : ''}
+          ${isSidebarOpen ? 'w-[260px]' : ''}
+          overflow-hidden
         `}>
-          <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+          <div className={`p-6 border-b border-slate-100 flex items-center shrink-0 ${isCollapsed ? 'justify-center px-0' : 'justify-between'}`}>
+            <div className={`flex items-center gap-2.5 ${isCollapsed ? 'hidden' : 'flex'}`}>
+              <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white font-bold text-xl shrink-0">
                 <Landmark size={18} />
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-900 tracking-tight leading-none">FaithFlow</h2>
-                <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mt-1">
+              <div className="overflow-hidden">
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight leading-none truncate underline decoration-blue-500/30">FaithFlow</h2>
+                <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mt-1 truncate">
                   {role === 'superadmin' ? 'Global System' : role === 'district' ? 'North America' : 'Main Campus'}
                 </p>
               </div>
             </div>
-            <button 
-              onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden p-2 hover:bg-slate-100 rounded-lg text-slate-400"
-            >
-              <X size={20} />
-            </button>
+            
+            {isCollapsed && (
+              <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-slate-200">
+                <Landmark size={20} />
+              </div>
+            )}
+
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="hidden lg:flex p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                {isCollapsed ? <LayoutGrid size={18} /> : <ArrowLeftRight size={18} className="opacity-50" />}
+              </button>
+              <button 
+                onClick={() => setIsSidebarOpen(false)}
+                className="lg:hidden p-2 hover:bg-slate-100 rounded-lg text-slate-400"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
-          <div className="flex-1 p-4 space-y-6 overflow-y-auto">
+          <div className={`flex-1 space-y-6 overflow-y-auto no-scrollbar py-4 ${isCollapsed ? 'px-2' : 'p-4'}`}>
             {/* Core Section */}
             <div>
-              <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-1">Core Modules</p>
+              {!isCollapsed && <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 mt-1">Core Modules</p>}
               <nav className="space-y-0.5">
                 <NavItem 
                   to="/dashboard" 
                   icon={<LayoutDashboard size={18} />} 
                   label="Dashboard" 
-                  active={location.pathname === '/dashboard'} 
+                  active={location.pathname === '/dashboard'}
+                  isCollapsed={isCollapsed}
+                  onClick={() => setIsSidebarOpen(false)}
                 />
-                <NavItem to="/members" icon={<Users size={18} />} label="Members" active={location.pathname.startsWith('/members')} />
-                <NavItem to="/departments" icon={<Building2 size={18} />} label="Departments" active={location.pathname.startsWith('/departments')} />
-                <NavItem to="/ministries" icon={<Network size={18} />} label="Ministries" active={location.pathname.startsWith('/ministries')} />
+                <NavItem to="/members" icon={<Users size={18} />} label="Members" active={location.pathname.startsWith('/members')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
+                <NavItem to="/departments" icon={<Building2 size={18} />} label="Departments" active={location.pathname.startsWith('/departments')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
+                <NavItem to="/ministries" icon={<Network size={18} />} label="Ministries" active={location.pathname.startsWith('/ministries')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
               </nav>
             </div>
 
             {/* Spiritual Section */}
             <div>
-              <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Spiritual</p>
+              {!isCollapsed && <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Spiritual</p>}
               <nav className="space-y-0.5">
-                <NavItem to="/events" icon={<Calendar size={18} />} label="Events" active={location.pathname.startsWith('/events')} />
-                <NavItem to="/bible-school" icon={<BookOpen size={18} />} label="Bible School" active={location.pathname.startsWith('/bible-school')} />
-                <NavItem to="/streaming" icon={<Video size={18} />} label="Live Stream" active={location.pathname.startsWith('/streaming')} />
+                <NavItem to="/events" icon={<Calendar size={18} />} label="Events" active={location.pathname.startsWith('/events')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
+                <NavItem to="/bible-school" icon={<BookOpen size={18} />} label="Bible School" active={location.pathname.startsWith('/bible-school')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
+                <NavItem to="/streaming" icon={<Video size={18} />} label="Live Stream" active={location.pathname.startsWith('/streaming')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
               </nav>
             </div>
 
             {/* Operational Section */}
             <div>
-              <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Operations</p>
+              {!isCollapsed && <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Operations</p>}
               <nav className="space-y-0.5">
-                <NavItem to="/financials" icon={<Banknote size={18} />} label="Financials" active={location.pathname.startsWith('/financials')} />
-                <NavItem to="/volunteers" icon={<Heart size={18} />} label="Volunteers" active={location.pathname.startsWith('/volunteers')} />
-                <NavItem to="/tasks" icon={<CheckSquare size={18} />} label="Tasks" active={location.pathname.startsWith('/tasks')} />
-                <NavItem to="/communication" icon={<MessageSquare size={18} />} label="Communication" active={location.pathname.startsWith('/communication')} />
+                <NavItem to="/financials" icon={<Banknote size={18} />} label="Financials" active={location.pathname.startsWith('/financials')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
+                <NavItem to="/volunteers" icon={<Heart size={18} />} label="Volunteers" active={location.pathname.startsWith('/volunteers')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
+                <NavItem to="/tasks" icon={<CheckSquare size={18} />} label="Tasks" active={location.pathname.startsWith('/tasks')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
+                <NavItem to="/communication" icon={<MessageSquare size={18} />} label="Communication" active={location.pathname.startsWith('/communication')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
               </nav>
             </div>
 
             {/* Admin Section */}
             {isAdmin && (
               <div>
-                <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Administration</p>
+                {!isCollapsed && <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Administration</p>}
                 <nav className="space-y-0.5">
-                  <NavItem to="/transfers" icon={<ArrowLeftRight size={18} />} label="Transfers" active={location.pathname.startsWith('/transfers')} />
-                  <NavItem to="/cms" icon={<Globe size={18} />} label="CMS" active={location.pathname.startsWith('/cms')} />
-                  <NavItem to="/reports" icon={<BarChart3 size={18} />} label="Reports" active={location.pathname.startsWith('/reports')} />
-                  <NavItem to="/settings" icon={<Settings size={18} />} label="Settings" active={location.pathname.startsWith('/settings')} />
+                  <NavItem to="/transfers" icon={<ArrowLeftRight size={18} />} label="Transfers" active={location.pathname.startsWith('/transfers')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
+                  <NavItem to="/cms" icon={<Globe size={18} />} label="CMS" active={location.pathname.startsWith('/cms')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
+                  <NavItem to="/reports" icon={<BarChart3 size={18} />} label="Reports" active={location.pathname.startsWith('/reports')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
+                  <NavItem to="/settings" icon={<Settings size={18} />} label="Settings" active={location.pathname.startsWith('/settings')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
                 </nav>
               </div>
             )}
           </div>
 
-          <div className="p-4 border-t border-slate-100">
-            <NavItem to="/help" icon={<HelpCircle size={18} />} label="Help" active={location.pathname === '/help'} />
+          <div className={`p-4 border-t border-slate-100 ${isCollapsed ? 'px-2' : ''}`}>
+            <NavItem to="/help" icon={<HelpCircle size={18} />} label="Help" active={location.pathname === '/help'} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
             <button 
               onClick={logout}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group duration-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group duration-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 ${isCollapsed ? 'justify-center' : ''}`}
             >
-              <div className="relative group-hover:scale-110 transition-transform duration-200">
+              <div className="relative group-hover:scale-110 transition-transform duration-200 shrink-0">
                 <LogOut size={18} />
               </div>
-              <span className="flex-1 text-left">Logout</span>
+              {!isCollapsed && <span className="flex-1 text-left">Logout</span>}
             </button>
           </div>
         </aside>
@@ -295,18 +317,20 @@ export default function Layout() {
   );
 }
 
-function NavItem({ to, icon, label, active = false }: { to: string, icon: React.ReactNode, label: string, active?: boolean }) {
+function NavItem({ to, icon, label, active = false, isCollapsed = false, onClick }: { to: string, icon: React.ReactNode, label: string, active?: boolean, isCollapsed?: boolean, onClick?: () => void }) {
   return (
     <Link 
       to={to} 
+      title={isCollapsed ? label : undefined}
+      onClick={onClick}
       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium mb-1 ${
         active 
           ? 'bg-blue-50 text-blue-600' 
           : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-      }`}
+      } ${isCollapsed ? 'justify-center' : ''}`}
     >
-      {icon}
-      <span>{label}</span>
+      <div className="shrink-0">{icon}</div>
+      {!isCollapsed && <span className="truncate">{label}</span>}
     </Link>
   );
 }

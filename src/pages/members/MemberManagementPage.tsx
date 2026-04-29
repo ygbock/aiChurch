@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Send, ArrowDownToLine, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Plus, Send, ArrowDownToLine, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { deleteDoc, doc } from 'firebase/firestore';
+import { deleteDoc, doc, collectionGroup, getDocs, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useMembers } from './hooks/useMembers';
 import { useMemberFilters } from './hooks/useMemberFilters';
@@ -13,16 +13,21 @@ import { MemberToolbar } from './components/MemberToolbar';
 import { MemberTable } from './components/MemberTable';
 import { Button } from '@/components/ui/button';
 import { MemberData } from '@/types/membership';
+import { useFirebase } from '@/components/FirebaseProvider';
 
 export default function MemberManagementPage() {
   const navigate = useNavigate();
+  const { profile } = useFirebase();
   const { members, loading } = useMembers();
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const { 
     searchQuery, 
     setSearchQuery, 
     activeTab, 
     setActiveTab, 
-    filteredMembers 
+    filteredMembers,
+    filters,
+    setFilters
   } = useMemberFilters(members);
 
   const counts = useMemo(() => ({
@@ -54,7 +59,13 @@ export default function MemberManagementPage() {
   };
 
   const handleAddClick = () => {
-    navigate(`/members/new?level=${activeTab}`);
+    if (activeTab === 'Convert') {
+      navigate('/members/new-convert');
+    } else if (activeTab === 'Visitor') {
+      navigate('/members/new-first-timer');
+    } else {
+      navigate(`/members/new?level=${activeTab}`);
+    }
   };
 
   return (
@@ -87,7 +98,7 @@ export default function MemberManagementPage() {
             className="bg-slate-900 text-white rounded-xl px-6 h-11 font-bold flex items-center gap-2 shadow-lg shadow-slate-200 hover:shadow-xl hover:translate-y-[-1px] transition-all"
           >
             <Plus size={18} />
-            {activeTab === 'Member' ? 'Add Member' : activeTab === 'Visitor' ? 'Add Visitor' : 'Add Convert'}
+            {activeTab === 'Member' ? 'Add Member' : activeTab === 'Visitor' ? 'Add First Timer' : 'Add Convert'}
           </Button>
         </div>
       </div>
@@ -106,13 +117,16 @@ export default function MemberManagementPage() {
           <MemberToolbar 
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            onAddClick={handleAddClick}
             onBulkUpdate={() => toast.info("Bulk update coming soon")}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            filters={filters}
+            onFilterChange={setFilters}
           />
         </div>
 
         <motion.div
-          key={activeTab}
+          key={activeTab + viewMode}
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.2 }}
@@ -121,6 +135,7 @@ export default function MemberManagementPage() {
             members={filteredMembers}
             loading={loading}
             activeTab={activeTab}
+            viewMode={viewMode}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onView={handleView}

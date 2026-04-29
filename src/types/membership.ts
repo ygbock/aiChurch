@@ -13,6 +13,8 @@ export interface MemberData {
   maritalStatus?: string;
   occupation?: string;
   photoUrl?: string;
+  community?: string;
+  area?: string;
   
   // Scoping
   districtId: string;
@@ -21,6 +23,7 @@ export interface MemberData {
   
   // Membership Details
   level: MemberLevel;
+  baptizedSubLevel?: 'leader' | 'worker' | 'disciple';
   status: MemberStatus;
   baptismStatus: BaptismStatus;
   isBaptised: boolean;
@@ -39,7 +42,38 @@ export interface MemberData {
   source?: string;
   invitedBy?: string;
   
+  // First Timer Specifics
+  street?: string;
+  publicLandmark?: string;
+  serviceDate?: string;
+  firstVisit?: string;
+  followUpStatus?: 'pending' | 'called' | 'visited' | 'completed';
+  followUpNotes?: string;
+  notes?: string;
+  
   path?: string; // Firestore path
   createdAt: any;
   updatedAt: any;
+}
+
+export interface FirstTimerData {
+  id?: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  community: string;
+  area: string;
+  street: string;
+  publicLandmark?: string;
+  serviceDate: string;
+  firstVisit: string;
+  invitedBy?: string;
+  branchId: string;
+  districtId: string;
+  status: 'new' | 'contacted' | 'followed_up' | 'converted';
+  followUpStatus: 'pending' | 'called' | 'visited' | 'completed';
+  followUpNotes?: string;
+  notes?: string;
+  createdAt?: any;
+  updatedAt?: any;
 }

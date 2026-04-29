@@ -20,9 +20,11 @@ import {
   Edit2,
   FileText,
   Phone,
-  CheckCircle2
+  CheckCircle2,
+  LayoutGrid
 } from 'lucide-react';
 import Modal from '../components/Modal';
+import CollapsibleSection from '../components/CollapsibleSection';
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -529,34 +531,36 @@ export default function SuperadminDashboard() {
       </div>
 
       {activeTab === 'overview' && (
-        <>
-          {/* Global Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <GlobalStatCard 
-              label="Total Global Members" 
-              value={totalMembers.toLocaleString()} 
-              trend={`${totalMembers > 0 ? '+5.2%' : 'No data'}`} 
-              icon={<Users className="text-blue-600" size={20} />}
-            />
-            <GlobalStatCard 
-              label="Active Branches" 
-              value={totalBranches.toString()} 
-              trend="Across all districts" 
-              icon={<Building2 className="text-emerald-600" size={20} />}
-            />
-            <GlobalStatCard 
-              label="Live Districts" 
-              value={totalDistrictsCount.toString()} 
-              trend="System-wide" 
-              icon={<Map className="text-purple-600" size={20} />}
-            />
-            <GlobalStatCard 
-              label="System Health" 
-              value="100%" 
-              trend="Stable" 
-              icon={<Activity className="text-orange-600" size={20} />}
-            />
-          </div>
+        <div className="space-y-8">
+          {/* Global Stats Grid - Collapsible */}
+          <CollapsibleSection title="Global Statistics" icon={<LayoutGrid size={20} />}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <GlobalStatCard 
+                label="Total Global Members" 
+                value={totalMembers.toLocaleString()} 
+                trend={`${totalMembers > 0 ? '+5.2%' : 'No data'}`} 
+                icon={<Users className="text-blue-600" size={20} />}
+              />
+              <GlobalStatCard 
+                label="Active Branches" 
+                value={totalBranches.toString()} 
+                trend="Across all districts" 
+                icon={<Building2 className="text-emerald-600" size={20} />}
+              />
+              <GlobalStatCard 
+                label="Live Districts" 
+                value={totalDistrictsCount.toString()} 
+                trend="System-wide" 
+                icon={<Map className="text-purple-600" size={20} />}
+              />
+              <GlobalStatCard 
+                label="System Health" 
+                value="100%" 
+                trend="Stable" 
+                icon={<Activity className="text-orange-600" size={20} />}
+              />
+            </div>
+          </CollapsibleSection>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Global Growth Chart */}
@@ -618,7 +622,7 @@ export default function SuperadminDashboard() {
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {activeTab === 'districts' && (
