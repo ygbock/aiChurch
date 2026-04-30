@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import FloatingActionMenu from '../components/FloatingActionMenu';
 import { 
   Users, 
   Calendar, 
@@ -114,25 +115,7 @@ export default function CommitteeWorkspace() {
 
       {/* Content Area */}
       {activeTab === 'Home' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Quick Actions */}
-          <section className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
-            <div>
-              <h3 className="text-2xl font-bold text-slate-900 font-display">Quick Actions</h3>
-              <p className="text-sm text-slate-500 mt-1 font-medium italic text-slate-400">
-                Common tasks for {getCommitteeName()}
-              </p>
-            </div>
-            
-            <div className="space-y-3">
-              <QuickActionItem icon={<CheckSquare size={18} />} label="Create New Task" />
-              <QuickActionItem icon={<Calendar size={18} />} label="Schedule Meeting" />
-              <QuickActionItem icon={<DollarSign size={18} />} label="Record Expense" />
-              <QuickActionItem icon={<MessageSquare size={18} />} label="Create Publication" />
-              <QuickActionItem icon={<BarChart3 size={18} />} label="View Reports" />
-            </div>
-          </section>
-
+        <div className="grid grid-cols-1 gap-8">
           {/* Recent Activity */}
           <section className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-8">
             <div>
@@ -159,6 +142,14 @@ export default function CommitteeWorkspace() {
           </section>
         </div>
       )}
+      {/* Floating Action Menu */}
+      <FloatingActionMenu actions={[
+        { icon: <CheckSquare size={18} />, label: "Create New Task", onClick: () => {} },
+        { icon: <Calendar size={18} />, label: "Schedule Meeting", onClick: () => {} },
+        { icon: <DollarSign size={18} />, label: "Record Expense", onClick: () => {} },
+        { icon: <MessageSquare size={18} />, label: "Create Publication", onClick: () => {} },
+        { icon: <BarChart3 size={18} />, label: "View Reports", onClick: () => {} }
+      ]} />
     </motion.div>
   );
 }

@@ -161,7 +161,7 @@ export const MemberTable = ({
       viewMode === 'list' && "md:bg-white md:rounded-2xl md:border md:border-slate-200 md:shadow-sm"
     )}>
       {viewMode === 'grid' ? (
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 p-4 md:p-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 p-0">
           {members.map((member) => (
             <MemberCard key={member.id} member={member} />
           ))}
@@ -169,7 +169,7 @@ export const MemberTable = ({
       ) : (
         <>
           {/* Mobile grid view (always grid on mobile) */}
-          <div className="md:hidden grid grid-cols-2 gap-4 p-4">
+          <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-4 p-0">
             {members.map((member) => (
               <MemberCard key={member.id} member={member} />
             ))}

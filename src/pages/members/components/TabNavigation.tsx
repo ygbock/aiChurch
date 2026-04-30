@@ -32,7 +32,7 @@ export const TabNavigation = ({ activeTab, onTabChange, counts }: TabNavigationP
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             className={cn(
-              "relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all",
+              "relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap shrink-0",
               isActive ? "text-slate-900" : "text-slate-500 hover:text-slate-700"
             )}
           >

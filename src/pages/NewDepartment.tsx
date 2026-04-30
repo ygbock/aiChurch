@@ -89,8 +89,8 @@ export default function NewDepartment({ onCancel, onSuccess }: NewDepartmentProp
               <Fingerprint size={18} className="text-slate-500" />
               <h3 className="text-base font-semibold text-slate-900">Department Identity</h3>
             </div>
-            <div className="p-5 grid grid-cols-2 gap-5">
-              <div className="col-span-2 md:col-span-1">
+            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="col-span-1">
                 <label className="block text-xs font-semibold text-slate-800 mb-1.5">Department Name</label>
                 <input 
                   type="text" 
@@ -100,7 +100,7 @@ export default function NewDepartment({ onCancel, onSuccess }: NewDepartmentProp
                   className="w-full bg-white border border-slate-200 rounded-lg py-2.5 px-3 focus:ring-1 focus:ring-blue-600 focus:border-blue-600 text-sm text-slate-800 placeholder:text-slate-400 transition-all outline-none"
                 />
               </div>
-              <div className="col-span-2 md:col-span-1">
+              <div className="col-span-1">
                 <label className="block text-xs font-semibold text-slate-800 mb-1.5">Category</label>
                 <select 
                   value={category}
@@ -114,7 +114,7 @@ export default function NewDepartment({ onCancel, onSuccess }: NewDepartmentProp
                   <option>Pastoral Care</option>
                 </select>
               </div>
-              <div className="col-span-2">
+              <div className="col-span-1 sm:col-span-2">
                 <label className="block text-xs font-semibold text-slate-800 mb-1.5">Mission & Purpose</label>
                 <textarea 
                   value={mission}

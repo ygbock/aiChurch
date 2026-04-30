@@ -71,7 +71,7 @@ export default function MemberManagementPage() {
   return (
     <div className="space-y-8 pb-12">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold border border-blue-100 flex items-center gap-1">
@@ -85,17 +85,17 @@ export default function MemberManagementPage() {
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-row md:flex-row items-center gap-3 w-full md:w-auto">
           <Button 
             variant="outline"
-            className="rounded-xl px-5 font-bold border-slate-200 hidden sm:flex items-center gap-2"
+            className="hidden sm:flex flex-1 md:flex-none rounded-xl px-5 font-bold border-slate-200 items-center justify-center gap-2 h-11"
           >
             <Send size={18} />
             Bulk Notify
           </Button>
           <Button 
             onClick={handleAddClick}
-            className="bg-slate-900 text-white rounded-xl px-6 h-11 font-bold flex items-center gap-2 shadow-lg shadow-slate-200 hover:shadow-xl hover:translate-y-[-1px] transition-all"
+            className="w-full sm:flex-1 md:flex-none justify-center bg-slate-900 text-white rounded-xl px-6 h-11 font-bold flex items-center gap-2 shadow-lg shadow-slate-200 hover:shadow-xl hover:translate-y-[-1px] transition-all"
           >
             <Plus size={18} />
             {activeTab === 'Member' ? 'Add Member' : activeTab === 'Visitor' ? 'Add First Timer' : 'Add Convert'}

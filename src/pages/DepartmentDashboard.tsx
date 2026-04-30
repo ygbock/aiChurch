@@ -50,6 +50,7 @@ import {
 import { doc, getDoc, collection, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
+import FloatingActionMenu from '../components/FloatingActionMenu';
 import { getScheduledEvents } from '../lib/churchSchedule';
 import { 
   BarChart, 
@@ -192,7 +193,7 @@ export default function DepartmentDashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-3 md:grid-cols-4 gap-2 sm:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-6">
         {isUshering ? (
           <>
             <StatBox icon={<Users size={18} className="text-slate-400" />} label="TOTAL USHERS" value="0" />
@@ -232,38 +233,30 @@ export default function DepartmentDashboard() {
         )}
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {isUshering ? (
-          <>
-            <ActionButton icon={<UserPlus size={20} />} label="Add Usher" active={true} onClick={() => openModal('add_member')} />
-            <ActionButton icon={<Calendar size={20} />} label="Assign Service" onClick={() => openModal('assign_service')} />
-            <ActionButton icon={<ClipboardList size={20} />} label="Create Schedule" onClick={() => openModal('create_schedule')} />
-            <ActionButton icon={<Users size={20} />} label="Training Session" onClick={() => openModal('training')} />
-          </>
-        ) : isChoir ? (
-          <>
-            <ActionButton icon={<UserPlus size={20} />} label="Add Singer" active={true} onClick={() => openModal('add_member')} />
-            <ActionButton icon={<Calendar size={20} />} label="Schedule Rehearsal" onClick={() => openModal('schedule_rehearsal')} />
-            <ActionButton icon={<Music size={20} />} label="Add Song" onClick={() => openModal('add_song')} />
-            <ActionButton icon={<Download size={20} />} label="Import Members" onClick={() => openModal('import_members')} />
-          </>
-        ) : isTechnical ? (
-          <>
-            <ActionButton icon={<UserPlus size={20} />} label="Add Member" active={true} onClick={() => openModal('add_member')} />
-            <ActionButton icon={<AlertCircle size={20} />} label="New Ticket" onClick={() => openModal('new_ticket')} />
-            <ActionButton icon={<Monitor size={20} />} label="Add Equipment" onClick={() => openModal('add_equipment')} />
-            <ActionButton icon={<Wrench size={20} />} label="Schedule Maintenance" onClick={() => openModal('schedule_maintenance')} />
-          </>
-        ) : (
-          <>
-            <ActionButton icon={<UserPlus size={20} />} label="Add Member" active={true} onClick={() => openModal('add_member')} />
-            <ActionButton icon={<Calendar size={20} />} label="Plan Outreach" onClick={() => openModal('plan_outreach')} />
-            <ActionButton icon={<Target size={20} />} label="Add Follow-up" onClick={() => openModal('add_followup')} />
-            <ActionButton icon={<BookOpen size={20} />} label="Training" onClick={() => openModal('training')} />
-          </>
-        )}
-      </div>
+      {/* Quick Actions Menu */}
+      <FloatingActionMenu actions={
+        isUshering ? [
+          { icon: <UserPlus size={18} />, label: "Add Usher", onClick: () => openModal('add_member') },
+          { icon: <Calendar size={18} />, label: "Assign Service", onClick: () => openModal('assign_service') },
+          { icon: <ClipboardList size={18} />, label: "Create Schedule", onClick: () => openModal('create_schedule') },
+          { icon: <Users size={18} />, label: "Training Session", onClick: () => openModal('training') }
+        ] : isChoir ? [
+          { icon: <UserPlus size={18} />, label: "Add Singer", onClick: () => openModal('add_member') },
+          { icon: <Calendar size={18} />, label: "Schedule Rehearsal", onClick: () => openModal('schedule_rehearsal') },
+          { icon: <Music size={18} />, label: "Add Song", onClick: () => openModal('add_song') },
+          { icon: <Download size={18} />, label: "Import Members", onClick: () => openModal('import_members') }
+        ] : isTechnical ? [
+          { icon: <UserPlus size={18} />, label: "Add Member", onClick: () => openModal('add_member') },
+          { icon: <AlertCircle size={18} />, label: "New Ticket", onClick: () => openModal('new_ticket') },
+          { icon: <Monitor size={18} />, label: "Add Equipment", onClick: () => openModal('add_equipment') },
+          { icon: <Wrench size={18} />, label: "Schedule Maintenance", onClick: () => openModal('schedule_maintenance') }
+        ] : [
+          { icon: <UserPlus size={18} />, label: "Add Member", onClick: () => openModal('add_member') },
+          { icon: <Calendar size={18} />, label: "Plan Outreach", onClick: () => openModal('plan_outreach') },
+          { icon: <Target size={18} />, label: "Add Follow-up", onClick: () => openModal('add_followup') },
+          { icon: <BookOpen size={18} />, label: "Training", onClick: () => openModal('training') }
+        ]
+      } />
 
       {/* Modal Backdrop and Content */}
       <AnimatePresence>
@@ -557,7 +550,10 @@ export default function DepartmentDashboard() {
               {isChoir ? 'Choir Singers' : (isUshering ? 'Usher Team' : (isTechnical ? 'Technical Team' : `${department?.name || 'Department'} Team`))}
             </h3>
             <div className="flex items-center gap-3 w-full md:w-auto">
-              <button className="flex-1 md:flex-none bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+              <button 
+                onClick={() => openModal('add_member')}
+                className="flex-1 md:flex-none bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+              >
                 <UserPlus size={16} />
                 {isChoir ? 'Add Singer' : (isUshering ? 'Add Usher' : (isTechnical ? 'Add Technical Member' : 'Add Member'))}
               </button>
@@ -621,49 +617,26 @@ export default function DepartmentDashboard() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead>
-                <tr className="bg-slate-50/50">
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">{isChoir ? 'Singer' : (isUshering ? 'Usher' : (isTechnical ? 'Staff' : 'Member'))}</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">{isChoir ? 'Voice Part' : (isUshering ? 'Station' : (isTechnical ? 'Specialization' : 'Area'))}</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Role</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-center">{isChoir ? 'Soloist' : (isUshering ? 'Experience' : (isTechnical ? 'Certifications' : 'Events Led'))}</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-center">{isUshering ? 'Availability' : (isTechnical ? 'Devices' : 'Attendance')}</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Status</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <MemberRow 
-                  id="mem-1" 
-                  name="John Smith" 
-                  initial="JS"
-                  dept={isChoir ? 'Tenor' : (isUshering ? 'Main Entrance' : (isTechnical ? 'Audio' : 'Main Area'))} 
-                  role="Lead" 
-                  status="Active" 
-                  onView={() => navigate(`/departments/${departmentId}/members/mem-1`)}
-                />
-                <MemberRow 
-                  id="mem-2" 
-                  name="Sarah Johnson" 
-                  initial="SJ"
-                  dept={isChoir ? 'Soprano' : (isUshering ? 'Sanctuary' : (isTechnical ? 'Support' : 'Outreach'))} 
-                  role="Member" 
-                  status="Active" 
-                  onView={() => navigate(`/departments/${departmentId}/members/mem-2`)}
-                />
-                <MemberRow 
-                  id="mem-3" 
-                  name="Michael Brown" 
-                  initial="MB"
-                  dept={isChoir ? 'Bass' : (isUshering ? 'Parking' : (isTechnical ? 'IT' : 'North Side'))} 
-                  role="Member" 
-                  status="Active" 
-                  onView={() => navigate(`/departments/${departmentId}/members/mem-3`)}
-                />
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { id: "mem-1", name: "John Smith", initial: "JS", dept: isChoir ? 'Tenor' : (isUshering ? 'Main Entrance' : (isTechnical ? 'Audio' : 'Main Area')), role: "Lead", status: "Active" },
+              { id: "mem-2", name: "Sarah Johnson", initial: "SJ", dept: isChoir ? 'Soprano' : (isUshering ? 'Sanctuary' : (isTechnical ? 'Support' : 'Outreach')), role: "Member", status: "Active" },
+              { id: "mem-3", name: "Michael Brown", initial: "MB", dept: isChoir ? 'Bass' : (isUshering ? 'Parking' : (isTechnical ? 'IT' : 'North Side')), role: "Member", status: "Active" }
+            ].map(member => (
+              <MemberCard 
+                key={member.id}
+                id={member.id} 
+                name={member.name} 
+                initial={member.initial}
+                dept={member.dept} 
+                role={member.role} 
+                status={member.status} 
+                isChoir={isChoir}
+                isUshering={isUshering}
+                isTechnical={isTechnical}
+                onView={() => navigate(`/departments/${departmentId}/members/${member.id}`)}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -944,7 +917,7 @@ export default function DepartmentDashboard() {
             </div>
             <button 
               onClick={() => openModal('assign_service')}
-              className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-black transition-all flex items-center gap-2 shadow-lg shadow-slate-200"
+              className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-black transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-200 w-full md:w-auto"
             >
               <UserCheck size={18} />
               Quick Assign
@@ -984,17 +957,17 @@ export default function DepartmentDashboard() {
       {activeTab === 'Schedule' && (isUshering || isChoir || isTechnical) && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
               <div>
-                <h3 className="text-2xl font-bold text-slate-900 leading-none">
+                <h3 className="text-xl sm:text-2xl font-bold text-slate-900 leading-none">
                   {isChoir ? 'Music Calendar' : (isTechnical ? 'Maintenance Schedule' : 'Service Schedule')}
                 </h3>
-                <p className="text-sm text-slate-500 mt-2">Manage assignments and coverage</p>
+                <p className="text-xs sm:text-sm text-slate-500 mt-2">Manage assignments and coverage</p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button 
                   onClick={() => openModal(isChoir ? 'add_song' : (isTechnical ? 'schedule_maintenance' : 'assign_service'))}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                  className="w-full sm:w-auto justify-center bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
                 >
                   <Plus size={18} />
                   {isChoir ? 'Add Rehearsal' : 'Add Event'}
@@ -1026,12 +999,12 @@ export default function DepartmentDashboard() {
 
       {activeTab === 'Stations' && isUshering && (
         <div className="space-y-6">
-          <div className="flex justify-between items-center bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
             <div>
-              <h3 className="text-2xl font-bold text-slate-900 leading-none">Stations Management</h3>
-              <p className="text-sm text-slate-500 mt-2">Define and oversee usher deployment zones</p>
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 leading-none">Stations Management</h3>
+              <p className="text-xs sm:text-sm text-slate-500 mt-2">Define and oversee usher deployment zones</p>
             </div>
-            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2">
+            <button className="bg-blue-600 w-full md:w-auto justify-center text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2">
               <Plus size={16} />
               New Station
             </button>
@@ -1056,12 +1029,12 @@ export default function DepartmentDashboard() {
                 {isChoir ? 'Detailed insights into choir growth, mastery, and attendance.' : 'Comprehensive tracking of attendance trends, growth metrics, and efficiency.'}
               </p>
             </div>
-            <div className="flex gap-3">
-              <button className="px-4 py-2 bg-slate-50 text-slate-600 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-slate-100 transition-colors border border-slate-100">
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              <button className="w-full sm:w-auto justify-center px-4 py-2 bg-slate-50 text-slate-600 rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-slate-100 transition-colors border border-slate-100">
                 <Download size={16} />
                 Export CSV
               </button>
-              <button className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg shadow-blue-100">
+              <button className="w-full sm:w-auto justify-center bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-lg shadow-blue-100">
                 <FileText size={18} />
                 Full Report
               </button>
@@ -1392,48 +1365,53 @@ export default function DepartmentDashboard() {
   );
 }
 
-function MemberRow({ id, name, initial, dept, role, status, onView }: any) {
+function MemberCard({ id, name, initial, dept, role, status, isChoir, isUshering, isTechnical, onView }: any) {
   return (
-    <tr className="hover:bg-slate-50 transition-colors group">
-      <td className="px-6 py-4">
+    <div className="bg-white rounded-xl border border-slate-200 p-5 hover:border-blue-200 transition-colors group flex flex-col h-full shadow-sm">
+      <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-500">
+          <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-lg">
             {initial}
           </div>
-          <span className="font-bold text-slate-900">{name}</span>
+          <div>
+            <h4 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{name}</h4>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{role}</span>
+          </div>
         </div>
-      </td>
-      <td className="px-6 py-4">
-        <span className="text-xs font-bold text-slate-600">{dept}</span>
-      </td>
-      <td className="px-6 py-4">
-        <span className="text-xs font-medium text-slate-500">{role}</span>
-      </td>
-      <td className="px-6 py-4 text-center">
-        <span className="text-xs font-black text-blue-600">Pro</span>
-      </td>
-      <td className="px-6 py-4 text-center">
-        <span className="text-xs font-bold text-slate-700">85%</span>
-      </td>
-      <td className="px-6 py-4">
         <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded text-[10px] font-black uppercase">
           {status}
         </span>
-      </td>
-      <td className="px-6 py-4 text-right">
-        <div className="flex justify-end gap-2">
-          <button 
-            onClick={onView}
-            className="px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-colors"
-          >
-            View Profile
-          </button>
-          <button className="p-2 text-slate-300 hover:text-slate-600 transition-colors">
+      </div>
+      
+      <div className="grid grid-cols-2 gap-3 mb-5 mt-auto">
+        <div className="bg-slate-50 p-2.5 rounded-lg">
+          <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">{isChoir ? 'Voice Part' : (isUshering ? 'Station' : (isTechnical ? 'Specialization' : 'Area'))}</p>
+          <p className="text-xs font-semibold text-slate-700 truncate">{dept}</p>
+        </div>
+        <div className="bg-slate-50 p-2.5 rounded-lg">
+           <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">{isChoir ? 'Soloist' : (isUshering ? 'Experience' : (isTechnical ? 'Certif.' : 'Events'))}</p>
+           <p className="text-xs font-semibold text-blue-600">Pro</p>
+        </div>
+      </div>
+      
+      <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-auto">
+        <div className="flex -space-x-2">
+           <div className="w-6 h-6 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-[8px] font-bold text-blue-600" title="Active">A</div>
+           <div className="w-6 h-6 rounded-full bg-amber-100 border-2 border-white flex items-center justify-center text-[8px] font-bold text-amber-600" title="Recent activity">R</div>
+        </div>
+        <div className="flex gap-2">
+          <button className="p-2 text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors">
             <MoreVertical size={16} />
           </button>
+          <button 
+            onClick={onView}
+            className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold transition-all shadow-sm"
+          >
+            Profile
+          </button>
         </div>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }
 
@@ -1764,7 +1742,7 @@ function AssignServiceForm({ onClose, department, selectedDate }: { onClose: () 
   const [assignmentRoles] = useState(getInitialRoles());
   
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-8 space-y-4 sm:space-y-6">
       <div className="space-y-2">
         <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Selected Date</label>
         <p className="text-lg font-bold text-slate-900">{selectedDate.toLocaleDateString('en-US', { dateStyle: 'full' })}</p>
@@ -1795,11 +1773,11 @@ function AssignServiceForm({ onClose, department, selectedDate }: { onClose: () 
         </button>
       </div>
 
-      <div className="pt-4 flex gap-3">
-        <button onClick={onClose} className="flex-1 px-6 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+      <div className="pt-4 flex flex-col sm:flex-row gap-3">
+        <button onClick={onClose} className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors">
           Cancel
         </button>
-        <button onClick={onClose} className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200">
+        <button onClick={onClose} className="flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200">
           Save Assignments
         </button>
       </div>
@@ -1930,7 +1908,7 @@ function AddMemberForm({ department, onClose }: { department: any, onClose: () =
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Full Name</label>
               <input 
@@ -2355,13 +2333,13 @@ function VoicePartStat({ icon, label, value }: { icon: React.ReactNode, label: s
 
 function StatBox({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) {
   return (
-    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-      <div className="p-2 bg-slate-50 rounded-lg">
+    <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+      <div className="p-1.5 sm:p-2 bg-slate-50 rounded-lg">
         {icon}
       </div>
       <div>
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
-        <p className="text-lg font-bold text-slate-900 leading-tight">{value}</p>
+        <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
+        <p className="text-base sm:text-lg font-bold text-slate-900 leading-tight">{value}</p>
       </div>
     </div>
   );

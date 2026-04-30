@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import FloatingActionMenu from '../components/FloatingActionMenu';
 import { 
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
@@ -345,18 +346,12 @@ export default function MinistryDashboard() {
         ))}
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {config.quickActions.map((action: any, i: number) => (
-          <ActionButton 
-            key={i} 
-            icon={action.icon} 
-            label={action.label} 
-            active={activeTab === action.tab} 
-            onClick={() => setActiveTab(action.tab)} 
-          />
-        ))}
-      </div>
+      {/* Quick Actions Menu */}
+      <FloatingActionMenu actions={config.quickActions.map((action: any) => ({
+        icon: action.icon,
+        label: action.label,
+        onClick: () => setActiveTab(action.tab)
+      }))} />
 
       {/* Tabs */}
       <div className="p-1 border-b border-slate-200 flex overflow-x-auto no-scrollbar">

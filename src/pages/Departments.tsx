@@ -89,7 +89,7 @@ export default function Departments() {
       </div>
 
       {/* Department Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-4 sm:gap-6">
         <StatCard label="Total Departments" value={departments.length.toString()} icon={<Building2 className="text-blue-600" size={20} />} trend="Active units" />
         <StatCard label="Total Staff" value="--" icon={<Users className="text-emerald-600" size={20} />} trend="Assigned workers" />
         <StatCard label="Total Budget" value={`$${departments.reduce((acc, curr) => acc + (curr.budgetLimit || 0), 0) || '0'}`} icon={<Banknote className="text-purple-600" size={20} />} trend="Allocated funds" />
@@ -132,16 +132,16 @@ export default function Departments() {
 
 function StatCard({ label, value, icon, trend }: { label: string, value: string, icon: React.ReactNode, trend: string }) {
   return (
-    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-      <div className="flex justify-between items-start mb-4">
-        <div className="p-2 bg-slate-50 rounded-lg">
+    <div className="bg-white p-3 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex justify-between items-start mb-2 sm:mb-4">
+        <div className="p-1.5 sm:p-2 bg-slate-50 rounded-lg shrink-0">
           {icon}
         </div>
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{trend}</span>
+        <span className="hidden sm:inline-block text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">{trend}</span>
       </div>
       <div>
-        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{label}</p>
-        <p className="text-2xl font-bold text-slate-900">{value}</p>
+        <p className="text-[9px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 truncate" title={label}>{label}</p>
+        <p className="text-lg sm:text-2xl font-bold text-slate-900">{value}</p>
       </div>
     </div>
   );

@@ -24,7 +24,7 @@ export const MemberToolbar = ({
   onFilterChange
 }: MemberToolbarProps) => {
   return (
-    <div className="flex flex-row items-center gap-4 bg-white p-2 sm:p-3 rounded-2xl border border-slate-200 w-full lg:w-auto">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 bg-white p-2 sm:p-3 rounded-2xl border border-slate-200 w-full lg:w-auto">
       <div className="relative flex-1 min-w-0 w-full sm:w-64">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <Input 
@@ -35,7 +35,7 @@ export const MemberToolbar = ({
         />
       </div>
       
-      <div className="flex items-center gap-2 shrink-0 w-auto sm:w-auto">
+      <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
          {/* Filter Level Dropdown */}
          <div className="hidden md:block">
            <select 
@@ -51,7 +51,7 @@ export const MemberToolbar = ({
          </div>
          {/* ... other filters ... */}
 
-        <div className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl mr-2">
+        <div className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl mr-auto sm:mr-2">
           <Button
             variant="ghost"
             size="sm"
@@ -76,18 +76,20 @@ export const MemberToolbar = ({
           </Button>
         </div>
 
-        <Button variant="outline" className="h-11 px-4 rounded-xl flex items-center justify-center gap-2 border-slate-200 text-slate-600 font-bold text-xs">
-          <Filter size={18} />
-          Filter
-        </Button>
-        <Button 
-          variant="outline" 
-          onClick={onBulkUpdate}
-          className="h-11 px-4 rounded-xl flex items-center justify-center gap-2 border-slate-200 text-slate-600 font-bold text-xs"
-        >
-          <ArrowDownToLine size={18} />
-          Batch
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="h-11 px-4 rounded-xl flex items-center justify-center gap-2 border-slate-200 text-slate-600 font-bold text-xs flex-1 sm:flex-none">
+            <Filter size={18} />
+            <span className="hidden sm:inline">Filter</span>
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={onBulkUpdate}
+            className="h-11 px-4 rounded-xl flex items-center justify-center gap-2 border-slate-200 text-slate-600 font-bold text-xs flex-1 sm:flex-none"
+          >
+            <ArrowDownToLine size={18} />
+            <span className="hidden sm:inline">Batch</span>
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -234,9 +234,6 @@ export default function Layout() {
               >
                 <LayoutGrid size={20} />
               </button>
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight hidden xl:block">
-                {currentModule ? currentModule.name : 'FaithFlow CMS'}
-              </h1>
               <div className="max-w-[400px] w-full relative hidden sm:block">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                 <input 
@@ -247,12 +244,6 @@ export default function Layout() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              {/* Profile/Role Badge */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg text-xs font-bold text-slate-700 border border-slate-200 cursor-default">
-                {roles[role]?.icon}
-                {roles[role]?.label}
-              </div>
-
               <button className="p-2 text-slate-500 hover:bg-slate-100 transition-colors rounded-full relative">
                 <Bell size={20} />
                 <span className="absolute top-2 right-2 w-2 h-2 bg-blue-600 rounded-full"></span>
