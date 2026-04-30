@@ -450,21 +450,21 @@ export const FirstTimerForm: React.FC<FirstTimerFormProps> = ({
           </div>
 
           {/* Action Hub */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-6 pt-10 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 sm:gap-6 pt-10 border-t border-slate-100">
             <Button
               type="button"
               variant="ghost"
               onClick={onCancel}
-              className="w-full sm:w-auto text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-500 h-14 px-10 rounded-2xl transition-all"
+              className="w-full sm:w-auto text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-500 h-12 sm:h-14 px-10 rounded-2xl transition-all"
             >
               Abort Encounter
             </Button>
 
-            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
               <Button
                 type="submit"
                 disabled={isSaving}
-                className="w-full sm:w-auto bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest h-14 px-12 rounded-2xl hover:bg-slate-800 active:scale-95 transition-all shadow-xl flex items-center justify-center gap-3 group disabled:opacity-50"
+                className="w-full sm:w-auto bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest h-12 sm:h-14 px-8 sm:px-12 rounded-2xl hover:bg-slate-800 active:scale-95 transition-all shadow-xl flex items-center justify-center gap-2 sm:gap-3 group disabled:opacity-50"
               >
                 {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Sparkles className="h-4 w-4 group-hover:rotate-12 transition-transform" />}
                 {firstTimer && firstTimer.id ? 'Authorize Update' : 'Execute Recording'}

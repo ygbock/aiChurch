@@ -1,0 +1,23 @@
+596-          </div>
+597-
+598:          <div className="hidden sm:block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+599-            <div className="overflow-x-auto -mx-4 sm:mx-0">
+600-              <table className="w-full text-left border-collapse min-w-[500px] sm:min-w-[600px]">
+--
+680-                </div>
+681-               ) : (
+682:                <div className="hidden sm:block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto">
+683-                  <table className="w-full text-left border-collapse">
+684-                    <thead>
+--
+1635-      </div>
+1636-
+1637:      <div className="hidden sm:block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+1638-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+1639-          <table className="w-full text-left border-collapse min-w-[700px]">
+--
+1924-      </div>
+1925-
+1926:      <div className="hidden sm:block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+1927-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+1928-          <h4 className="font-bold text-slate-900 text-sm uppercase tracking-widest text-[10px]">Recent Transactions</h4>

@@ -55,7 +55,8 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, loading, provisioningStatus, login, loginWithEmail, signUpWithEmail, logout } = useFirebase();
-  const role = profile?.role || 'member';
+  const rawRole = profile?.role || 'member';
+  const role = rawRole === 'branch_admin' ? 'admin' : rawRole;
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -224,9 +225,9 @@ export default function Layout() {
         </aside>
 
         {/* Main Content */}
-        <main className={`flex-1 flex flex-col min-h-screen min-w-0 p-4 md:p-8`}>
+        <main className={`flex-1 flex flex-col min-h-screen min-w-0 px-4 pt-0 pb-4 md:px-8 md:pb-8`}>
           {/* Topbar */}
-          <header className="flex justify-between items-center mb-6 md:mb-8 gap-4">
+          <header className="sticky top-0 z-40 flex justify-between items-center py-4 md:py-6 mb-6 md:mb-8 gap-4 bg-slate-50/90 backdrop-blur-md -mx-4 px-4 md:-mx-8 md:px-8 shadow-sm">
             <div className="flex items-center gap-3 md:gap-6 flex-1">
               <button 
                 onClick={() => setIsSidebarOpen(true)}

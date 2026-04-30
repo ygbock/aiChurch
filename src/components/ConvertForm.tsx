@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { motion } from 'motion/react';
-import { Sparkles, Camera, Phone, Mail, MapPin, Building2, User, Loader2, RotateCcw, Upload, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Camera, Phone, Mail, MapPin, Building2, User, Loader2, RotateCcw, Upload, CheckCircle2, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import {
@@ -36,6 +36,8 @@ const convertSchema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address').optional().or(z.literal('')),
   phone: z.string().min(7, 'Invalid phone number'),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  gender: z.enum(['Male', 'Female']),
   community: z.string().min(1, 'Community is required'),
   area: z.string().min(1, 'Area is required'),
   branchId: z.string().min(1, 'Branch is required'),
@@ -62,6 +64,7 @@ export const ConvertForm: React.FC<ConvertFormProps> = ({
   role,
 }) => {
   const [showCamera, setShowCamera] = useState(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('user');
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
 
@@ -71,6 +74,8 @@ export const ConvertForm: React.FC<ConvertFormProps> = ({
       fullName: convert?.fullName || '',
       email: convert?.email || '',
       phone: convert?.phone || '',
+      dateOfBirth: convert?.dateOfBirth || '',
+      gender: convert?.gender || 'Male',
       community: convert?.community || '',
       area: convert?.area || '',
       branchId: convert?.branchId || '',
@@ -84,11 +89,13 @@ export const ConvertForm: React.FC<ConvertFormProps> = ({
     }
   }, [branches, form]);
 
-  const startCamera = async () => {
+  const startCamera = async (facingMode = cameraFacingMode) => {
     try {
+      if (showCamera) stopCamera();
+
       setShowCamera(true);
       setTimeout(async () => {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode } });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
@@ -99,6 +106,13 @@ export const ConvertForm: React.FC<ConvertFormProps> = ({
       setShowCamera(false);
     }
   };
+
+  const toggleCamera = async () => {
+    const newMode = cameraFacingMode === 'user' ? 'environment' : 'user';
+    setCameraFacingMode(newMode);
+    await startCamera(newMode);
+  };
+
 
   const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -148,7 +162,7 @@ export const ConvertForm: React.FC<ConvertFormProps> = ({
           animate={{ opacity: 1, x: 0 }}
           className="space-y-12"
         >
-          <div className="flex flex-col lg:flex-row gap-16">
+          <div className="flex flex-col lg:flex-row gap-8 lg:gap-16">
             {/* Photo Acquisition Block */}
             <div className="lg:w-1/3 xl:w-1/4 space-y-6">
               <div className="space-y-4">
@@ -157,7 +171,47 @@ export const ConvertForm: React.FC<ConvertFormProps> = ({
                   <div className="h-px flex-1 bg-slate-100" />
                 </div>
                 <div className="relative aspect-square rounded-[3rem] bg-slate-50 border-4 border-slate-100 overflow-hidden shadow-inner group flex items-center justify-center">
-                  {form.watch('photoUrl') ? (
+                  {showCamera ? (
+                    <div className="relative w-full h-full bg-black">
+                      <video 
+                        ref={videoRef} 
+                        autoPlay 
+                        playsInline 
+                        muted
+                        className="w-full h-full object-cover" 
+                        style={{ transform: cameraFacingMode === 'user' ? 'scaleX(-1)' : 'none' }}
+                      />
+                      {/* Camera Overlay */}
+                      <div className="absolute inset-0 flex flex-col justify-between p-4 pointer-events-none">
+                        <div className="flex justify-between items-center w-full">
+                          <button
+                            type="button"
+                            onClick={stopCamera}
+                            className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white pointer-events-auto"
+                          >
+                            <X size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={toggleCamera}
+                            className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white pointer-events-auto sm:hidden"
+                          >
+                            <RotateCcw size={16} />
+                          </button>
+                        </div>
+                        <div className="flex justify-center items-center pb-4">
+                          <button
+                            type="button"
+                            onClick={capturePhoto}
+                            className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center pointer-events-auto active:scale-95 transition-transform"
+                          >
+                            <div className="w-12 h-12 bg-white rounded-full opacity-80" />
+                          </button>
+                        </div>
+                      </div>
+                      <canvas ref={canvasRef} className="hidden" />
+                    </div>
+                  ) : form.watch('photoUrl') ? (
                     <img src={form.watch('photoUrl')} alt="Convert" className="w-full h-full object-cover" />
                   ) : (
                     <div className="text-center p-8 text-slate-200">
@@ -166,7 +220,7 @@ export const ConvertForm: React.FC<ConvertFormProps> = ({
                     </div>
                   )}
                   
-                  {form.watch('photoUrl') && (
+                  {(form.watch('photoUrl') && !showCamera) && (
                     <button
                       type="button"
                       onClick={() => form.setValue('photoUrl', '')}
@@ -180,14 +234,14 @@ export const ConvertForm: React.FC<ConvertFormProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     type="button"
-                    onClick={startCamera}
+                    onClick={() => startCamera()}
                     variant="outline"
-                    className="rounded-2xl border-slate-200 gap-2 h-14 text-[10px] font-black uppercase tracking-widest hover:border-indigo-600 transition-all group"
+                    className="rounded-2xl border-slate-200 gap-2 h-10 sm:h-14 text-[10px] sm:text-xs font-black uppercase tracking-widest hover:border-indigo-600 transition-all group"
                   >
                     <Camera size={16} className="group-hover:text-indigo-600" /> Acquisition
                   </Button>
                   
-                  <div className="relative h-14">
+                  <div className="relative h-10 sm:h-14">
                     <input
                       type="file"
                       accept="image/*"
@@ -197,52 +251,12 @@ export const ConvertForm: React.FC<ConvertFormProps> = ({
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full rounded-2xl border-slate-200 gap-2 h-14 text-[10px] font-black uppercase tracking-widest hover:border-emerald-600 transition-all group"
+                      className="w-full rounded-2xl border-slate-200 gap-2 h-10 sm:h-14 text-[10px] sm:text-xs font-black uppercase tracking-widest hover:border-emerald-600 transition-all group"
                     >
                       <Upload size={16} className="group-hover:text-emerald-600" /> Upload
                     </Button>
                   </div>
                 </div>
-
-                {/* Camera Dialog */}
-                <Dialog open={showCamera} onOpenChange={(open) => !open && stopCamera()}>
-                  <DialogContent className="w-[95vw] sm:max-w-md rounded-[2.5rem] p-0 border-0 bg-slate-900 overflow-hidden">
-                    <div className="relative aspect-video bg-black flex items-center justify-center">
-                      <video 
-                        ref={videoRef} 
-                        autoPlay 
-                        playsInline 
-                        muted
-                        className="w-full h-full object-cover -scale-x-100" 
-                      />
-                      <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none">
-                        <div className="w-full h-full border border-white/20 rounded-2xl" />
-                      </div>
-                    </div>
-                    <div className="p-8 flex items-center justify-between gap-4">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={stopCamera}
-                        className="text-white hover:bg-white/10 rounded-xl"
-                      >
-                        Disconnect
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={capturePhoto}
-                        size="lg"
-                        className="rounded-full w-16 h-16 bg-white text-slate-900 hover:bg-slate-100 p-0 shadow-2xl active:scale-95 transition-all"
-                      >
-                        <div className="w-12 h-12 rounded-full border-2 border-slate-900 flex items-center justify-center">
-                          <div className="w-8 h-8 rounded-full bg-slate-900" />
-                        </div>
-                      </Button>
-                      <div className="w-[100px]" />
-                    </div>
-                    <canvas ref={canvasRef} className="hidden" />
-                  </DialogContent>
-                </Dialog>
               </div>
               
               <div className="p-6 bg-slate-50 border border-slate-100 rounded-[2rem]">
@@ -275,6 +289,43 @@ export const ConvertForm: React.FC<ConvertFormProps> = ({
                       </FormItem>
                     )}
                   />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <FormField
+                      control={form.control}
+                      name="dateOfBirth"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Date of Birth *</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="gender"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Gender *</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold">
+                                <SelectValue placeholder="Select gender" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="rounded-2xl">
+                              <SelectItem value="Male" className="font-bold">Male</SelectItem>
+                              <SelectItem value="Female" className="font-bold">Female</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <FormField
@@ -387,21 +438,21 @@ export const ConvertForm: React.FC<ConvertFormProps> = ({
           </div>
 
           {/* Action Hub */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-6 pt-10 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 sm:gap-6 pt-10 border-t border-slate-100">
             <Button
               type="button"
               variant="ghost"
               onClick={onCancel}
-              className="w-full sm:w-auto text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-red-500 h-14 px-10 rounded-2xl transition-all"
+              className="w-full sm:w-auto text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-red-500 h-12 sm:h-14 px-10 rounded-2xl transition-all"
             >
               Cancel
             </Button>
 
-            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
               <Button
                 type="submit"
                 disabled={isSaving}
-                className="w-full sm:w-auto bg-slate-900 text-white font-bold text-[10px] uppercase tracking-widest h-14 px-12 rounded-2xl hover:bg-slate-800 active:scale-95 transition-all shadow-xl flex items-center justify-center gap-3 group disabled:opacity-50"
+                className="w-full sm:w-auto bg-slate-900 text-white font-bold text-[10px] uppercase tracking-widest h-12 sm:h-14 px-8 sm:px-12 rounded-2xl hover:bg-slate-800 active:scale-95 transition-all shadow-xl flex items-center justify-center gap-2 sm:gap-3 group disabled:opacity-50"
               >
                 {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
                 {convert && convert.id ? 'Save Changes' : 'Initialize Record'}

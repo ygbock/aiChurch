@@ -131,6 +131,8 @@ export default function MinistryDashboard() {
   const [activeTab, setActiveTab] = useState('Overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateProgramModalOpen, setIsCreateProgramModalOpen] = useState(false);
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+  const [memberForm, setMemberForm] = useState({ name: '', email: '', phone: '', role: 'Member', committee: '-' });
   const [editingProgramId, setEditingProgramId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [programForm, setProgramForm] = useState({
@@ -325,14 +327,14 @@ export default function MinistryDashboard() {
 
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 font-display">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 font-display">
               {config.name}
             </h1>
-            <p className="text-slate-500 mt-1 font-medium">
+            <p className="text-sm sm:text-base text-slate-500 mt-1 font-medium">
               {config.description}
             </p>
           </div>
-          <button className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2 shadow-sm">
+          <button className="w-full md:w-auto justify-center bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2 shadow-sm">
             <Settings size={18} />
             Ministry Settings
           </button>
@@ -354,8 +356,8 @@ export default function MinistryDashboard() {
       }))} />
 
       {/* Tabs */}
-      <div className="p-1 border-b border-slate-200 flex overflow-x-auto no-scrollbar">
-        <div className="flex gap-8">
+      <div className="p-1 border-b border-slate-200 flex overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="flex gap-4 sm:gap-6 md:gap-8">
           {tabs.map((tab) => (
             <button
               key={tab}
@@ -557,25 +559,25 @@ export default function MinistryDashboard() {
 
       {activeTab === 'Members' && (
         <div className="space-y-6">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-2xl font-bold text-slate-900 font-display">Ministry Members</h3>
-            <div className="flex gap-2">
-              <button className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-slate-50 transition-colors shadow-sm">
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+              <button className="flex-1 sm:flex-none px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors shadow-sm">
                 <Download size={18} />
-                Export
+                <span className="hidden sm:inline">Export</span>
               </button>
-              <button className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-slate-50 transition-colors shadow-sm">
+              <button className="flex-1 sm:flex-none px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors shadow-sm">
                 <Mail size={18} />
-                Send Message
+                <span className="hidden sm:inline">Message</span>
               </button>
-              <button className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+              <button onClick={() => setIsAddMemberModalOpen(true)} className="flex-1 sm:flex-none bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm">
                 <Plus size={18} />
-                Add Member
+                Add
               </button>
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
@@ -584,31 +586,32 @@ export default function MinistryDashboard() {
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
-            <select className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all min-w-[200px]">
+            <select className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all min-w-[140px] sm:min-w-[200px]">
               <option>All Roles</option>
               <option>Leader</option>
               <option>Member</option>
               <option>Volunteer</option>
             </select>
-            <button className="px-6 py-2.5 bg-slate-50 border border-slate-200 text-slate-400 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+            <button className="w-full sm:w-auto px-6 py-2.5 bg-slate-50 border border-slate-200 text-slate-400 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
               Select Members
             </button>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-            <table className="w-full text-left border-collapse">
+          <div className="hidden sm:block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <table className="w-full text-left border-collapse min-w-[500px] sm:min-w-[600px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-6 py-4">
-                    <div className="w-5 h-5 border-2 border-blue-600 rounded flex items-center justify-center cursor-pointer">
-                      <div className="w-2 h-2 bg-transparent rounded-full" />
+                  <th className="px-4 py-3 sm:px-6 sm:py-4 w-12 sm:w-auto">
+                    <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-blue-600 rounded flex items-center justify-center cursor-pointer">
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-transparent rounded-full" />
                     </div>
                   </th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Member</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Role</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Committees</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Joined</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-4 text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Member</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-4 text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Role</th>
+                  <th className="hidden sm:table-cell px-4 py-3 sm:px-6 sm:py-4 text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Committees</th>
+                  <th className="hidden sm:table-cell px-4 py-3 sm:px-6 sm:py-4 text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Joined</th>
+                  <th className="px-4 py-3 sm:px-6 sm:py-4 text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -617,6 +620,13 @@ export default function MinistryDashboard() {
                 <MemberRow name="John Conteh" email="john@eample.com" role="member" joined="2026-03-02" />
               </tbody>
             </table>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-4 sm:hidden">
+            <MemberCard name="Joseph Conteh" email="joseph@gmail.com" role="member" joined="2026-03-02" />
+            <MemberCard name="Philip Conteh" email="philip@gmail.com" role="member" joined="2026-03-02" />
+            <MemberCard name="John Conteh" email="john@eample.com" role="member" joined="2026-03-02" />
           </div>
         </div>
       )}
@@ -628,31 +638,40 @@ export default function MinistryDashboard() {
               <h3 className="text-2xl font-bold text-slate-900 font-display">Operational Programs</h3>
               <p className="text-sm text-slate-500 font-medium mt-1">Manage training cycles and discipleship tracks</p>
             </div>
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="relative flex-1 sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  />
+                </div>
+                <div className="bg-slate-100 p-1 rounded-xl flex gap-1 shrink-0">
+                  <button
+                    onClick={() => setViewMode('cards')}
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'cards' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    <LayoutGrid size={18} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                    <ClipboardList size={18} />
+                  </button>
+                </div>
               </div>
-              <div className="bg-slate-100 p-1 rounded-xl flex gap-1">
-                <button
-                  onClick={() => setViewMode('cards')}
-                  className={`p-2 rounded-lg transition-all ${viewMode === 'cards' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                  <LayoutGrid size={18} />
-                </button>
-                <button
-                  onClick={() => setViewMode('table')}
-                  className={`p-2 rounded-lg transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                  <ClipboardList size={18} />
-                </button>
-              </div>
+              <button
+                onClick={handleOpenCreateModal}
+                className="flex bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors items-center justify-center gap-2 shadow-sm shrink-0 w-full sm:w-auto"
+              >
+                <Plus size={18} />
+                New Program
+              </button>
             </div>
           </div>
 
@@ -671,7 +690,8 @@ export default function MinistryDashboard() {
                   ))}
                 </div>
                ) : (
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto">
+                <>
+                <div className="hidden sm:block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200">
@@ -722,6 +742,18 @@ export default function MinistryDashboard() {
                     </tbody>
                   </table>
                 </div>
+                <div className="grid grid-cols-1 gap-4 sm:hidden">
+                  {programs.filter(p => searchQuery ? p.title.toLowerCase().includes(searchQuery.toLowerCase()) : true).map(prog => (
+                    <TrainingProgramCard
+                      key={prog.id}
+                      {...prog}
+                      onEdit={() => handleOpenEditModal(prog)}
+                      onDelete={() => handleDeleteProgram(prog.id)}
+                      onManage={() => navigate(`/programs/${prog.id}`, { state: { fromMinistry: ministryId, programName: prog.title } })}
+                    />
+                  ))}
+                </div>
+                </>
                )
              ) : (
                 <div className="py-20 text-center bg-slate-50 border-2 border-dashed border-slate-100 rounded-3xl">
@@ -729,13 +761,6 @@ export default function MinistryDashboard() {
                 </div>
              )}
           </div>
-          
-          <button 
-                onClick={handleOpenCreateModal}
-                className="fixed bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-colors sm:hidden z-50"
-              >
-                <Plus size={24} />
-              </button>
         </div>
       )}
 
@@ -921,6 +946,86 @@ export default function MinistryDashboard() {
           <BookOpen size={48} className="text-slate-400 mb-4 stroke-[1.5]" />
           <h4 className="text-lg font-bold text-slate-900 font-display mb-1">Ministry Publications</h4>
           <p className="text-sm text-slate-500 font-medium">Magazines, newsletters, and digital tracts</p>
+        </div>
+      )}
+
+      {/* Add Member Modal */}
+      {isAddMemberModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+          >
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Add Ministry Member</h3>
+                <p className="text-sm text-slate-500">Register a new member to this ministry.</p>
+              </div>
+              <button 
+                onClick={() => setIsAddMemberModalOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-lg border border-slate-200"
+              >
+                <Plus size={20} className="rotate-45" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Full Name</label>
+                <input 
+                  type="text" 
+                  value={memberForm.name}
+                  onChange={(e) => setMemberForm({...memberForm, name: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-colors"
+                  placeholder="e.g. John Doe"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Email Address</label>
+                <input 
+                  type="email" 
+                  value={memberForm.email}
+                  onChange={(e) => setMemberForm({...memberForm, email: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-colors"
+                  placeholder="e.g. john@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Role</label>
+                <select 
+                  value={memberForm.role}
+                  onChange={(e) => setMemberForm({...memberForm, role: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-colors"
+                >
+                  <option value="Member">Member</option>
+                  <option value="Leader">Leader</option>
+                  <option value="Volunteer">Volunteer</option>
+                  <option value="Coordinator">Coordinator</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <button 
+                onClick={() => setIsAddMemberModalOpen(false)}
+                className="px-6 py-2.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  setIsAddMemberModalOpen(false);
+                  setMemberForm({ name: '', email: '', phone: '', role: 'Member', committee: '-' });
+                }}
+                className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                Add Member
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
 
@@ -1144,18 +1249,18 @@ function CareMentoringCard({ name, age, priority, type, status, assignedTo }: { 
   };
 
   return (
-    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex items-center gap-3">
-          <h4 className="text-xl font-bold text-slate-900 font-display">{name}</h4>
-          <span className="px-3 py-1 bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-full">
+    <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h4 className="text-lg sm:text-xl font-bold text-slate-900 font-display">{name}</h4>
+          <span className="px-2 py-1 bg-slate-50 border border-slate-200 text-slate-700 text-[10px] sm:text-xs font-bold rounded-full">
             Age {age}
           </span>
-          <span className={`px-3 py-1 text-white text-xs font-bold rounded-full ${getPriorityColor()}`}>
+          <span className={`px-2 py-1 text-white text-[10px] sm:text-xs font-bold rounded-full uppercase ${getPriorityColor()}`}>
             {priority}
           </span>
         </div>
-        <button className="px-4 py-1.5 flex items-center gap-2 border border-slate-200 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition-colors">
+        <button className="w-full sm:w-auto px-4 py-1.5 flex items-center justify-center gap-2 border border-slate-200 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 transition-colors shrink-0">
           <Shield size={16} />
           Review
         </button>
@@ -1185,12 +1290,14 @@ function CareMentoringCard({ name, age, priority, type, status, assignedTo }: { 
 
 function StatBox({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) {
   return (
-    <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2">
-      <div className="flex items-center gap-2">
-        {icon}
-        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">{label}</span>
+    <div className="bg-white p-3 md:p-4 rounded-xl border border-slate-200 shadow-sm space-y-2">
+      <div className="flex items-center gap-1.5 md:gap-2">
+        <div className="shrink-0 flex items-center justify-center [&>svg]:w-4 [&>svg]:h-4 md:[&>svg]:w-5 md:[&>svg]:h-5">
+          {icon}
+        </div>
+        <span className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none truncate block">{label}</span>
       </div>
-      <p className="text-xl font-bold text-slate-900 tracking-tight">{value}</p>
+      <p className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 tracking-tight">{value}</p>
     </div>
   );
 }
@@ -1219,11 +1326,11 @@ function ActionButton({ icon, label, active, onClick }: { icon: React.ReactNode,
 function PipelineRow({ label, count, color }: { label: string, count: number, color: string }) {
   return (
     <div className="flex justify-between items-center group">
-      <div className="flex items-center gap-3">
-        <div className={`w-2 h-2 rounded-full ${color}`} />
-        <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{label}</span>
+      <div className="flex items-center gap-2 sm:gap-3">
+        <div className={`w-2 h-2 rounded-full shrink-0 ${color}`} />
+        <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900 transition-colors truncate max-w-[150px] sm:max-w-none">{label}</span>
       </div>
-      <span className="text-sm font-black text-slate-900">{count}</span>
+      <span className="text-sm font-black text-slate-900 shrink-0">{count}</span>
     </div>
   );
 }
@@ -1266,27 +1373,27 @@ function MemberRow({ name, email, role, joined }: { name: string, email: string,
   
   return (
     <tr className="hover:bg-slate-50 transition-colors">
-      <td className="px-6 py-4">
-        <div className="w-5 h-5 border-2 border-blue-600 rounded flex items-center justify-center cursor-pointer">
-          <div className="w-2 h-2 bg-transparent rounded-full transition-all" />
+      <td className="px-4 py-3 sm:px-6 sm:py-4">
+        <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-blue-600 rounded flex items-center justify-center cursor-pointer">
+          <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-transparent rounded-full transition-all" />
         </div>
       </td>
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm">
+      <td className="px-4 py-3 sm:px-6 sm:py-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs sm:text-sm shrink-0">
             {initials}
           </div>
-          <div>
-            <p className="text-sm font-bold text-slate-900">{name}</p>
-            <p className="text-xs text-slate-500 font-medium">{email}</p>
+          <div className="min-w-0">
+            <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">{name}</p>
+            <p className="text-[10px] sm:text-xs text-slate-500 font-medium truncate">{email}</p>
           </div>
         </div>
       </td>
-      <td className="px-6 py-4 text-center">
+      <td className="px-2 py-3 sm:px-6 sm:py-4 text-center">
         <select 
           value={selectedRole}
           onChange={(e) => setSelectedRole(e.target.value)}
-          className="text-xs font-bold uppercase text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+          className="text-[10px] sm:text-xs font-bold uppercase text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-1.5 sm:px-2 py-1 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer max-w-[80px] sm:max-w-none"
         >
           <option value="member">Member</option>
           <option value="coordinator">Coordinator</option>
@@ -1295,7 +1402,7 @@ function MemberRow({ name, email, role, joined }: { name: string, email: string,
           <option value="admin">Super Admin</option>
         </select>
       </td>
-      <td className="px-6 py-4 text-center">
+      <td className="hidden sm:table-cell px-6 py-4 text-center">
         <select 
           value={selectedCommittee}
           onChange={(e) => setSelectedCommittee(e.target.value)}
@@ -1308,16 +1415,22 @@ function MemberRow({ name, email, role, joined }: { name: string, email: string,
           <option value="outreach">Outreach</option>
         </select>
       </td>
-      <td className="px-6 py-4 text-center text-sm font-medium text-slate-500">
+      <td className="hidden sm:table-cell px-6 py-4 text-center text-sm font-medium text-slate-500">
         {joined}
       </td>
-      <td className="px-6 py-4 text-right">
-        <div className="flex justify-end gap-3 text-slate-400">
-          <button className="hover:text-amber-600 transition-colors" title="Save Role">
-            <CheckCircle2 size={18} />
+      <td className="px-4 py-3 sm:px-6 sm:py-4 text-right">
+        <div className="flex justify-end gap-2 sm:gap-3 text-slate-400">
+          <button className="hover:text-blue-600 transition-colors" title="Email Member" onClick={() => window.location.href = `mailto:${email}`}>
+            <Mail size={16} className="sm:w-[18px] sm:h-[18px]" />
           </button>
-          <button className="hover:text-blue-600 transition-colors">
-            <Eye size={18} />
+          <button className="hover:text-emerald-600 transition-colors" title="In-App Message" onClick={() => alert(`Open in-app message dialog for ${name}`)}>
+            <MessageSquare size={16} className="sm:w-[18px] sm:h-[18px]" />
+          </button>
+          <button className="hover:text-amber-600 transition-colors" title="Save Role">
+            <CheckCircle2 size={16} className="sm:w-[18px] sm:h-[18px]" />
+          </button>
+          <button className="hover:text-blue-600 transition-colors" title="View Profile">
+            <Eye size={16} className="sm:w-[18px] sm:h-[18px]" />
           </button>
         </div>
       </td>
@@ -1325,16 +1438,68 @@ function MemberRow({ name, email, role, joined }: { name: string, email: string,
   );
 }
 
+function MemberCard({ name, email, role, joined }: { name: string, email: string, role: string, joined: string }) {
+  const [selectedRole, setSelectedRole] = useState(role);
+  const initials = name.split(' ').map(n => n[0]).join('');
+
+  return (
+    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm shrink-0">
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-slate-900 truncate">{name}</p>
+          <p className="text-[10px] text-slate-500 font-medium truncate">{email}</p>
+        </div>
+        <div className="flex justify-end gap-2 text-slate-400 shrink-0">
+          <button className="hover:text-blue-600 transition-colors" title="Email Member" onClick={() => window.location.href = `mailto:${email}`}>
+            <Mail size={16} />
+          </button>
+          <button className="hover:text-emerald-600 transition-colors" title="In-App Message" onClick={() => alert(`Open in-app message dialog for ${name}`)}>
+            <MessageSquare size={16} />
+          </button>
+          <button className="hover:text-amber-600 transition-colors" title="Save Role">
+            <CheckCircle2 size={16} />
+          </button>
+          <button className="hover:text-blue-600 transition-colors" title="View Profile">
+            <Eye size={16} />
+          </button>
+        </div>
+      </div>
+      <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+        <select 
+          value={selectedRole}
+          onChange={(e) => setSelectedRole(e.target.value)}
+          className="text-[10px] font-bold uppercase text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+        >
+          <option value="member">Member</option>
+          <option value="coordinator">Coordinator</option>
+          <option value="treasurer">Treasurer</option>
+          <option value="leader">Leader</option>
+          <option value="admin">Super Admin</option>
+        </select>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          Joined: {joined}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ProgramRow({ title, time, attendees }: { title: string, time: string, attendees: number }) {
   return (
-    <div className="flex items-center justify-between p-4 bg-slate-50/50 rounded-xl border border-slate-100 group hover:border-blue-200 transition-all cursor-pointer">
+    <div className="flex sm:items-center flex-col sm:flex-row justify-between p-3 sm:p-4 bg-slate-50/50 rounded-xl border border-slate-100 group hover:border-blue-200 transition-all cursor-pointer gap-2 sm:gap-0">
       <div className="space-y-1">
-        <h4 className="text-sm font-bold text-slate-900">{title}</h4>
-        <p className="text-xs text-slate-500 font-medium">{time}</p>
+        <h4 className="text-sm font-bold text-slate-900 truncate">{title}</h4>
+        <p className="text-[10px] sm:text-xs text-slate-500 font-medium">{time}</p>
       </div>
-      <div className="text-right">
-        <p className="text-sm font-black text-slate-900">{attendees}</p>
-        <p className="text-[10px] font-bold text-slate-400 uppercase">Avg. Reach</p>
+      <div className="flex sm:block justify-between items-center sm:text-right border-t border-slate-100 sm:border-0 pt-2 sm:pt-0 mt-1 sm:mt-0">
+        <p className="text-[10px] font-bold text-slate-400 uppercase sm:hidden shrink-0">Avg. Reach</p>
+        <div>
+          <p className="text-sm font-black text-slate-900 text-right sm:text-auto">{attendees}</p>
+          <p className="hidden sm:block text-[10px] font-bold text-slate-400 uppercase">Avg. Reach</p>
+        </div>
       </div>
     </div>
   );
@@ -1566,23 +1731,67 @@ function TasksTab() {
         </button>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Task</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assignee</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Due Date</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-             <TaskRow title="Prepare Outreach Materials" assignee="Jane Doe" status="In Progress" due="May 10, 2026" />
-             <TaskRow title="Follow up with new visitors" assignee="Philip Conteh" status="Pending" due="May 12, 2026" />
-             <TaskRow title="Update Ministry Constitution" assignee="Joseph Conteh" status="Completed" due="May 1, 2026" />
-          </tbody>
-        </table>
+      <div className="hidden sm:block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <table className="w-full text-left border-collapse min-w-[700px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Task</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assignee</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Due Date</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+               <TaskRow title="Prepare Outreach Materials" assignee="Jane Doe" status="In Progress" due="May 10, 2026" />
+               <TaskRow title="Follow up with new visitors" assignee="Philip Conteh" status="Pending" due="May 12, 2026" />
+               <TaskRow title="Update Ministry Constitution" assignee="Joseph Conteh" status="Completed" due="May 1, 2026" />
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:hidden">
+         <TaskCard title="Prepare Outreach Materials" assignee="Jane Doe" status="In Progress" due="May 10, 2026" />
+         <TaskCard title="Follow up with new visitors" assignee="Philip Conteh" status="Pending" due="May 12, 2026" />
+         <TaskCard title="Update Ministry Constitution" assignee="Joseph Conteh" status="Completed" due="May 1, 2026" />
+      </div>
+    </div>
+  );
+}
+
+function TaskCard({ title, assignee, status, due }: any) {
+  const getStatusColor = () => {
+    switch (status) {
+      case 'Completed': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+      case 'In Progress': return 'bg-blue-100 text-blue-700 border-blue-200';
+      default: return 'bg-slate-100 text-slate-700 border-slate-200';
+    }
+  };
+
+  return (
+    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3">
+      <div className="flex justify-between items-start">
+        <div className="flex items-center gap-3">
+          <div className="p-2 border border-slate-200 rounded-lg bg-white text-slate-400 shrink-0">
+             {status === 'Completed' ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Clock size={16} />}
+          </div>
+          <p className="text-sm font-bold text-slate-900">{title}</p>
+        </div>
+      </div>
+      <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+        <div className="flex items-center gap-2">
+           <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
+             {assignee.charAt(0)}
+           </div>
+           <span className="text-[10px] font-medium text-slate-700">{assignee}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex px-2 py-1 text-[8px] font-bold uppercase rounded-full border ${getStatusColor()}`}>
+            {status}
+          </span>
+          <span className="text-[10px] font-medium text-slate-500">{due}</span>
+        </div>
       </div>
     </div>
   );
@@ -1811,7 +2020,7 @@ function FinanceTab() {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="hidden sm:block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h4 className="font-bold text-slate-900 text-sm uppercase tracking-widest text-[10px]">Recent Transactions</h4>
           <select className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-white font-medium text-slate-700 focus:outline-none">
@@ -1820,24 +2029,69 @@ function FinanceTab() {
             <option>Expenses</option>
           </select>
         </div>
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-white border-b border-slate-100">
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Category</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Amount</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-             <FinanceRow date="May 5, 2026" description="Retreat Venue Deposit" category="Event Expense" amount="-£1,500" type="expense" status="Cleared" />
-             <FinanceRow date="May 2, 2026" description="Pledge Payment - J. Doe" category="Donation" amount="+£250" type="income" status="Cleared" />
-             <FinanceRow date="Apr 28, 2026" description="Speaker Honorarium" category="Honorarium" amount="-£300" type="expense" status="Pending" />
-             <FinanceRow date="Apr 25, 2026" description="Outreach Supplies" category="Materials" amount="-£120" type="expense" status="Cleared" />
-             <FinanceRow date="Apr 20, 2026" description="Ministry Allowance Q2" category="Allocation" amount="+£5,000" type="income" status="Cleared" />
-          </tbody>
-        </table>
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <table className="w-full text-left border-collapse min-w-[700px]">
+            <thead>
+              <tr className="bg-white border-b border-slate-100">
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Category</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Amount</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+               <FinanceRow date="May 5, 2026" description="Retreat Venue Deposit" category="Event Expense" amount="-£1,500" type="expense" status="Cleared" />
+               <FinanceRow date="May 2, 2026" description="Pledge Payment - J. Doe" category="Donation" amount="+£250" type="income" status="Cleared" />
+               <FinanceRow date="Apr 28, 2026" description="Speaker Honorarium" category="Honorarium" amount="-£300" type="expense" status="Pending" />
+               <FinanceRow date="Apr 25, 2026" description="Outreach Supplies" category="Materials" amount="-£120" type="expense" status="Cleared" />
+               <FinanceRow date="Apr 20, 2026" description="Ministry Allowance Q2" category="Allocation" amount="+£5,000" type="income" status="Cleared" />
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="sm:hidden space-y-4">
+        <div className="flex justify-between items-center">
+          <h4 className="font-bold text-slate-900 text-xs text-[10px] uppercase tracking-widest">Recent Transactions</h4>
+          <select className="px-2 py-1 border border-slate-200 rounded-md text-[10px] bg-white font-medium text-slate-700 focus:outline-none">
+            <option>All Transactions</option>
+            <option>Income</option>
+            <option>Expenses</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-1 gap-3">
+           <FinanceCard date="May 5, 2026" description="Retreat Venue Deposit" category="Event Expense" amount="-£1,500" type="expense" status="Cleared" />
+           <FinanceCard date="May 2, 2026" description="Pledge Payment - J. Doe" category="Donation" amount="+£250" type="income" status="Cleared" />
+           <FinanceCard date="Apr 28, 2026" description="Speaker Honorarium" category="Honorarium" amount="-£300" type="expense" status="Pending" />
+           <FinanceCard date="Apr 25, 2026" description="Outreach Supplies" category="Materials" amount="-£120" type="expense" status="Cleared" />
+           <FinanceCard date="Apr 20, 2026" description="Ministry Allowance Q2" category="Allocation" amount="+£5,000" type="income" status="Cleared" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FinanceCard({ date, description, category, amount, type, status }: any) {
+  return (
+    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3">
+      <div className="flex justify-between items-start gap-4">
+        <div>
+          <p className="text-sm font-bold text-slate-900">{description}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold uppercase rounded-md border border-slate-200">
+              {category}
+            </span>
+          </div>
+        </div>
+        <div className={`text-right text-sm font-bold whitespace-nowrap shrink-0 ${type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+          {amount}
+        </div>
+      </div>
+      <div className="flex justify-between items-center pt-3 border-t border-slate-100">
+        <span className="text-[10px] font-medium text-slate-500">{date}</span>
+        <span className={`inline-flex px-2 py-1 text-[8px] font-bold uppercase rounded-full border ${status === 'Cleared' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
+          {status}
+        </span>
       </div>
     </div>
   );

@@ -42,7 +42,7 @@ export interface MemberData {
   source?: string;
   invitedBy?: string;
   
-  // First Timer Specifics
+  // Specific to First Timers
   street?: string;
   publicLandmark?: string;
   serviceDate?: string;
@@ -50,6 +50,8 @@ export interface MemberData {
   followUpStatus?: 'pending' | 'called' | 'visited' | 'completed';
   followUpNotes?: string;
   notes?: string;
+
+  ministries?: string[];
   
   path?: string; // Firestore path
   createdAt: any;

@@ -168,12 +168,18 @@ export default function NewMember() {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
 
-  const startCamera = async () => {
+  const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('user');
+
+  const startCamera = async (facingMode = cameraFacingMode) => {
     try {
+      if (showCamera) stopCamera();
+      
       setShowCamera(true);
-      // Wait for dialog to open and video ref to be available
+      // Wait for React to render the video element
       setTimeout(async () => {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode } 
+        });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
@@ -190,6 +196,13 @@ export default function NewMember() {
       setShowCamera(false);
     }
   };
+
+  const toggleCamera = async () => {
+    const newMode = cameraFacingMode === 'user' ? 'environment' : 'user';
+    setCameraFacingMode(newMode);
+    await startCamera(newMode);
+  };
+
 
   const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -350,15 +363,41 @@ export default function NewMember() {
     }
   }, [watchedBranchId, profile?.districtId, districtIdParam]);
 
+  const resolveMinistries = (dob: string, gender: string): string[] => {
+    if (!dob) return [];
+    
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    const g = gender.toLowerCase();
+    
+    if (age < 13) {
+      return ['children'];
+    } else if (age >= 13 && age <= 34) {
+      return ['youth'];
+    } else if (age >= 35) {
+      return g === 'female' ? ['womens'] : ['mens'];
+    }
+    return [];
+  };
+
   const onSubmit = async (data: MemberFormData) => {
     setIsSaving(true);
     try {
       const districtId = districtIdParam || profile?.districtId;
       if (!districtId || !data.branchId) throw new Error("Missing district or branch configuration");
 
+      const calculatedMinistries = resolveMinistries(data.dateOfBirth, data.gender as string);
+
       const memberData = {
         ...data,
         districtId,
+        ministries: calculatedMinistries,
         updatedAt: serverTimestamp(),
       };
 
@@ -407,28 +446,28 @@ export default function NewMember() {
   }
 
   return (
-    <div className="w-full mx-auto pb-20 px-2 sm:px-6">
-      <div className="mb-6 flex flex-col items-start justify-between gap-4 md:mb-10 md:flex-row md:items-center md:gap-6">
-        <div className="space-y-1">
+    <div className="w-full mx-auto pb-20 px-2 sm:px-4 md:px-6">
+      <div className="mb-4 sm:mb-6 flex flex-col items-start justify-between gap-4 md:mb-10 md:flex-row md:items-center md:gap-6">
+        <div className="space-y-1 w-full">
           <div className="mb-2 flex w-fit items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-indigo-600">
              <Building2 size={14} />
              <span className="text-[10px] font-black uppercase tracking-widest">Repository Ingestion</span>
           </div>
-          <h1 className="text-2xl font-black leading-none tracking-tight text-slate-900 md:text-4xl">
+          <h1 className="text-2xl sm:text-3xl font-black leading-none tracking-tight text-slate-900 md:text-4xl">
             {memberId ? 'Edit Profile' : 'Member Registration'}
           </h1>
-          <p className="max-w-xl font-medium text-slate-500 text-sm md:text-base">
+          <p className="max-w-xl font-medium text-slate-500 text-xs sm:text-sm md:text-base">
             {memberId ? 'Updating secure identity records and ecclesiastical profiles.' : 'Initializing secure identity records and ecclesiastical dispersion profiles.'}
           </p>
         </div>
         <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:gap-4">
-          <Button variant="outline" onClick={() => navigate(-1)} className="h-12 w-full rounded-[2rem] border-slate-200 px-8 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 md:w-auto">
+          <Button variant="outline" onClick={() => navigate(-1)} className="h-10 sm:h-12 w-full rounded-[2rem] border-slate-200 px-8 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 md:w-auto">
             <ChevronLeft className="mr-2" size={16} /> Back
           </Button>
           <Button 
             onClick={form.handleSubmit(onSubmit)} 
             disabled={isSaving}
-            className="h-12 w-full rounded-[2rem] bg-slate-900 px-10 text-[10px] font-black uppercase tracking-widest text-white shadow-xl transition-all gap-3 hover:bg-slate-800 active:scale-95 md:w-auto"
+            className="h-10 sm:h-12 w-full rounded-[2rem] bg-slate-900 px-10 text-[10px] font-black uppercase tracking-widest text-white shadow-xl transition-all gap-3 hover:bg-slate-800 active:scale-95 md:w-auto"
           >
             {isSaving ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
             Commit
@@ -492,7 +531,7 @@ export default function NewMember() {
             </Button>
           </div>
 
-          <div className="min-h-[500px] rounded-[2rem] border border-slate-200 bg-white p-4 shadow-sm md:rounded-[3rem] md:p-10">
+          <div className="min-h-[500px] rounded-[1.5rem] sm:rounded-[2rem] border border-slate-200 bg-white p-4 sm:p-6 shadow-sm md:rounded-[3rem] md:p-10">
             <AnimatePresence mode="wait">
               {activeTab === 'personal' && (
                 <motion.div
@@ -502,7 +541,7 @@ export default function NewMember() {
                   exit={{ opacity: 0, x: 20 }}
                   className="space-y-12"
                 >
-                  <div className="flex flex-col lg:flex-row gap-16">
+                  <div className="flex flex-col lg:flex-row gap-8 lg:gap-16">
                     {/* Photo Acquisition Block */}
                     <div className="lg:w-1/3 xl:w-1/4 space-y-6">
                       <div className="space-y-4">
@@ -511,7 +550,47 @@ export default function NewMember() {
                           <div className="h-px flex-1 bg-slate-100" />
                         </div>
                         <div className="relative aspect-square rounded-[3rem] bg-slate-50 border-4 border-slate-100 overflow-hidden shadow-inner group flex items-center justify-center">
-                          {form.watch('photoUrl') ? (
+                          {showCamera ? (
+                            <div className="relative w-full h-full bg-black">
+                              <video 
+                                ref={videoRef} 
+                                autoPlay 
+                                playsInline 
+                                muted
+                                className="w-full h-full object-cover" 
+                                style={{ transform: cameraFacingMode === 'user' ? 'scaleX(-1)' : 'none' }}
+                              />
+                              {/* Camera Overlay */}
+                              <div className="absolute inset-0 flex flex-col justify-between p-4 pointer-events-none">
+                                <div className="flex justify-between items-center w-full">
+                                  <button
+                                    type="button"
+                                    onClick={stopCamera}
+                                    className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white pointer-events-auto"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={toggleCamera}
+                                    className="p-3 bg-black/40 backdrop-blur-md rounded-full text-white pointer-events-auto sm:hidden"
+                                  >
+                                    <RotateCcw size={16} />
+                                  </button>
+                                </div>
+                                <div className="flex justify-center items-center pb-4">
+                                  <button
+                                    type="button"
+                                    onClick={capturePhoto}
+                                    className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center pointer-events-auto active:scale-95 transition-transform"
+                                  >
+                                    <div className="w-12 h-12 bg-white rounded-full opacity-80" />
+                                  </button>
+                                </div>
+                              </div>
+                              <canvas ref={canvasRef} className="hidden" />
+                            </div>
+                          ) : form.watch('photoUrl') ? (
                             <img src={form.watch('photoUrl')} alt="Member" className="w-full h-full object-cover" />
                           ) : (
                             <div className="text-center p-8 text-slate-200">
@@ -520,7 +599,7 @@ export default function NewMember() {
                             </div>
                           )}
                           
-                          {form.watch('photoUrl') && (
+                          {(form.watch('photoUrl') && !showCamera) && (
                             <button
                               type="button"
                               onClick={() => form.setValue('photoUrl', '')}
@@ -534,14 +613,14 @@ export default function NewMember() {
                         <div className="grid grid-cols-2 gap-3">
                           <Button
                             type="button"
-                            onClick={startCamera}
+                            onClick={() => startCamera()}
                             variant="outline"
-                            className="rounded-2xl border-slate-200 gap-2 h-14 text-[10px] font-black uppercase tracking-widest hover:border-indigo-600 transition-all group"
+                            className="rounded-2xl border-slate-200 gap-2 h-10 sm:h-14 text-[10px] sm:text-xs font-black uppercase tracking-widest hover:border-indigo-600 transition-all group"
                           >
                             <Camera size={16} className="group-hover:text-indigo-600" /> Acquisition
                           </Button>
                           
-                          <div className="relative h-14">
+                          <div className="relative h-10 sm:h-14">
                             <input
                               type="file"
                               accept="image/*"
@@ -551,52 +630,12 @@ export default function NewMember() {
                             <Button
                               type="button"
                               variant="outline"
-                              className="w-full rounded-2xl border-slate-200 gap-2 h-14 text-[10px] font-black uppercase tracking-widest hover:border-emerald-600 transition-all group"
+                              className="w-full rounded-2xl border-slate-200 gap-2 h-10 sm:h-14 text-[10px] sm:text-xs font-black uppercase tracking-widest hover:border-emerald-600 transition-all group"
                             >
                               <Upload size={16} className="group-hover:text-emerald-600" /> Upload
                             </Button>
                           </div>
                         </div>
-
-                        {/* Camera Dialog */}
-                        <Dialog open={showCamera} onOpenChange={(open) => !open && stopCamera()}>
-                          <DialogContent className="w-[95vw] sm:max-w-md rounded-[2.5rem] p-0 border-0 bg-slate-900 overflow-hidden">
-                            <div className="relative aspect-video bg-black flex items-center justify-center">
-                              <video 
-                                ref={videoRef} 
-                                autoPlay 
-                                playsInline 
-                                muted
-                                className="w-full h-full object-cover -scale-x-100" 
-                              />
-                              <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none">
-                                <div className="w-full h-full border border-white/20 rounded-2xl" />
-                              </div>
-                            </div>
-                            <div className="p-8 flex items-center justify-between gap-4">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={stopCamera}
-                                className="text-white hover:bg-white/10 rounded-xl"
-                              >
-                                Disconnect
-                              </Button>
-                              <Button
-                                type="button"
-                                onClick={capturePhoto}
-                                size="lg"
-                                className="rounded-full w-16 h-16 bg-white text-slate-900 hover:bg-slate-100 p-0 shadow-2xl active:scale-95 transition-all"
-                              >
-                                <div className="w-12 h-12 rounded-full border-2 border-slate-900 flex items-center justify-center">
-                                  <div className="w-8 h-8 rounded-full bg-slate-900" />
-                                </div>
-                              </Button>
-                              <div className="w-[100px]" /> {/* Spacer */}
-                            </div>
-                            <canvas ref={canvasRef} className="hidden" />
-                          </DialogContent>
-                        </Dialog>
                       </div>
                       
                       <div className="p-6 bg-slate-50 border border-slate-100 rounded-[2rem]">
@@ -614,7 +653,7 @@ export default function NewMember() {
                            <h3 className="text-xl font-bold text-slate-900 uppercase tracking-tight">Personal Information</h3>
                            <div className="h-px flex-1 bg-slate-100" />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
                           <FormField
                             control={form.control}
                             name="fullName"
@@ -712,7 +751,7 @@ export default function NewMember() {
                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Geographic & Sync</h3>
                            <div className="h-px flex-1 bg-slate-100" />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
                           <FormField
                             control={form.control}
                             name="email"
@@ -863,20 +902,20 @@ export default function NewMember() {
 
                     {/* Child Editor Dialog */}
                     <Dialog open={showChildDialog} onOpenChange={setShowChildDialog}>
-                      <DialogContent className="sm:max-w-lg rounded-[2.5rem] p-8 border-slate-200 md:max-w-2xl">
+                      <DialogContent className="w-[95vw] max-h-[90vh] overflow-y-auto sm:max-w-lg rounded-[2.5rem] p-6 sm:p-8 border-slate-200 md:max-w-2xl">
                         <DialogHeader>
-                          <DialogTitle className="text-2xl font-black text-slate-900 uppercase tracking-tight">Kinship Record</DialogTitle>
+                          <DialogTitle className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tight">Kinship Record</DialogTitle>
                           <DialogDescription className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">Define biographic parameters for the descendant entity.</DialogDescription>
                         </DialogHeader>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 py-6 sm:py-8">
                           <div className="space-y-4">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Identity Name</Label>
                             <Input 
                               placeholder="Full Name" 
                               value={tempChild.name}
                               onChange={(e) => setTempChild({ ...tempChild, name: e.target.value })}
-                              className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold shadow-inner"
+                              className="h-12 sm:h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold shadow-inner"
                             />
                           </div>
                           <div className="space-y-4">
@@ -885,7 +924,7 @@ export default function NewMember() {
                               value={tempChild.gender}
                               onValueChange={(val) => setTempChild({ ...tempChild, gender: val as 'male' | 'female' })}
                             >
-                              <SelectTrigger className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold shadow-inner">
+                              <SelectTrigger className="h-12 sm:h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold shadow-inner">
                                 <SelectValue placeholder="Vector" />
                               </SelectTrigger>
                               <SelectContent className="rounded-2xl">
@@ -900,17 +939,17 @@ export default function NewMember() {
                               type="date"
                               value={tempChild.dateOfBirth}
                               onChange={(e) => setTempChild({ ...tempChild, dateOfBirth: e.target.value })}
-                              className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold shadow-inner"
+                              className="h-12 sm:h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold shadow-inner"
                             />
                           </div>
                         </div>
 
-                        <DialogFooter className="gap-3 mt-4">
+                        <DialogFooter className="gap-3 mt-2 sm:mt-4 flex-col sm:flex-row">
                           <Button 
                             type="button" 
                             variant="ghost" 
                             onClick={() => setShowChildDialog(false)}
-                            className="rounded-2xl h-14 px-8 text-[10px] font-black uppercase tracking-widest text-slate-500"
+                            className="rounded-2xl h-12 sm:h-14 w-full sm:w-auto px-8 text-[10px] font-black uppercase tracking-widest text-slate-500"
                           >
                             Discard
                           </Button>
@@ -924,7 +963,7 @@ export default function NewMember() {
                               }
                               setShowChildDialog(false);
                             }}
-                            className="rounded-2xl h-14 px-10 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-slate-200"
+                            className="rounded-2xl h-12 sm:h-14 w-full sm:w-auto px-10 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-slate-200 mt-2 sm:mt-0"
                           >
                             Complete Ingestion
                           </Button>
@@ -1258,11 +1297,11 @@ export default function NewMember() {
             </AnimatePresence>
           </div>
 
-          <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-900/5">
-            <Button type="button" variant="ghost" onClick={() => navigate(-1)} className="font-bold uppercase tracking-widest text-xs">
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center bg-white p-4 sm:p-6 rounded-[2rem] border border-slate-200 shadow-xl shadow-slate-900/5 gap-4">
+            <Button type="button" variant="ghost" onClick={() => navigate(-1)} className="font-bold uppercase tracking-widest text-[10px] sm:text-xs">
               Abort Registration
             </Button>
-            <Button type="submit" disabled={isSaving} className="bg-slate-900 text-white px-12 h-12 rounded-xl font-bold uppercase tracking-widest shadow-lg shadow-black/10 active:scale-95 disabled:opacity-50">
+            <Button type="submit" disabled={isSaving} className="w-full sm:w-auto bg-slate-900 text-white px-8 sm:px-12 h-12 rounded-xl font-bold uppercase tracking-widest shadow-lg shadow-black/10 active:scale-95 disabled:opacity-50 text-[10px] sm:text-xs">
               {isSaving ? <Loader2 className="animate-spin mr-2" size={18} /> : <CheckCircle2 className="mr-2" size={18} />}
               {memberId ? 'Update Record' : 'Initialize Identity'}
             </Button>

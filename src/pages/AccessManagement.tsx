@@ -122,7 +122,7 @@ export default function AccessManagement() {
       if (newRole === 'admin' || newRole === 'member') {
         payload.districtId = profile?.role === 'district' ? profile.districtId : newDistrictId;
       }
-      if (newRole === 'member') {
+      if (newRole === 'member' || newRole === 'admin') {
         payload.branchId = profile?.role === 'admin' ? profile.branchId : newBranchId;
       }
 
@@ -333,7 +333,7 @@ export default function AccessManagement() {
                    </select>
                  </div>
 
-                 {(newRole === 'admin' || newRole === 'member') && profile?.role === 'superadmin' && (
+                  {(newRole === 'admin' || newRole === 'member') && profile?.role === 'superadmin' && (
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Assigned District</label>
                       <input 
@@ -347,7 +347,7 @@ export default function AccessManagement() {
                     </div>
                  )}
 
-                 {newRole === 'member' && (profile?.role === 'superadmin' || profile?.role === 'district') && (
+                 {(newRole === 'member' || newRole === 'admin') && (profile?.role === 'superadmin' || profile?.role === 'district') && (
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Assigned Branch</label>
                       <input 

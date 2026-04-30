@@ -15,6 +15,8 @@ export default function DashboardDispatcher() {
       return <DistrictDashboard />;
     case 'member':
       return <MemberPortal />;
+    case 'branch_admin':
+    case 'admin':
     default:
       return <Dashboard />;
   }

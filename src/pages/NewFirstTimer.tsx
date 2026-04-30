@@ -97,24 +97,24 @@ export default function NewFirstTimer() {
   };
 
   return (
-    <div className="w-full mx-auto pb-20 px-2 sm:px-6">
-      <div className="mb-6 flex flex-col items-start justify-between gap-4 md:mb-10 md:flex-row md:items-center md:gap-6">
-        <div className="space-y-1">
+    <div className="w-full mx-auto pb-20 px-2 sm:px-4 md:px-6">
+      <div className="mb-4 sm:mb-6 flex flex-col items-start justify-between gap-4 md:mb-10 md:flex-row md:items-center md:gap-6">
+        <div className="space-y-1 w-full">
           <div className="mb-2 flex w-fit items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-blue-600">
              <UserPlus size={14} />
              <span className="text-[10px] font-black uppercase tracking-widest">First-Timer Module</span>
           </div>
-          <h1 className="text-2xl font-black leading-none tracking-tight text-slate-900 md:text-4xl uppercase">Encounter Recording</h1>
-          <p className="max-w-xl font-medium text-slate-500 text-sm md:text-base">Registering a new prospect encounter in the follow-up orchestration matrix.</p>
+          <h1 className="text-2xl sm:text-3xl font-black leading-none tracking-tight text-slate-900 md:text-4xl uppercase">Encounter Recording</h1>
+          <p className="max-w-xl font-medium text-slate-500 text-xs sm:text-sm md:text-base">Registering a new prospect encounter in the follow-up orchestration matrix.</p>
         </div>
         <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:gap-4">
-          <Button variant="outline" onClick={() => navigate(-1)} className="h-12 w-full rounded-[2rem] border-slate-200 px-8 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 md:w-auto">
+          <Button variant="outline" onClick={() => navigate(-1)} className="h-10 sm:h-12 w-full rounded-[2rem] border-slate-200 px-8 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 md:w-auto">
             <ChevronLeft className="mr-2" size={16} /> Back
           </Button>
         </div>
       </div>
 
-      <div className="min-h-[500px] rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:rounded-[3rem] md:p-12">
+      <div className="min-h-[500px] rounded-[1.5rem] sm:rounded-[2rem] border border-slate-200 bg-white p-4 sm:p-6 shadow-sm md:rounded-[3rem] md:p-12">
         <FirstTimerForm 
           branches={branches}
           members={members}
