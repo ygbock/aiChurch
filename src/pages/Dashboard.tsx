@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, 
   Banknote, 
@@ -17,14 +17,19 @@ import {
   Bell,
   Sparkles,
   Zap,
-  Globe
+  Globe,
+  Clock,
+  CheckCircle2,
+  X,
+  Loader2
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import CollapsibleSection from '../components/CollapsibleSection';
 import { useFirebase } from '../components/FirebaseProvider';
-import { doc, getDoc, collection, query, limit, onSnapshot, orderBy } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { doc, getDoc, collection, query, limit, onSnapshot, orderBy, where, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { toast } from 'sonner';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -32,6 +37,21 @@ export default function Dashboard() {
   const [branchName, setBranchName] = useState('Loading...');
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [recentMembers, setRecentMembers] = useState<any[]>([]);
+  const [myTasks, setMyTasks] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
+
+  // New Task Form State
+  const [taskForm, setTaskForm] = useState({
+    title: '',
+    description: '',
+    dept: 'General',
+    priority: 'Medium' as 'High' | 'Medium' | 'Low',
+    dueDate: new Date().toISOString().split('T')[0],
+    assigneeId: '',
+    assigneeName: ''
+  });
+  const [isSavingTask, setIsSavingTask] = useState(false);
 
   useEffect(() => {
     async function fetchBranch() {
@@ -55,18 +75,91 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!profile?.districtId || !profile?.branchId) return;
-    const path = `districts/${profile.districtId}/branches/${profile.branchId}/members`;
-    const q = query(collection(db, path), orderBy('createdAt', 'desc'), limit(5));
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    // Fetch Recent Members
+    const membersPath = `districts/${profile.districtId}/branches/${profile.branchId}/members`;
+    const membersQ = query(collection(db, membersPath), orderBy('createdAt', 'desc'), limit(5));
+    const unsubscribeMembers = onSnapshot(membersQ, (snapshot) => {
       setRecentMembers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => unsubscribe();
+
+    // Fetch My Tasks
+    const tasksPath = `districts/${profile.districtId}/branches/${profile.branchId}/tasks`;
+    const tasksQ = query(
+      collection(db, tasksPath), 
+      where('assigneeId', '==', profile.uid),
+      orderBy('createdAt', 'desc'),
+      limit(5)
+    );
+    const unsubscribeTasks = onSnapshot(tasksQ, (snapshot) => {
+      setMyTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoadingTasks(false);
+    }, (error) => {
+       console.error("Error fetching tasks:", error);
+       setLoadingTasks(false);
+    });
+
+    // Fetch Users for task assignment
+    const fetchUsers = async () => {
+      try {
+        const usersSnap = await getDocs(query(collection(db, 'users'), where('branchId', '==', profile.branchId)));
+        setUsers(usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() })));
+      } catch (e) {}
+    };
+    fetchUsers();
+
+    return () => {
+      unsubscribeMembers();
+      unsubscribeTasks();
+    };
   }, [profile]);
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsTaskModalOpen(false);
+    if (!taskForm.title || !taskForm.assigneeId) {
+      toast.error('Please fill required fields');
+      return;
+    }
+
+    setIsSavingTask(true);
+    try {
+      const selectedUser = users.find(u => u.uid === taskForm.assigneeId);
+      const path = `districts/${profile?.districtId}/branches/${profile?.branchId}/tasks`;
+      
+      await addDoc(collection(db, path), {
+        ...taskForm,
+        assigneeName: selectedUser?.fullName || 'Assigned User',
+        status: 'pending',
+        createdBy: profile?.uid,
+        branchId: profile?.branchId,
+        createdAt: serverTimestamp()
+      });
+
+      toast.success('Task assigned successfully');
+      setIsTaskModalOpen(false);
+      setTaskForm({
+        title: '',
+        description: '',
+        dept: 'General',
+        priority: 'Medium',
+        dueDate: new Date().toISOString().split('T')[0],
+        assigneeId: profile?.uid || '',
+        assigneeName: profile?.fullName || ''
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'tasks');
+    } finally {
+      setIsSavingTask(false);
+    }
+  };
+
+  const openTaskModal = () => {
+    setTaskForm(prev => ({ 
+      ...prev, 
+      assigneeId: profile?.uid || '', 
+      assigneeName: profile?.fullName || '' 
+    }));
+    setIsTaskModalOpen(true);
   };
 
   return (
@@ -91,7 +184,7 @@ export default function Dashboard() {
                <span className="text-blue-600">{profile?.fullName?.split(' ')[0] || 'Administrator'}</span>
              </h1>
              <p className="text-slate-500 max-w-md font-medium text-sm sm:text-lg">
-               Your branch control center is primed and ready. You have <span className="text-slate-900 font-bold">12 pending tasks</span> requiring your attention today.
+               Your branch control center is primed and ready. You have <span className="text-slate-900 font-bold">{myTasks.filter(t => t.status !== 'completed').length} pending tasks</span> requiring your attention.
              </p>
           </div>
 
@@ -106,47 +199,58 @@ export default function Dashboard() {
               <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Directory</span>
             </button>
             <button 
-              onClick={() => navigate('/financials')}
+              onClick={openTaskModal}
               className="p-4 sm:p-6 bg-slate-50 hover:bg-slate-100 rounded-[1.5rem] sm:rounded-3xl transition-all group flex flex-col items-center gap-2 sm:gap-3 border border-transparent hover:border-slate-200"
             >
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-[1rem] sm:rounded-2xl flex items-center justify-center shadow-sm text-emerald-600 group-hover:scale-110 transition-transform">
-                <Banknote size={20} className="sm:w-6 sm:h-6 w-5 h-5" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-[1rem] sm:rounded-2xl flex items-center justify-center shadow-sm text-indigo-600 group-hover:scale-110 transition-transform">
+                <CheckSquare size={20} className="sm:w-6 sm:h-6 w-5 h-5" />
               </div>
-              <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Financials</span>
+              <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Assign Task</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Profile Completion Nudge */}
-      {memberProfile && memberProfile.isProfileComplete === false && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-slate-900 rounded-[2rem] p-6 md:p-8 text-white shadow-2xl shadow-slate-200 relative overflow-hidden"
-        >
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="flex items-center gap-4 sm:gap-6">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/10 shrink-0">
-                <AlertCircle size={24} className="text-blue-400 sm:w-7 sm:h-7" />
-              </div>
-              <div>
-                <h3 className="font-bold text-lg sm:text-xl">Identity Verification Required</h3>
-                <p className="text-slate-400 text-xs sm:text-sm mt-1">Your user profile is missing critical details for the global directory.</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => navigate(`/members/edit/${memberProfile.id}`)}
-              className="w-full md:w-auto bg-blue-600 justify-center text-white px-8 py-3 rounded-2xl font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2 whitespace-nowrap shadow-xl shadow-blue-900/40 active:scale-95"
-            >
-              Complete Profile
-              <ArrowRight size={18} />
-            </button>
-          </div>
-          <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none">
-            <Globe size={240} className="translate-x-[20%] translate-y-[20%] sm:translate-x-1/2 sm:translate-y-1/2" />
-          </div>
-        </motion.div>
+      {loadingTasks ? (
+        <div className="flex justify-center py-10">
+          <Loader2 className="animate-spin text-blue-600" size={32} />
+        </div>
+      ) : (
+        <CollapsibleSection title="My Assigned Tasks" icon={<CheckSquare size={22} />} defaultOpen={myTasks.length > 0}>
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-1">
+             {myTasks.length === 0 ? (
+               <div className="col-span-full py-12 bg-slate-50 rounded-[2rem] border border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
+                 <CheckCircle2 size={40} className="text-slate-300 mb-4" />
+                 <p className="text-slate-400 font-bold text-sm">No tasks assigned to you yet.</p>
+                 <button onClick={openTaskModal} className="mt-4 text-blue-600 font-black text-[10px] uppercase tracking-widest">Create Your First Task</button>
+               </div>
+             ) : (
+               myTasks.map(task => (
+                 <div key={task.id} onClick={() => navigate('/tasks')} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all cursor-pointer group">
+                    <div className="flex justify-between items-start mb-4">
+                      <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+                        task.priority === 'High' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                        task.priority === 'Medium' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                        'bg-blue-50 text-blue-600 border border-blue-100'
+                      }`}>
+                        {task.priority} Priority
+                      </span>
+                      <div className={`w-2 h-2 rounded-full ${task.status === 'completed' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
+                    </div>
+                    <h4 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors uppercase italic tracking-tight mb-2">
+                      {task.title}
+                    </h4>
+                    <div className="flex items-center gap-4 mt-6 pt-4 border-t border-slate-50">
+                      <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        <Clock size={14} className="text-blue-600" />
+                        Due: {task.dueDate}
+                      </div>
+                    </div>
+                 </div>
+               ))
+             )}
+           </div>
+        </CollapsibleSection>
       )}
 
       {/* Main Stats Hub - Collapsible */}
@@ -280,33 +384,73 @@ export default function Dashboard() {
        <Modal 
         isOpen={isTaskModalOpen} 
         onClose={() => setIsTaskModalOpen(false)} 
-        title="Assign Priority Task"
+        title="Initialize New Protocol"
       >
         <form onSubmit={handleCreateTask} className="space-y-6 p-2">
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Task Definition</label>
-            <input type="text" placeholder="e.g. Audit Sanctuary Audio Systems" className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none focus:ring-2 focus:ring-blue-100 transition-all" required />
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Task Definition</label>
+            <input 
+              type="text" 
+              placeholder="e.g. Audit Sanctuary Audio Systems" 
+              value={taskForm.title} onChange={e => setTaskForm({...taskForm, title: e.target.value})}
+              className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none focus:ring-2 focus:ring-blue-100 transition-all" 
+              required 
+            />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Recipient</label>
-              <select className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-100 transition-all appearance-none">
-                <option>Technical Team</option>
-                <option>Worship Dept</option>
-                <option>Hospitality</option>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Recipient</label>
+              <select 
+                value={taskForm.assigneeId} 
+                onChange={e => setTaskForm({...taskForm, assigneeId: e.target.value})}
+                className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-100 transition-all appearance-none"
+                required
+              >
+                <option value="">Select Assignee</option>
+                {users.map(u => <option key={u.uid} value={u.uid}>{u.fullName}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Priority</label>
-              <select className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-100 transition-all appearance-none">
-                <option>High</option>
-                <option>Medium</option>
-                <option>Low</option>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Priority Matrix</label>
+              <select 
+                value={taskForm.priority} 
+                onChange={e => setTaskForm({...taskForm, priority: e.target.value as any})}
+                className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-100 transition-all appearance-none"
+              >
+                <option value="High">High Priority</option>
+                <option value="Medium">Medium Priority</option>
+                <option value="Low">Low Priority</option>
               </select>
             </div>
           </div>
-          <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold text-sm shadow-2xl shadow-slate-200 hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
-            Confirm Task Assignment
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Target Date</label>
+               <input 
+                  type="date"
+                  value={taskForm.dueDate}
+                  onChange={e => setTaskForm({...taskForm, dueDate: e.target.value})}
+                  className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                  required
+               />
+            </div>
+            <div>
+               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">Department</label>
+               <input 
+                  type="text"
+                  placeholder="e.g. Technical"
+                  value={taskForm.dept}
+                  onChange={e => setTaskForm({...taskForm, dept: e.target.value})}
+                  className="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm font-bold shadow-inner outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+               />
+            </div>
+          </div>
+          <button 
+            disabled={isSavingTask}
+            type="submit" 
+            className="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold text-sm shadow-2xl shadow-slate-200 hover:bg-slate-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isSavingTask ? 'Assigning...' : 'Confirm Activation'}
             <ArrowRight size={18} />
           </button>
         </form>

@@ -296,7 +296,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithEmail = async (email: string, pass: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, pass);
+      const sanitizedEmail = email.trim();
+      if (!sanitizedEmail) throw new Error("Email is required.");
+      await signInWithEmailAndPassword(auth, sanitizedEmail, pass);
     } catch (error) {
       console.error('Email Login failed', error);
       throw error;
@@ -305,8 +307,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
 
   const signUpWithEmail = async (email: string, pass: string) => {
     try {
+      const sanitizedEmail = email.trim();
+      if (!sanitizedEmail) throw new Error("Email is required.");
       // Create user credential (user will be automatically logged in)
-      await createUserWithEmailAndPassword(auth, email, pass);
+      await createUserWithEmailAndPassword(auth, sanitizedEmail, pass);
     } catch (error) {
       console.error('Email Signup failed', error);
       throw error;

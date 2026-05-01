@@ -59,9 +59,10 @@
         "title": { "type": "string" },
         "description": { "type": "string" },
         "date": { "type": "string", "format": "date-time" },
+        "time": { "type": "string" },
         "location": { "type": "string" },
         "branchId": { "type": "string" },
-        "type": { "type": "string", "enum": ["service", "conference", "meeting", "youth"] }
+        "type": { "type": "string", "enum": ["Service", "Youth", "Conference", "Meetings", "Outreach"] }
       },
       "required": ["title", "date", "branchId"]
     },
@@ -115,6 +116,25 @@
         "resolvedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["memberId", "fromBranchId", "toBranchId", "status", "requestedBy"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Operational tasks and assignments.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "dept": { "type": "string" },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High"] },
+        "dueDate": { "type": "string", "format": "date" },
+        "assigneeId": { "type": "string" },
+        "assigneeName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "in-progress", "completed"] },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "branchId": { "type": "string" }
+      },
+      "required": ["title", "priority", "status", "assigneeId", "branchId"]
     }
   },
   "firestore": {
@@ -145,6 +165,10 @@
     "/districts/{districtId}/branches/{branchId}/events/{eventId}": {
       "schema": "Event",
       "description": "Events scoped by branch."
+    },
+    "/districts/{districtId}/branches/{branchId}/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Tasks scoped by branch."
     }
   }
 }

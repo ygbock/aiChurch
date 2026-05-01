@@ -15,6 +15,7 @@ import MinistryDashboard from './pages/MinistryDashboard';
 import CommitteeWorkspace from './pages/CommitteeWorkspace';
 import Reports from './pages/Reports';
 import Events from './pages/Events';
+import Calendar from './pages/Calendar';
 import LiveStreaming from './pages/LiveStreaming';
 import Settings from './pages/Settings';
 import BibleSchool from './pages/BibleSchool';
@@ -68,6 +69,7 @@ export default function App() {
             <Route path="financials" element={<Financials />} />
             <Route path="reports" element={<Reports />} />
             <Route path="events" element={<Events />} />
+            <Route path="calendar" element={<Calendar />} />
             <Route path="streaming" element={<LiveStreaming />} />
             <Route path="bible-school" element={<BibleSchool />} />
             <Route path="communication" element={<CommunicationHub />} />

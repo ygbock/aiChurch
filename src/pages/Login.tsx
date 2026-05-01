@@ -80,11 +80,15 @@ export default function Login() {
   const translateAuthError = (err: any) => {
     switch (err.code) {
       case 'auth/invalid-credential':
-        return 'Invalid email or password.';
+        return 'Invalid credentials. Please check your email and password, and ensure Email/Password login is enabled in your Firebase Console.';
       case 'auth/email-already-in-use':
         return 'An account already exists with this email.';
       case 'auth/weak-password':
         return 'Password should be at least 6 characters.';
+      case 'auth/invalid-email':
+        return 'The email address is not valid.';
+      case 'auth/user-disabled':
+        return 'This user account has been disabled.';
       case 'auth/operation-not-allowed':
         return 'Email/Password login is not enabled in the Firebase Console. Please enable it in Authentication > Sign-in method.';
       case 'auth/user-not-found':

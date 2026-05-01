@@ -99,6 +99,20 @@ service cloud.firestore {
           allow read: if isSignedIn();
           allow write: if isBranchAdmin(districtId, branchId);
         }
+
+        match /tasks/{taskId} {
+          allow read: if isSignedIn();
+          allow create: if isSignedIn();
+          allow update: if isSignedIn() && (
+            isBranchAdmin(districtId, branchId) || 
+            resource.data.assigneeId == request.auth.uid || 
+            resource.data.createdBy == request.auth.uid
+          );
+          allow delete: if isSignedIn() && (
+            isBranchAdmin(districtId, branchId) || 
+            resource.data.createdBy == request.auth.uid
+          );
+        }
       }
     }
 

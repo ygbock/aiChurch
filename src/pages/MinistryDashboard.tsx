@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, isToday, parseISO } from 'date-fns';
 import FloatingActionMenu from '../components/FloatingActionMenu';
 import { 
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area
@@ -539,9 +540,9 @@ export default function MinistryDashboard() {
 
       {activeTab === 'Committees' && (
         <div className="space-y-6">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-2xl font-bold text-slate-900 font-display">Committees</h3>
-            <button className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+            <button className="w-full sm:w-auto justify-center bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
               <Plus size={18} />
               Create Committee
             </button>
@@ -690,16 +691,15 @@ export default function MinistryDashboard() {
                   ))}
                 </div>
                ) : (
-                <>
-                <div className="hidden sm:block bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-x-auto w-full">
+                  <table className="w-full text-left border-collapse min-w-[600px]">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200">
-                        <th className="px-1 sm:px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Program</th>
-                        <th className="hidden sm:table-cell px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Level</th>
-                        <th className="hidden sm:table-cell px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Audience</th>
-                        <th className="px-1 sm:px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Partic.</th>
-                        <th className="px-1 sm:px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                        <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Program</th>
+                        <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Level</th>
+                        <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Audience</th>
+                        <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Partic.</th>
+                        <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -709,28 +709,22 @@ export default function MinistryDashboard() {
                           className="hover:bg-slate-50 transition-colors cursor-pointer"
                           onClick={() => navigate(`/programs/${prog.id}`, { state: { fromMinistry: ministryId, programName: prog.title } })}
                         >
-                          <td className="px-1 sm:px-4 py-4">
-                            <h4 className="text-xs sm:text-sm font-bold text-slate-900">{prog.title}</h4>
-                            <p className="text-[10px] sm:text-xs text-slate-500">{prog.duration}</p>
-                            <div className="sm:hidden flex gap-2 mt-1">
-                                <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 text-[9px] font-bold rounded-full uppercase">
-                                {prog.level}
-                                </span>
-                                <span className="text-[9px] font-medium text-slate-500">{prog.ageGroup}</span>
-                            </div>
+                          <td className="px-4 py-4">
+                            <h4 className="text-sm font-bold text-slate-900">{prog.title}</h4>
+                            <p className="text-xs text-slate-500">{prog.duration}</p>
                           </td>
-                          <td className="hidden sm:table-cell px-6 py-4 text-center">
-                            <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold rounded-full uppercase">
+                          <td className="px-6 py-4 text-center">
+                            <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold rounded-full uppercase truncate">
                               {prog.level}
                             </span>
                           </td>
-                          <td className="hidden sm:table-cell px-6 py-4 text-center text-sm font-medium text-slate-600">
+                          <td className="px-6 py-4 text-center text-sm font-medium text-slate-600 truncate">
                             {prog.ageGroup}
                           </td>
-                          <td className="px-1 sm:px-4 py-4 text-center">
-                            <span className="text-xs sm:text-sm font-black text-slate-900">{prog.participants}</span>
+                          <td className="px-4 py-4 text-center">
+                            <span className="text-sm font-black text-slate-900">{prog.participants}</span>
                           </td>
-                          <td className="px-1 sm:px-4 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-4 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                             <ProgramActionMenu
                               onEdit={() => handleOpenEditModal(prog)}
                               onDelete={() => handleDeleteProgram(prog.id)}
@@ -742,18 +736,6 @@ export default function MinistryDashboard() {
                     </tbody>
                   </table>
                 </div>
-                <div className="grid grid-cols-1 gap-4 sm:hidden">
-                  {programs.filter(p => searchQuery ? p.title.toLowerCase().includes(searchQuery.toLowerCase()) : true).map(prog => (
-                    <TrainingProgramCard
-                      key={prog.id}
-                      {...prog}
-                      onEdit={() => handleOpenEditModal(prog)}
-                      onDelete={() => handleDeleteProgram(prog.id)}
-                      onManage={() => navigate(`/programs/${prog.id}`, { state: { fromMinistry: ministryId, programName: prog.title } })}
-                    />
-                  ))}
-                </div>
-                </>
                )
              ) : (
                 <div className="py-20 text-center bg-slate-50 border-2 border-dashed border-slate-100 rounded-3xl">
@@ -768,9 +750,9 @@ export default function MinistryDashboard() {
 
       {activeTab === 'Groups' && (
         <div className="space-y-6">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-2xl font-bold text-slate-900 font-display">Youth Groups & Cells</h3>
-            <button className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+            <button className="w-full sm:w-auto justify-center bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
               <UserPlus size={18} />
               Create Group
             </button>
@@ -804,9 +786,9 @@ export default function MinistryDashboard() {
 
       {activeTab === 'Care & Mentoring' && (
         <div className="space-y-6">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-2xl font-bold text-slate-900 font-display">Counseling & Mentoring</h3>
-            <button className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+            <button className="w-full sm:w-auto bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm">
               <Heart size={18} />
               New Session
             </button>
@@ -835,9 +817,9 @@ export default function MinistryDashboard() {
 
       {activeTab === 'Media & Resources' && (
         <div className="space-y-6">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-2xl font-bold text-slate-900 font-display">Media & Digital Resources</h3>
-            <label className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm cursor-pointer border border-blue-600">
+            <label className="w-full sm:w-auto justify-center bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm cursor-pointer border border-blue-600">
               <Camera size={18} />
               Upload Content
               <input type="file" className="hidden" aria-label="Upload Content" />
@@ -854,9 +836,9 @@ export default function MinistryDashboard() {
 
       {activeTab === 'Analytics' && (
         <div className="space-y-6">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <h3 className="text-2xl font-bold text-slate-900 font-display">Ministry Analytics</h3>
-            <button className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+            <button className="w-full sm:w-auto justify-center bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
               <Download size={18} />
               Export Report
             </button>
@@ -1627,61 +1609,152 @@ function EventCard({ title, category, date, location, registered, capacity }: { 
 
 function CalendarEventsTab() {
   const [filter, setFilter] = useState('All');
+  const [currentMonth, setCurrentMonth] = useState(new Date(2026, 4, 1));
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  const [events, setEvents] = useState([
+    { id: 1, title: 'Youth Outreach', date: new Date(2026, 4, 10), type: 'Outreach', time: '10:00 AM', location: 'City Center' },
+    { id: 2, title: 'Youth Retreat', date: new Date(2026, 4, 15), type: 'Retreats', time: '9:00 AM', location: 'Camp Galilee' },
+    { id: 3, title: 'Leadership Meeting', date: new Date(2026, 4, 25), type: 'Meetings', time: '7:00 PM', location: 'Hall B' }
+  ]);
+
+  const [newEventForm, setNewEventForm] = useState({
+    title: '',
+    time: '',
+    location: '',
+    type: 'Service'
+  });
+
+  const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+  const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+
+  const handleOpenModal = (date?: Date) => {
+    setSelectedDate(date || new Date());
+    setNewEventForm({ title: '', time: '', location: '', type: 'Service' });
+    setIsEventModalOpen(true);
+  };
+
+  const handleCreateEvent = () => {
+    if (!newEventForm.title || !selectedDate) return;
+    setEvents([...events, {
+      id: Date.now(),
+      title: newEventForm.title,
+      date: selectedDate,
+      time: newEventForm.time,
+      location: newEventForm.location,
+      type: newEventForm.type
+    }]);
+    setIsEventModalOpen(false);
+  };
+
+  const renderCells = () => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(monthStart);
+    const startDate = startOfWeek(monthStart);
+    const endDate = endOfWeek(monthEnd);
+
+    const dateFormat = "d";
+    const dayRows = [];
+    let days = [];
+    let day = startDate;
+    let formattedDate = "";
+
+    while (day <= endDate) {
+      for (let i = 0; i < 7; i++) {
+        formattedDate = format(day, dateFormat);
+        const cloneDay = day;
+        
+        const dayEvents = events.filter(e => isSameDay(e.date, cloneDay) && (filter === 'All' || e.type === filter));
+
+        days.push(
+          <div 
+            key={day.toString()} 
+            onClick={() => handleOpenModal(cloneDay)}
+            className={`h-20 sm:h-28 p-1 sm:p-2 border border-slate-200 rounded-lg transition-colors flex flex-col cursor-pointer hover:border-blue-300 hover:bg-blue-50/50 relative ${!isSameMonth(day, monthStart) ? "bg-slate-50/50" : "bg-white"} ${isToday(day) ? "ring-2 ring-blue-500 ring-inset" : ""}`}
+          >
+            <span className={`text-xs sm:text-sm font-bold block text-right mb-1 ${isToday(day) ? "text-blue-600" : (isSameMonth(day, monthStart) ? "text-slate-700" : "text-slate-400")}`}>
+              {formattedDate}
+            </span>
+            <div className="flex flex-col gap-1 overflow-y-auto no-scrollbar flex-1">
+              {dayEvents.map(evt => {
+                let badgeClass = "bg-slate-100 text-slate-700";
+                let dotClass = "bg-slate-400";
+                switch(evt.type) {
+                  case 'Outreach': badgeClass = "bg-emerald-100 text-emerald-700"; dotClass = "bg-emerald-500"; break;
+                  case 'Retreats': badgeClass = "bg-blue-100 text-blue-700"; dotClass = "bg-blue-500"; break;
+                  case 'Meetings': badgeClass = "bg-purple-100 text-purple-700"; dotClass = "bg-purple-500"; break;
+                  case 'Service': badgeClass = "bg-amber-100 text-amber-700"; dotClass = "bg-amber-500"; break;
+                  case 'Conference': badgeClass = "bg-rose-100 text-rose-700"; dotClass = "bg-rose-500"; break;
+                }
+                return (
+                  <div key={evt.id}>
+                    <div className={`hidden lg:block px-1.5 py-0.5 rounded text-[9px] xl:text-[10px] font-bold truncate ${badgeClass}`} title={evt.title}>
+                      {evt.title}
+                    </div>
+                    <div className={`lg:hidden w-1.5 h-1.5 rounded-full mx-auto my-0.5 ${dotClass}`} title={evt.title} />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        );
+        day = addDays(day, 1);
+      }
+      dayRows.push(
+        <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-1 sm:mb-2" key={day.toString()}>
+          {days}
+        </div>
+      );
+      days = [];
+    }
+    return <div className="min-w-[500px]">{dayRows}</div>;
+  };
+
+  const upcomingEvents = events
+    .filter(e => e.date >= new Date(new Date().setHours(0,0,0,0)) && (filter === 'All' || e.type === filter))
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .slice(0, 4);
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h3 className="text-2xl font-bold text-slate-900 font-display">Ministry Calendar</h3>
-        <button className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+        <button onClick={() => handleOpenModal()} className="w-full sm:w-auto bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm">
           <Calendar size={18} />
           New Event
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="lg:w-2/3 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-             <h4 className="font-bold text-slate-900 text-lg">May 2026</h4>
+      <div className="flex flex-col xl:flex-row gap-6">
+        <div className="xl:w-2/3 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm overflow-x-auto overflow-y-hidden">
+          <div className="flex justify-between items-center mb-4 sm:mb-6 min-w-[500px]">
+             <h4 className="font-bold text-slate-900 text-lg">{format(currentMonth, 'MMMM yyyy')}</h4>
              <div className="flex gap-2">
-                <button className="p-2 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100"><ChevronRight size={16} className="rotate-180" /></button>
-                <button className="p-2 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100"><ChevronRight size={16} /></button>
+                <button onClick={handlePrevMonth} className="p-2 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100"><ChevronRight size={16} className="rotate-180" /></button>
+                <button onClick={() => setCurrentMonth(new Date())} className="px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 text-sm font-bold text-slate-600">Today</button>
+                <button onClick={handleNextMonth} className="p-2 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100"><ChevronRight size={16} /></button>
              </div>
           </div>
-          {/* Mock Calendar Grid */}
-          <div className="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-bold text-slate-400 uppercase">
-            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
-          </div>
-          <div className="grid grid-cols-7 gap-2">
-             {Array.from({length: 31}).map((_, i) => (
-                <div key={i} className={`h-24 p-2 border ${i === 14 ? 'border-blue-400 bg-blue-50' : 'border-slate-100'} rounded-lg hover:bg-slate-50 transition-colors flex flex-col`}>
-                  <span className={`text-sm font-bold ${i === 14 ? 'text-blue-600' : 'text-slate-700'}`}>{i + 1}</span>
-                  {i === 9 && <div className="mt-auto px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded truncate">Outreach</div>}
-                  {i === 14 && <div className="mt-auto px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded truncate">Retreat</div>}
-                  {i === 24 && <div className="mt-auto px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded truncate">Meeting</div>}
-                </div>
-             ))}
+          <div className="min-w-[500px]">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 text-center text-[10px] sm:text-xs font-bold text-slate-400 uppercase">
+              <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+            </div>
+            {renderCells()}
           </div>
         </div>
 
-        <div className="lg:w-1/3 space-y-6">
+        <div className="xl:w-1/3 space-y-6">
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
             <h4 className="font-bold text-slate-900 mb-4">Filters</h4>
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Ministry</label>
-                <select className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 font-medium">
-                  <option>Current Ministry Only</option>
-                  <option>All Ministries</option>
-                  <option>Youth Ministry</option>
-                  <option>Women's Ministry</option>
-                </select>
-              </div>
-              <div>
                 <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Event Type</label>
-                <div className="space-y-2">
-                  {['All', 'Meetings', 'Outreach', 'Tasks', 'Retreats'].map(f => (
-                    <label key={f} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors -mx-2">
+                <div className="flex flex-wrap gap-2">
+                  {['All', 'Service', 'Meetings', 'Outreach', 'Retreats', 'Conference'].map(f => (
+                    <label key={f} className="flex items-center gap-2 p-2 px-3 border border-slate-200 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors max-w-full">
                       <input type="radio" name="event-filter" checked={filter === f} onChange={() => setFilter(f)} className="text-blue-600 focus:ring-blue-500" />
-                      <span className="text-sm font-medium text-slate-700">{f}</span>
+                      <span className="text-sm font-medium text-slate-700 truncate">{f}</span>
                     </label>
                   ))}
                 </div>
@@ -1691,31 +1764,145 @@ function CalendarEventsTab() {
 
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
              <h4 className="font-bold text-slate-900 mb-4">Upcoming</h4>
-             <div className="space-y-4">
-                <div className="flex gap-4">
-                   <div className="flex flex-col items-center justify-center w-12 h-12 bg-blue-50 text-blue-600 rounded-xl shrink-0">
-                      <span className="text-xs font-bold uppercase">May</span>
-                      <span className="text-lg font-black leading-none">15</span>
-                   </div>
-                   <div>
-                     <p className="text-sm font-bold text-slate-900">Youth Retreat</p>
-                     <p className="text-xs text-slate-500 font-medium">9:00 AM - Camp Galilee</p>
-                   </div>
-                </div>
-                <div className="flex gap-4">
-                   <div className="flex flex-col items-center justify-center w-12 h-12 bg-purple-50 text-purple-600 rounded-xl shrink-0">
-                      <span className="text-xs font-bold uppercase">May</span>
-                      <span className="text-lg font-black leading-none">25</span>
-                   </div>
-                   <div>
-                     <p className="text-sm font-bold text-slate-900">Leadership Meeting</p>
-                     <p className="text-xs text-slate-500 font-medium">7:00 PM - Hall B</p>
-                   </div>
-                </div>
-             </div>
+             {upcomingEvents.length > 0 ? (
+               <div className="space-y-4">
+                  {upcomingEvents.map(evt => {
+                    let badgeClass = "bg-blue-50 text-blue-600";
+                    switch(evt.type) {
+                      case 'Outreach': badgeClass = "bg-emerald-50 text-emerald-600"; break;
+                      case 'Retreats': badgeClass = "bg-blue-50 text-blue-600"; break;
+                      case 'Meetings': badgeClass = "bg-purple-50 text-purple-600"; break;
+                      case 'Service': badgeClass = "bg-amber-50 text-amber-600"; break;
+                      case 'Conference': badgeClass = "bg-rose-50 text-rose-600"; break;
+                    }
+                    return (
+                      <div key={evt.id} className="flex gap-4">
+                         <div className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl shrink-0 ${badgeClass}`}>
+                            <span className="text-xs font-bold uppercase">{format(evt.date, 'MMM')}</span>
+                            <span className="text-lg font-black leading-none">{format(evt.date, 'd')}</span>
+                         </div>
+                         <div className="min-w-0">
+                           <p className="text-sm font-bold text-slate-900 truncate">{evt.title}</p>
+                           <p className="text-xs text-slate-500 font-medium truncate">{evt.time} {evt.location ? `- ${evt.location}` : ''}</p>
+                         </div>
+                      </div>
+                    )
+                  })}
+               </div>
+             ) : (
+               <p className="text-sm text-slate-500 font-medium">No upcoming events found.</p>
+             )}
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+      {isEventModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden relative z-[101]"
+          >
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">New Event</h3>
+                <p className="text-sm text-slate-500">Schedule a new ministry event.</p>
+              </div>
+              <button 
+                onClick={() => setIsEventModalOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 bg-white rounded-lg border border-slate-200"
+              >
+                <Plus size={20} className="rotate-45" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Event Title</label>
+                <input 
+                  type="text" 
+                  value={newEventForm.title}
+                  onChange={(e) => setNewEventForm({...newEventForm, title: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-colors"
+                  placeholder="e.g. Wednesday Prayer Service"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Date</label>
+                  <input 
+                    type="date"
+                    value={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
+                    onChange={(e) => {
+                      if(e.target.value) {
+                         const d = parseISO(e.target.value);
+                         setSelectedDate(d);
+                      }
+                    }}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Time</label>
+                  <input 
+                    type="text" 
+                    value={newEventForm.time}
+                    onChange={(e) => setNewEventForm({...newEventForm, time: e.target.value})}
+                    placeholder="e.g. 6:30 PM"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Event Type</label>
+                <select 
+                  value={newEventForm.type}
+                  onChange={(e) => setNewEventForm({...newEventForm, type: e.target.value})}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-colors"
+                >
+                  <option value="Service">Service</option>
+                  <option value="Conference">Conference</option>
+                  <option value="Meetings">Meeting</option>
+                  <option value="Outreach">Outreach</option>
+                  <option value="Retreats">Retreat</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Location</label>
+                <input 
+                  type="text" 
+                  value={newEventForm.location}
+                  onChange={(e) => setNewEventForm({...newEventForm, location: e.target.value})}
+                  placeholder="e.g. Main Sanctuary"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white transition-colors"
+                />
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+              <button 
+                onClick={() => setIsEventModalOpen(false)}
+                className="px-6 py-2.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleCreateEvent}
+                disabled={!newEventForm.title || !selectedDate}
+                className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Create Event
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1723,9 +1910,9 @@ function CalendarEventsTab() {
 function TasksTab() {
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h3 className="text-2xl font-bold text-slate-900 font-display">Task Management</h3>
-        <button className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+        <button className="w-full sm:w-auto justify-center bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
           <CheckSquare size={18} />
           Create Task
         </button>
@@ -1842,9 +2029,9 @@ function TaskRow({ title, assignee, status, due }: any) {
 function DocsTab() {
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h3 className="text-2xl font-bold text-slate-900 font-display">Document Storage</h3>
-        <label className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm cursor-pointer border border-blue-600">
+        <label className="w-full sm:w-auto justify-center bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm cursor-pointer border border-blue-600">
           <Upload size={18} />
           Upload File
           <input type="file" className="hidden" />
@@ -1971,14 +2158,14 @@ function ChatMessage({ sender, time, message, isSelf }: any) {
 function FinanceTab() {
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h3 className="text-2xl font-bold text-slate-900 font-display">Ministry Finance & Budget</h3>
-        <div className="flex gap-2">
-          <button className="bg-slate-50 border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors flex items-center gap-2 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <button className="w-full sm:w-auto justify-center bg-slate-50 border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-100 transition-colors flex items-center gap-2 shadow-sm">
             <Download size={18} />
             Export
           </button>
-          <button className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-sm">
+          <button className="w-full sm:w-auto justify-center bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-sm">
             <Plus size={18} />
             Record Transaction
           </button>
