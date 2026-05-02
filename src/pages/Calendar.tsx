@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Calendar as CalendarIcon, 
@@ -12,7 +13,8 @@ import {
   Loader2,
   ChevronDown,
   Trash2,
-  Database
+  Database,
+  ArrowLeft
 } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, isToday, parseISO } from 'date-fns';
 import { useFirebase } from '../components/FirebaseProvider';
@@ -32,6 +34,7 @@ interface EventData {
 }
 
 export default function Calendar() {
+  const navigate = useNavigate();
   const { role } = useRole();
   const { profile } = useFirebase();
   const [events, setEvents] = useState<EventData[]>([]);
@@ -236,25 +239,25 @@ export default function Calendar() {
           <div 
             key={day.toString()} 
             onClick={() => handleOpenCreateModal(cloneDay)}
-            className={`min-h-[140px] p-2 border-r border-b border-slate-100 transition-all cursor-pointer group hover:bg-slate-50/50 ${!isSameMonth(day, monthStart) ? "bg-slate-50/20 text-slate-300 pointer-events-none opacity-40" : "bg-white"} ${isToday(day) ? "bg-blue-50/20" : ""}`}
+            className={`min-h-[80px] md:min-h-[140px] p-1 md:p-2 border-r border-b border-slate-100 transition-all cursor-pointer group hover:bg-slate-50/50 ${!isSameMonth(day, monthStart) ? "bg-slate-50/20 text-slate-300 pointer-events-none opacity-40" : "bg-white"} ${isToday(day) ? "bg-blue-50/20" : ""}`}
           >
-            <div className="flex flex-col items-center mb-2">
-              <span className={`text-[11px] font-bold w-7 h-7 flex items-center justify-center rounded-full transition-all ${isToday(day) ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+            <div className="flex flex-col items-center mb-1 md:mb-2">
+              <span className={`text-[10px] md:text-[11px] font-bold w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full transition-all ${isToday(day) ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
                 {formattedDate}
               </span>
             </div>
-            <div className="space-y-0.5 overflow-y-auto max-h-[100px] no-scrollbar">
+            <div className="space-y-0.5 overflow-y-auto max-h-[50px] md:max-h-[100px] no-scrollbar">
               {dayEvents.map(evt => {
                 const cat = categories.find(c => c.label === evt.type);
                 return (
                   <div 
                     key={evt.id} 
                     onClick={(e) => { e.stopPropagation(); handleOpenEditModal(evt); }}
-                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded cursor-pointer transition-all hover:bg-slate-100 group/evt`}
+                    className={`flex items-center justify-center md:justify-start gap-1.5 p-0.5 md:px-2 md:py-0.5 rounded cursor-pointer transition-all hover:bg-slate-100 group/evt`}
                     title={`${evt.time} - ${evt.title}`}
                   >
-                    <div className={`w-2 h-2 shrink-0 rounded-full ${cat?.color || 'bg-blue-500'}`}></div>
-                    <span className="text-[10px] font-bold text-slate-700 truncate">
+                    <div className={`w-1.5 h-1.5 md:w-2 md:h-2 shrink-0 rounded-full ${cat?.color || 'bg-blue-500'}`}></div>
+                    <span className="hidden md:inline text-[10px] font-bold text-slate-700 truncate">
                       <span className="text-slate-400 font-medium mr-1">{evt.time}</span>
                       {evt.title}
                     </span>
@@ -279,64 +282,68 @@ export default function Calendar() {
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col bg-white overflow-hidden">
       {/* GCal Top Header */}
-      <header className="h-16 border-b border-slate-200 flex items-center justify-between px-6 bg-white shrink-0">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-3">
+      <header className="h-auto md:h-16 border-b border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-6 bg-white shrink-0 gap-4">
+        <div className="flex items-center gap-3">
+             <button 
+                onClick={() => navigate(-1)}
+                className="w-10 h-10 hover:bg-slate-100 text-slate-500 rounded-xl flex items-center justify-center transition-colors"
+             >
+                <ArrowLeft size={22} />
+             </button>
              <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
                <CalendarIcon size={22} />
              </div>
              <h1 className="text-xl font-bold text-slate-800 tracking-tight">Ministry Calendar</h1>
-          </div>
-          
-          <div className="flex items-center gap-4">
+        </div>
+        
+        <div className="flex flex-col sm:flex-row w-full md:w-auto items-center gap-4">
+          <div className="flex items-center justify-between w-full sm:w-auto">
             <button 
               onClick={() => setCurrentMonth(new Date())}
-              className="px-4 py-1.5 border border-slate-200 rounded text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+              className="px-4 py-1.5 border border-slate-200 rounded text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors hidden sm:block mr-2"
             >
               Today
             </button>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 mx-auto">
               <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-600 transition-colors">
                 <ChevronLeft size={20} />
               </button>
+              <h2 className="text-sm md:text-lg font-medium text-slate-800 mx-2 text-center whitespace-nowrap">
+                {format(currentMonth, 'MMMM yyyy')}
+              </h2>
               <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-600 transition-colors">
                 <ChevronRight size={20} />
               </button>
             </div>
-            <h2 className="text-lg font-medium text-slate-800 ml-2">
-              {format(currentMonth, 'MMMM yyyy')}
-            </h2>
           </div>
-        </div>
 
-        <div className="flex items-center gap-4">
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input 
               type="text" 
               placeholder="Search events"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-slate-100/50 border border-transparent rounded-lg text-sm focus:bg-white focus:border-blue-500 outline-none w-64 transition-all"
+              className="pl-10 pr-4 py-2 w-full bg-slate-100/50 border border-transparent rounded-lg text-sm focus:bg-white focus:border-blue-500 outline-none md:w-64 transition-all"
             />
           </div>
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Left Sidebar */}
-        <aside className="w-72 border-r border-slate-200 bg-white p-4 flex flex-col gap-8 shrink-0 overflow-y-auto">
+        <aside className="w-full md:w-72 border-b md:border-b-0 md:border-r border-slate-200 bg-white p-4 flex flex-col md:gap-8 shrink-0 overflow-y-auto z-20">
           {isAdmin && (
             <button 
               onClick={() => handleOpenCreateModal()}
-              className="flex items-center gap-3 px-6 py-4 bg-white border border-slate-200 rounded-full shadow-md hover:shadow-lg transition-all text-sm font-medium text-slate-700 active:scale-95 group"
+              className="flex items-center justify-center md:justify-start gap-3 px-6 py-3 md:py-4 bg-white border border-slate-200 rounded-xl md:rounded-full shadow-sm hover:shadow-md transition-all text-sm font-medium text-slate-700 active:scale-95 group mb-4 md:mb-0"
             >
-              <Plus size={24} className="text-blue-600 group-hover:rotate-90 transition-transform" />
-              Create
+              <Plus size={20} className="text-blue-600 md:group-hover:rotate-90 transition-transform" />
+              Create Event
             </button>
           )}
 
-          <div className="space-y-4 px-2">
+          <div className="hidden md:block space-y-4 px-2">
             <div className="flex items-center justify-between mb-4">
                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{format(currentMonth, 'MMMM yyyy')}</h3>
                <div className="flex gap-1">
@@ -347,21 +354,21 @@ export default function Calendar() {
             {renderMiniCalendar()}
           </div>
 
-          <div className="space-y-4 px-2">
-            <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+          <div className="space-y-2 md:space-y-4 px-1 md:px-2">
+            <h3 className="hidden md:flex text-xs font-semibold text-slate-500 uppercase tracking-wider items-center justify-between">
               My Calendars
               <ChevronDown size={14} />
             </h3>
-            <div className="space-y-1">
+            <div className="flex md:flex-col gap-2 md:gap-1 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
               {categories.map((cat) => (
-                <label key={cat.label} className="flex items-center gap-3 px-2 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer group">
+                <label key={cat.label} className="flex items-center gap-2 md:gap-3 px-3 md:px-2 py-1.5 bg-slate-50 md:bg-transparent border border-slate-100 md:border-none rounded-full md:rounded-lg cursor-pointer group whitespace-nowrap shrink-0">
                   <input 
                     type="checkbox"
                     checked={selectedCategories.includes(cat.label)}
                     onChange={() => toggleCategory(cat.label)}
-                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    className="w-3.5 h-3.5 md:w-4 md:h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
-                  <span className="text-sm text-slate-600 font-medium group-hover:text-slate-900 transition-colors">{cat.label}</span>
+                  <span className="text-xs md:text-sm text-slate-600 font-medium group-hover:text-slate-900 transition-colors">{cat.label}</span>
                 </label>
               ))}
             </div>
@@ -373,8 +380,9 @@ export default function Calendar() {
           <div className="h-full flex flex-col">
             <div className="grid grid-cols-7 border-b border-slate-200 bg-white sticky top-0 z-10 shrink-0">
               {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => (
-                <div key={day} className="py-2 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-r last:border-r-0 border-slate-100/50">
-                  {day}
+                <div key={day} className="py-2 text-center text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest md:tracking-[0.2em] border-r last:border-r-0 border-slate-100/50 truncate">
+                  <span className="hidden md:inline">{day}</span>
+                  <span className="md:hidden">{day.charAt(0)}</span>
                 </div>
               ))}
             </div>

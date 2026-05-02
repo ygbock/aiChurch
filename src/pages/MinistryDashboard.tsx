@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { useFirebase } from '../components/FirebaseProvider';
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addDays, isToday, parseISO } from 'date-fns';
 import FloatingActionMenu from '../components/FloatingActionMenu';
 import { 
@@ -129,48 +132,14 @@ export default function MinistryDashboard() {
   const { ministryId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { profile } = useFirebase();
   const [activeTab, setActiveTab] = useState('Overview');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isCreateProgramModalOpen, setIsCreateProgramModalOpen] = useState(false);
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [memberForm, setMemberForm] = useState({ name: '', email: '', phone: '', role: 'Member', committee: '-' });
-  const [editingProgramId, setEditingProgramId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
-  const [programForm, setProgramForm] = useState({
-    title: '',
-    level: 'Branch Level',
-    ageGroup: 'All Ages',
-    duration: '',
-    participants: 0,
-    startDate: '',
-    endDate: '',
-    occurrence: 'Weekly',
-    description: '',
-    isOpenToPublic: false,
-    requiresRegistration: true,
-    isPaid: false,
-    registrationFee: ''
-  });
-
-  // Calculate duration automatically
-  useEffect(() => {
-    if (programForm.startDate && programForm.endDate) {
-      const start = new Date(programForm.startDate);
-      const end = new Date(programForm.endDate);
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-      
-      let durationStr = '';
-      if (diffDays < 30) {
-        durationStr = `${diffDays} days`;
-      } else {
-        const diffMonths = Math.floor(diffDays / 30);
-        durationStr = `${diffMonths} ${diffMonths === 1 ? 'month' : 'months'}`;
-      }
-      
-      setProgramForm(prev => ({ ...prev, duration: durationStr }));
-    }
-  }, [programForm.startDate, programForm.endDate]);
+  
+  const [programs, setPrograms] = useState<any[]>([]);
 
   // Initialize tab from location state if available
   useEffect(() => {
@@ -178,133 +147,61 @@ export default function MinistryDashboard() {
       setActiveTab(location.state.initialTab);
     }
   }, [location.state, location.state?.initialTab]);
-  
-  const [programs, setPrograms] = useState<any[]>(() => {
-    const storageKey = `ministry_programs_${ministryId || 'youth'}`;
-    const savedPrograms = localStorage.getItem(storageKey);
-    if (savedPrograms) {
-      try {
-        return JSON.parse(savedPrograms);
-      } catch (e) {
-        console.error("Failed to parse saved programs", e);
-      }
-    }
-    // Start empty if no programs saved
-    return [];
-  });
 
-  // Keep state in sync with ministryId changes
   useEffect(() => {
-    const storageKey = `ministry_programs_${ministryId || 'youth'}`;
-    const savedPrograms = localStorage.getItem(storageKey);
-    if (savedPrograms) {
-      try {
-        setPrograms(JSON.parse(savedPrograms));
-      } catch (e) {
-        console.error("Failed to parse saved programs", e);
-      }
+    if (!profile) return;
+    const districtId = profile?.districtId || 'default-district';
+    const branchId = profile?.branchId || 'default-branch';
+    const path = `districts/${districtId}/branches/${branchId}/events`;
+    
+    const q = query(collection(db, path), orderBy('date', 'asc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          let eventDate = data.date;
+          if (eventDate?.toDate) eventDate = eventDate.toDate();
+          else if (eventDate?.seconds) eventDate = new Date(eventDate.seconds * 1000);
+          else if (typeof eventDate === 'string') eventDate = parseISO(eventDate);
+
+          return {
+            id: doc.id,
+            ...data,
+            date: eventDate,
+            level: 'Branch Level',
+            ageGroup: 'All Ages',
+            duration: '1 event',
+            participants: 0
+          };
+        })
+        .filter(doc => (doc as any).targetMinistry === ministryId || (doc as any).targetMinistry === 'All');
+        
+      setPrograms(docs);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'ministry_events');
+    });
+
+    return () => unsubscribe();
+  }, [profile, ministryId]);
+
+  const handleDeleteProgram = async (id: string) => {
+    try {
+      const districtId = profile?.districtId || 'default-district';
+      const branchId = profile?.branchId || 'default-branch';
+      const path = `districts/${districtId}/branches/${branchId}/events`;
+      await deleteDoc(doc(db, path, id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `events/${id}`);
     }
-  }, [ministryId]);
-
-  // Save programs to localStorage whenever they change
-  useEffect(() => {
-    const storageKey = `ministry_programs_${ministryId || 'youth'}`;
-    localStorage.setItem(storageKey, JSON.stringify(programs));
-  }, [programs, ministryId]);
-
-  const handleDeleteProgram = (id: string) => {
-    setPrograms(prev => prev.filter(p => p.id !== id));
   };
 
   const handleOpenEditModal = (program: any) => {
-    setEditingProgramId(program.id);
-    setProgramForm({
-      title: program.title,
-      level: program.level,
-      ageGroup: program.ageGroup,
-      duration: program.duration,
-      participants: program.participants,
-      startDate: program.startDate || '',
-      endDate: program.endDate || '',
-      occurrence: program.occurrence || 'Weekly',
-      description: program.description || '',
-      isOpenToPublic: program.isOpenToPublic || false,
-      requiresRegistration: program.requiresRegistration ?? true,
-      isPaid: program.isPaid || false,
-      registrationFee: program.registrationFee || ''
-    });
-    setIsCreateProgramModalOpen(true);
+    navigate('/events');
   };
 
   const handleOpenCreateModal = () => {
-    setEditingProgramId(null);
-    setProgramForm({
-      title: '',
-      level: 'Branch Level',
-      ageGroup: 'All Ages',
-      duration: '',
-      participants: 0,
-      startDate: '',
-      endDate: '',
-      occurrence: 'Weekly',
-      description: '',
-      isOpenToPublic: false,
-      requiresRegistration: true,
-      isPaid: false,
-      registrationFee: ''
-    });
-    setIsCreateProgramModalOpen(true);
-  };
-
-  const handleCreateProgram = () => {
-    if (!programForm.title) return;
-
-    if (editingProgramId) {
-      setPrograms(prev => prev.map(p => 
-        p.id === editingProgramId 
-          ? { 
-              ...p, 
-              title: programForm.title,
-              level: programForm.level,
-              participants: Number(programForm.participants) || 0,
-              ageGroup: programForm.ageGroup,
-              duration: programForm.duration || "TBD",
-              startDate: programForm.startDate,
-              endDate: programForm.endDate,
-              occurrence: programForm.occurrence,
-              description: programForm.description,
-              isOpenToPublic: programForm.isOpenToPublic,
-              requiresRegistration: programForm.requiresRegistration,
-              isPaid: programForm.isPaid,
-              registrationFee: programForm.registrationFee
-            } 
-          : p
-      ));
-    } else {
-      const newId = `prog-${Math.random().toString(36).substr(2, 9)}`;
-      const newProg = {
-        id: newId,
-        title: programForm.title,
-        level: programForm.level,
-        participants: Number(programForm.participants) || 0,
-        ageGroup: programForm.ageGroup,
-        duration: programForm.duration || "TBD",
-        status: "active",
-        completion: "0%",
-        startDate: programForm.startDate,
-        endDate: programForm.endDate,
-        occurrence: programForm.occurrence,
-        description: programForm.description,
-        isOpenToPublic: programForm.isOpenToPublic,
-        requiresRegistration: programForm.requiresRegistration,
-        isPaid: programForm.isPaid,
-        registrationFee: programForm.registrationFee
-      };
-      setPrograms([newProg, ...programs]);
-    }
-
-    setIsCreateProgramModalOpen(false);
-    setEditingProgramId(null);
+    navigate('/events', { state: { createEventForMinistry: ministryId } });
   };
 
   const config = MINISTRY_CONFIGS[ministryId || 'youth'] || MINISTRY_CONFIGS.youth;
@@ -1005,173 +902,6 @@ export default function MinistryDashboard() {
                 className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
               >
                 Add Member
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* Create Program Modal */}
-      {isCreateProgramModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
-          >
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center shrink-0">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">{editingProgramId ? 'Edit Program' : 'Create New Program'}</h3>
-                <p className="text-sm text-slate-500">{editingProgramId ? 'Update project details' : 'Set up a new training or discipleship program'}</p>
-              </div>
-              <button 
-                onClick={() => setIsCreateProgramModalOpen(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-colors focus:outline-none"
-              >
-                &times;
-              </button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto space-y-6 text-slate-900">
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700">Program Name</label>
-                <input 
-                  type="text" 
-                  value={programForm.title}
-                  onChange={e => setProgramForm({ ...programForm, title: e.target.value })}
-                  placeholder="e.g., Youth Leadership Track 2026" 
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold" 
-                />
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <label className="flex items-center gap-2 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer">
-                  <input type="checkbox" checked={programForm.isOpenToPublic} onChange={e => setProgramForm({...programForm, isOpenToPublic: e.target.checked})} />
-                  <span className="text-sm font-bold text-slate-700">Public</span>
-                </label>
-                <label className="flex items-center gap-2 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer">
-                  <input type="checkbox" checked={programForm.requiresRegistration} onChange={e => setProgramForm({...programForm, requiresRegistration: e.target.checked})} />
-                  <span className="text-sm font-bold text-slate-700">Reg. Req.</span>
-                </label>
-                <label className="flex items-center gap-2 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer">
-                  <input type="checkbox" checked={programForm.isPaid} onChange={e => setProgramForm({...programForm, isPaid: e.target.checked})} />
-                  <span className="text-sm font-bold text-slate-700">Paid</span>
-                </label>
-                {programForm.isPaid && (
-                  <input type="number" placeholder="Fee" value={programForm.registrationFee} onChange={e => setProgramForm({...programForm, registrationFee: e.target.value})} className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none" />
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-slate-700">Program Level</label>
-                  <select 
-                    value={programForm.level}
-                    onChange={e => setProgramForm({ ...programForm, level: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-bold"
-                  >
-                    <option>National Level</option>
-                    <option>District Level</option>
-                    <option>Branch Level</option>
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-slate-700">Audience / Age Group</label>
-                  <select 
-                    value={programForm.ageGroup}
-                    onChange={e => setProgramForm({ ...programForm, ageGroup: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-bold"
-                  >
-                    <option>All Ages</option>
-                    <option>Teens (13-17)</option>
-                    <option>Youth (18-24)</option>
-                    <option>Young Adults (25-35)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-slate-700">Start Date</label>
-                  <input 
-                    type="date" 
-                    value={programForm.startDate}
-                    onChange={e => setProgramForm({ ...programForm, startDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold" 
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-slate-700">End Date (Optional)</label>
-                  <input 
-                    type="date" 
-                    value={programForm.endDate}
-                    onChange={e => setProgramForm({ ...programForm, endDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold" 
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-slate-700">Duration Text</label>
-                  <input 
-                    type="text" 
-                    value={programForm.duration}
-                    onChange={e => setProgramForm({ ...programForm, duration: e.target.value })}
-                    placeholder="e.g., 6 months" 
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold" 
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-slate-700">Target Enrollment</label>
-                  <input 
-                    type="number" 
-                    value={programForm.participants}
-                    onChange={e => setProgramForm({ ...programForm, participants: parseInt(e.target.value) })}
-                    placeholder="0" 
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold" 
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold text-slate-700">Occurrence</label>
-                  <select 
-                    value={programForm.occurrence}
-                    onChange={e => setProgramForm({ ...programForm, occurrence: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all bg-white font-bold"
-                  >
-                    <option>Weekly</option>
-                    <option>Bi-weekly</option>
-                    <option>Monthly</option>
-                    <option>One-Time</option>
-                    <option>Ongoing</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700">Description / Goals</label>
-                <textarea 
-                  rows={4} 
-                  value={programForm.description}
-                  onChange={e => setProgramForm({ ...programForm, description: e.target.value })}
-                  placeholder="What are the goals of this program?" 
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none font-medium"
-                ></textarea>
-              </div>
-            </div>
-
-            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0">
-              <button 
-                onClick={() => setIsCreateProgramModalOpen(false)}
-                className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors focus:outline-none"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleCreateProgram}
-                className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm focus:outline-none"
-              >
-                {editingProgramId ? 'Update Program' : 'Create Program'}
               </button>
             </div>
           </motion.div>

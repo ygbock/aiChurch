@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { useZxing } from 'react-zxing';
+import { useRole } from '../components/Layout';
 import { 
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
@@ -90,6 +92,8 @@ interface FormField {
 
 // --- Main Page Component ---
 export default function ProgramDashboard() {
+  const { role } = useRole();
+  const isAdmin = role === 'admin' || role === 'superadmin' || role === 'district';
   const { programId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -171,11 +175,17 @@ export default function ProgramDashboard() {
       {/* Breadcrumb / Top Bar */}
       <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
         <button 
-          onClick={() => navigate(`/ministries/${fromMinistry}`, { state: { initialTab: 'Programs' } })} 
+          onClick={() => {
+            if (location.state?.fromEvent) {
+              navigate('/events');
+            } else {
+              navigate(`/ministries/${fromMinistry}`, { state: { initialTab: 'Programs' } });
+            }
+          }} 
           className="hover:text-blue-600 transition-colors flex items-center gap-1"
         >
           <ArrowLeft size={14} />
-          Command Center
+          {location.state?.fromEvent ? 'Events' : 'Command Center'}
         </button>
       </div>
 
@@ -197,33 +207,37 @@ export default function ProgramDashboard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setIsMarketplaceOpen(true)}
-            className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs hover:bg-blue-700 transition-all shadow-lg hover:shadow-blue-200/50 flex items-center gap-2 uppercase tracking-widest shrink-0 whitespace-nowrap min-w-fit"
-          >
-            <Plus size={16} />
-            Activate Modules
-          </button>
-          <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto mt-4 md:mt-0">
+          {isAdmin && (
+            <button 
+              onClick={() => setIsMarketplaceOpen(true)}
+              className="flex-1 md:flex-none justify-center bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-xs hover:bg-blue-700 transition-all shadow-lg hover:shadow-blue-200/50 flex items-center gap-2 uppercase tracking-widest shrink-0 whitespace-nowrap min-w-fit"
+            >
+              <Plus size={16} />
+              Activate Modules
+            </button>
+          )}
+          <div className="flex items-center gap-2 shrink-0 md:justify-end">
              <IconButton icon={<MessageSquare size={18} />} badge />
              <IconButton icon={<Bell size={18} />} badge />
              <IconButton icon={<Settings size={18} />} />
-             <button 
-               id="delete-program-btn"
-               onClick={() => setIsDeleteModalOpen(true)}
-               className="w-10 h-10 bg-white rounded-2xl border border-rose-100 flex items-center justify-center text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-all shadow-sm shrink-0"
-               title="Delete Program"
-             >
-               <Trash2 size={18} />
-             </button>
+             {isAdmin && (
+               <button 
+                 id="delete-program-btn"
+                 onClick={() => setIsDeleteModalOpen(true)}
+                 className="w-10 h-10 bg-white rounded-2xl border border-rose-100 flex items-center justify-center text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-all shadow-sm shrink-0"
+                 title="Delete Program"
+               >
+                 <Trash2 size={18} />
+               </button>
+             )}
           </div>
         </div>
       </div>
 
       {/* Navigation Tabs */}
-      <div className="bg-white/50 backdrop-blur-sm p-1 rounded-2xl border border-slate-200 inline-flex">
-        {['Dashboard', 'Analytics', 'Command Team', 'Audit Log'].map(tab => (
+      <div className="bg-white/50 backdrop-blur-sm p-1 rounded-2xl border border-slate-200 flex flex-wrap gap-1">
+        {(isAdmin ? ['Dashboard', 'Analytics', 'Command Team', 'Audit Log'] : ['Dashboard']).map(tab => (
           <button
             key={tab}
             onClick={() => { setActiveTab(tab); setActiveModule(null); }}
@@ -254,22 +268,25 @@ export default function ProgramDashboard() {
                     key={mod.id} 
                     module={mod} 
                     onClick={() => mod.enabled && setActiveModule(mod.id)}
-                    onToggle={() => toggleModule(mod.id)}
+                    onToggle={() => isAdmin && toggleModule(mod.id)}
                     onManageStations={() => { setModuleToEditStations(mod); setIsStationModalOpen(true); }}
+                    isAdmin={isAdmin}
                   />
                 ))}
 
                 {/* Placeholder for Provisioning */}
-                <div 
-                  onClick={() => setIsMarketplaceOpen(true)}
-                  className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-6 flex flex-col items-center justify-center text-center group cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all"
-                >
-                  <div className="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center text-blue-500 mb-4 group-hover:scale-110 transition-transform">
-                    <Command size={24} />
+                {isAdmin && (
+                  <div 
+                    onClick={() => setIsMarketplaceOpen(true)}
+                    className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-6 flex flex-col items-center justify-center text-center group cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all"
+                  >
+                    <div className="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-center text-blue-500 mb-4 group-hover:scale-110 transition-transform">
+                      <Command size={24} />
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800 font-display">Provision Module</h3>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Expand event operations</p>
                   </div>
-                  <h3 className="text-lg font-bold text-slate-800 font-display">Provision Module</h3>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Expand event operations</p>
-                </div>
+                )}
               </div>
             )}
 
@@ -293,7 +310,7 @@ export default function ProgramDashboard() {
             exit={{ opacity: 0, scale: 1.02 }}
             className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden min-h-[600px] flex flex-col"
           >
-            <div className="px-8 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+            <div className="px-4 sm:px-8 py-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-50/50 gap-4">
               <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setActiveModule(null)}
@@ -302,21 +319,23 @@ export default function ProgramDashboard() {
                   <ArrowLeft size={18} />
                 </button>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 font-display flex items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 font-display flex items-center gap-2">
                     {modules.find(m => m.id === activeModule)?.name}
                     <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[9px] font-bold rounded-full">ACTIVE</span>
                   </h2>
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Operational Console</p>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest hidden sm:block">Operational Console</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                 <button className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2">
-                   <Download size={16} /> Export Data
-                 </button>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                 {isAdmin && (
+                   <button className="flex-1 sm:flex-none justify-center px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2">
+                     <Download size={16} /> Export Data
+                   </button>
+                 )}
               </div>
             </div>
 
-            <div className="flex-1 p-8">
+            <div className="flex-1 p-4 sm:p-8 overflow-x-hidden">
               {activeModule === 'registration' && <RegistrationModule />}
               {activeModule === 'attendance' && <AttendanceModule />}
               {activeModule === 'queue' && <QueueModule />}
@@ -374,6 +393,11 @@ export default function ProgramDashboard() {
               </button>
               <button 
                 onClick={() => {
+                  if (location.state?.fromEvent) {
+                    setIsDeleteModalOpen(false);
+                    navigate('/events');
+                    return;
+                  }
                   const storageKey = `ministry_programs_${fromMinistry}`;
                   const savedPrograms = localStorage.getItem(storageKey);
                   if (savedPrograms) {
@@ -569,7 +593,7 @@ function IconButton({ icon, badge }: { icon: React.ReactNode, badge?: boolean })
   );
 }
 
-function ModuleCard({ module, onClick, onToggle, onManageStations }: { module: ProgramModule, onClick: () => void, onToggle: () => void, onManageStations: () => void }) {
+function ModuleCard({ module, onClick, onToggle, onManageStations, isAdmin }: { module: ProgramModule, onClick: () => void, onToggle: () => void, onManageStations: () => void, isAdmin?: boolean }) {
   return (
     <div className={`bg-white rounded-3xl border border-slate-100 shadow-sm p-5 flex flex-col justify-between group transition-all ${module.enabled ? 'hover:shadow-xl hover:-translate-y-1' : 'opacity-60 overflow-hidden'}`}>
        <div className="space-y-3">
@@ -581,12 +605,14 @@ function ModuleCard({ module, onClick, onToggle, onManageStations }: { module: P
              <span className={`text-[9px] font-bold uppercase tracking-widest ${module.enabled ? 'text-emerald-500' : 'text-slate-400'}`}>
                 {module.enabled ? '● Online' : '○ Offline'}
              </span>
-             <button 
-               onClick={(e) => { e.stopPropagation(); onToggle(); }}
-               className="p-1 hover:text-blue-600"
-             >
-                <ChevronRight size={16} className={module.enabled ? 'text-slate-300' : 'text-slate-200'} />
-             </button>
+             {isAdmin && (
+               <button 
+                 onClick={(e) => { e.stopPropagation(); onToggle(); }}
+                 className="p-1 hover:text-blue-600"
+               >
+                  <ChevronRight size={16} className={module.enabled ? 'text-slate-300' : 'text-slate-200'} />
+               </button>
+             )}
            </div>
          </div>
 
@@ -597,9 +623,13 @@ function ModuleCard({ module, onClick, onToggle, onManageStations }: { module: P
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Status</p>
                 <p className="text-[10px] font-bold text-slate-900">{module.enabled ? 'Operational' : 'Disabled'}</p>
               </div>
-              <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-100 col-span-2 cursor-pointer hover:bg-slate-100" onClick={onManageStations}>
+              <div className={`bg-slate-50 p-2.5 rounded-2xl border border-slate-100 col-span-2 ${isAdmin ? 'cursor-pointer hover:bg-slate-100' : ''}`} onClick={() => isAdmin && onManageStations()}>
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Stations ({module.stations.length})</p>
-                <p className="text-[10px] font-bold text-blue-600 underline">Manage Stations</p>
+                {isAdmin ? (
+                  <p className="text-[10px] font-bold text-blue-600 underline">Manage Stations</p>
+                ) : (
+                  <p className="text-[10px] font-bold text-slate-600">{module.stations.join(', ')}</p>
+                )}
               </div>
            </div>
          </div>
@@ -1515,53 +1545,317 @@ function FieldTool({ label, icon, onClick }: { label: string, icon: React.ReactN
   );
 }
 
+function BarcodeScanner({ onScan, onBack, scannedResult }: { onScan: (code: string) => void, onBack: () => void, scannedResult: string }) {
+  const { ref } = useZxing({
+    onDecodeResult(result) {
+      onScan(result.getText());
+    },
+    onError(err) {
+      console.warn("Scanner Error:", err);
+    }
+  });
+
+  return (
+    <>
+      <div className="relative z-10 w-full max-w-sm aspect-square bg-black rounded-3xl overflow-hidden mb-6 border-4 border-slate-700">
+        <video ref={ref} className="w-full h-full object-cover" />
+        <div className="absolute inset-0 border-2 border-blue-500/50 rounded-3xl pointer-events-none"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 border-2 border-blue-500 pointer-events-none z-20"></div>
+      </div>
+      <h2 className="text-xl font-black text-white font-display uppercase tracking-widest mb-4">Scanning...</h2>
+      {scannedResult && (
+        <motion.div 
+          key={scannedResult}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="px-6 py-3 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 font-bold text-sm mb-6 z-10"
+        >
+          {scannedResult}
+        </motion.div>
+      )}
+      <button 
+        onClick={onBack}
+        className="relative z-10 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all"
+      >
+        Back to manual
+      </button>
+    </>
+  );
+}
+
 // --- MODULE: ATTENDANCE ---
 function AttendanceModule() {
+  const [sessionInfo, setSessionInfo] = useState('General Session');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isKioskMode, setIsKioskMode] = useState(false);
+  const [useCamera, setUseCamera] = useState(false);
+  const [kioskCode, setKioskCode] = useState('');
+  const [scannedResult, setScannedResult] = useState('');
+
+  // Mock list of attendees
+  const [attendees, setAttendees] = useState([
+    { id: '1', name: 'John Doe', email: 'john@example.com', status: 'present', time: '10:15 AM' },
+    { id: '2', name: 'Jane Smith', email: 'jane@example.com', status: 'pending', time: null },
+    { id: '3', name: 'Michael Johnson', email: 'michael@example.com', status: 'present', time: '10:20 AM' },
+    { id: '4', name: 'Sarah Williams', email: 'sarah@example.com', status: 'pending', time: null },
+    { id: '5', name: 'David Brown', email: 'david@example.com', status: 'pending', time: null },
+    { id: '6', name: 'Emily Davis', email: 'emily@example.com', status: 'present', time: '10:25 AM' },
+    { id: '7', name: 'Chris Wilson', email: 'chris@example.com', status: 'pending', time: null },
+  ]);
+
+  const toggleStatus = (id: string, currentStatus: string) => {
+    setAttendees(prev => prev.map(a => {
+      if (a.id === id) {
+        if (currentStatus === 'pending') {
+          return { ...a, status: 'present', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+        } else {
+          return { ...a, status: 'pending', time: null };
+        }
+      }
+      return a;
+    }));
+  };
+
+  const processScannedCode = (code: string) => {
+    const attendee = attendees.find(a => a.id === code || a.email.toLowerCase().includes(code.toLowerCase()) || a.name.toLowerCase().includes(code.toLowerCase()));
+    if (attendee) {
+       if (attendee.status !== 'present') {
+         toggleStatus(attendee.id, 'pending');
+         setScannedResult(`Checked in: ${attendee.name}`);
+       } else {
+         setScannedResult(`${attendee.name} is already checked in.`);
+       }
+    } else {
+       setScannedResult(`Attendee not found: ${code}`);
+    }
+  };
+
+  const handleKioskSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!kioskCode) return;
+    processScannedCode(kioskCode);
+    setKioskCode('');
+  };
+
+  const filteredAttendees = attendees.filter(a => 
+    a.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    a.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const presentCount = attendees.filter(a => a.status === 'present').length;
+  const metrics = [
+    { label: "Overall Attendance", percent: Math.round((presentCount / attendees.length) * 100) || 0, count: presentCount, color: "bg-blue-500" },
+    { label: "Main Service", percent: 82, count: 370, color: "bg-emerald-500" }
+  ];
+
+  if (isKioskMode) {
+    return (
+       <div className="absolute inset-0 z-50 bg-slate-900 flex items-center justify-center p-4">
+          <button 
+            onClick={() => { setIsKioskMode(false); setUseCamera(false); setScannedResult(''); }}
+            className="absolute top-8 right-8 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all font-bold text-xl"
+          >
+            <X size={24} />
+          </button>
+          <div className="bg-slate-800 p-8 sm:p-12 rounded-[2rem] max-w-lg w-full text-center relative overflow-hidden flex flex-col items-center">
+             <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
+             
+             {!useCamera ? (
+               <>
+                 <Scan size={80} className="mx-auto text-blue-500 mb-8 opacity-80" />
+                 <h2 className="text-2xl sm:text-3xl font-black text-white font-display uppercase tracking-widest mb-2">Check-in Scanner</h2>
+                 <p className="text-slate-400 mb-8 font-medium text-xs sm:text-sm">Scan QR code or barcode to record attendance instantly.</p>
+                 
+                 <form onSubmit={handleKioskSubmit} className="relative z-10 w-full mb-6">
+                    <input 
+                      type="text" 
+                      autoFocus 
+                      value={kioskCode} 
+                      onChange={e => setKioskCode(e.target.value)} 
+                      placeholder="Waiting for scanner input..." 
+                      className="w-full bg-slate-900/50 border-2 border-slate-700 rounded-2xl px-4 sm:px-6 py-4 sm:py-5 text-lg sm:text-xl font-black text-white text-center focus:outline-none focus:border-blue-500 focus:bg-slate-900 transition-all placeholder:text-slate-600 tracking-widest"
+                    />
+                    <button type="submit" className="hidden">Submit</button>
+                 </form>
+                 <p className="text-[9px] sm:text-[10px] uppercase font-black tracking-widest text-slate-500 mb-6">Keyboard wedge simulated</p>
+
+                 <div className="relative z-10 w-full flex flex-col gap-4">
+                   <div className="flex items-center gap-4 w-full">
+                     <div className="h-px bg-slate-700 flex-1"></div>
+                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">OR</span>
+                     <div className="h-px bg-slate-700 flex-1"></div>
+                   </div>
+                   <button 
+                     onClick={() => { setUseCamera(true); setScannedResult(''); }}
+                     className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg flex justify-center items-center gap-2"
+                   >
+                     Use Device Camera
+                   </button>
+                 </div>
+               </>
+             ) : (
+               <BarcodeScanner 
+                 onScan={(code) => processScannedCode(code)} 
+                 onBack={() => { setUseCamera(false); setScannedResult(''); }} 
+                 scannedResult={scannedResult} 
+               />
+             )}
+             
+          </div>
+       </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-      <div className="space-y-6">
-        <div className="bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden">
+    <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 min-h-[600px] h-full">
+      {/* Left Sidebar: Scan & Status */}
+      <div className="w-full lg:w-[350px] shrink-0 flex flex-col gap-6">
+        
+        <div className="bg-slate-900 rounded-[2rem] p-6 sm:p-8 text-white relative overflow-hidden shadow-xl shadow-slate-200/50">
           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl -mr-32 -mt-32"></div>
-          <div className="relative z-10">
-            <h4 className="text-lg font-black uppercase tracking-widest mb-6">Service Live Check-in</h4>
-            <div className="aspect-square bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 flex flex-col items-center justify-center text-center p-8">
-              <Scan size={64} className="mb-6 opacity-50" />
-              <p className="text-sm font-bold text-white/70">Position scanner over participant QR code</p>
-              <button className="mt-8 px-8 py-3 bg-white text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-all">
-                Launch Kiosk Mode
-              </button>
+          <div className="relative z-10 flex flex-col h-full">
+            <h4 className="text-[10px] font-black uppercase tracking-widest mb-4 opacity-80">Check-in Terminal</h4>
+            
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-6">
+              <div className="w-20 sm:w-24 h-20 sm:h-24 bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 flex items-center justify-center mb-4 sm:mb-6 shadow-inner">
+                <Scan size={40} className="text-blue-400" />
+              </div>
+              <h3 className="text-base sm:text-lg font-black font-display mb-2">Ready to Scan</h3>
+              <p className="text-[10px] sm:text-[11px] font-bold text-white/50 px-2 sm:px-4">Connect a barcode scanner or launch kiosk mode to use camera/device scanner.</p>
             </div>
+            
+            <button 
+              onClick={() => setIsKioskMode(true)}
+              className="mt-4 w-full py-3 sm:py-4 bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 active:scale-[0.98] transition-all shadow-lg flex justify-center items-center gap-2"
+            >
+              Launch Kiosk Mode
+            </button>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-3xl p-8">
-           <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Manual Entry</h4>
-           <div className="relative mb-4">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type="text" placeholder="Search by name or email..." className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
-           </div>
-           <p className="text-xs text-slate-400 text-center italic">Use manual entry for participants without digital passes</p>
+        <div className="bg-white rounded-[2rem] p-6 lg:p-8 border border-slate-200 shadow-sm flex flex-col">
+          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 block">Real-time Metrics</h4>
+          
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Present</p>
+              <h3 className="text-3xl sm:text-4xl font-black font-display text-slate-900 leading-none">{presentCount}<span className="text-base sm:text-lg text-slate-400 ml-1">/ {attendees.length}</span></h3>
+            </div>
+            <div className="text-right">
+              <div className="inline-flex items-center justify-center w-10 sm:w-12 h-10 sm:h-12 rounded-full bg-blue-50 text-blue-600 font-black text-sm">
+                {Math.round((presentCount / attendees.length) * 100) || 0}%
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-4 sm:space-y-5">
+             {metrics.map((m, i) => <AttendanceBar key={i} {...m} />)}
+          </div>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-3xl p-8 flex flex-col">
-        <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Attendance Metrics</h4>
-        <div className="space-y-4 flex-1">
-           <AttendanceBar label="General Sessions" percent={82} count={370} color="bg-blue-500" />
-           <AttendanceBar label="Breakout A" percent={65} count={120} color="bg-purple-500" />
-           <AttendanceBar label="Breakout B" percent={94} count={242} color="bg-emerald-500" />
-           <AttendanceBar label="Special Lunch" percent={45} count={110} color="bg-amber-500" />
+      {/* Main List Area: Search & Attendance Roster */}
+      <div className="flex-1 bg-white border border-slate-200 rounded-[2rem] shadow-sm flex flex-col overflow-hidden relative">
+        {/* Header / Tools */}
+        <div className="px-5 sm:px-8 py-4 sm:py-5 border-b border-slate-100 bg-slate-50/50 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 shrink-0 relative z-20">
+          <div>
+            <h3 className="text-base sm:text-lg font-black text-slate-900 font-display">Target Audience</h3>
+            <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Manual Entry & Roster</p>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-stretch gap-3 w-full xl:w-auto">
+             <select 
+               value={sessionInfo} 
+               onChange={e => setSessionInfo(e.target.value)} 
+               className="bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none shadow-sm cursor-pointer"
+             >
+               <option>General Session</option>
+               <option>Breakout: Leaders</option>
+               <option>Evening Service</option>
+             </select>
+             
+             <div className="relative w-full sm:flex-1 xl:w-64">
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                  type="text" 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search name or ID..." 
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+                />
+             </div>
+          </div>
         </div>
         
-        <div className="pt-8 border-t border-slate-100 grid grid-cols-2 gap-4">
-           <div>
-             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Peak Time</p>
-             <p className="text-xl font-black text-slate-900">10:45 AM</p>
-           </div>
-           <div className="text-right">
-             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Efficiency</p>
-             <p className="text-xl font-black text-emerald-500">92.4%</p>
-           </div>
+        {/* Table / List */}
+        <div className="flex-1 overflow-auto relative z-10">
+           <table className="w-full text-left border-collapse">
+             <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-sm z-30 border-b border-slate-200 hidden sm:table-header-group">
+               <tr>
+                 <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-16">No.</th>
+                 <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Participant</th>
+                 <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Check-In</th>
+                 <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Status</th>
+               </tr>
+             </thead>
+             <tbody className="divide-y divide-slate-100 flex flex-col sm:table-row-group">
+               {filteredAttendees.length === 0 ? (
+                 <tr className="block sm:table-row">
+                   <td colSpan={4} className="px-8 py-16 text-center text-slate-500 font-bold block sm:table-cell">
+                     No participants found matching "{searchQuery}"
+                   </td>
+                 </tr>
+               ) : (
+                 filteredAttendees.map((attendee, index) => (
+                   <tr key={attendee.id} className="group hover:bg-slate-50/50 transition-colors flex flex-col sm:table-row p-4 sm:p-0 relative">
+                     <td className="px-4 tracking-widest sm:px-8 sm:py-4 hidden sm:table-cell">
+                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{index + 1}</span>
+                     </td>
+                     <td className="sm:px-8 sm:py-4 flex flex-row items-center justify-between sm:table-cell w-full mb-3 sm:mb-0">
+                       <div className="flex items-center gap-3 w-full">
+                         <div className={`w-10 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-black text-[12px] sm:text-[10px] shrink-0 transition-colors shadow-sm ${attendee.status === 'present' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                           {attendee.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                         </div>
+                         <div className="flex-1 min-w-0">
+                           <p className="text-sm font-bold text-slate-900 truncate">{attendee.name}</p>
+                           <p className="text-[11px] sm:text-[10px] md:text-xs text-slate-500 font-medium truncate">{attendee.email}</p>
+                         </div>
+                       </div>
+                     </td>
+                     <td className="sm:px-8 sm:py-4 flex items-center gap-2 mb-3 sm:mb-0 sm:table-cell">
+                       <span className="sm:hidden text-[10px] font-black text-slate-400 uppercase tracking-widest">Time:</span>
+                       {attendee.time ? (
+                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100/80 text-slate-600 text-[10px] font-black tracking-widest uppercase border border-slate-200/50">
+                           <Clock size={12} /> {attendee.time}
+                         </span>
+                       ) : (
+                         <span className="text-[10px] font-bold text-slate-400 italic">--</span>
+                       )}
+                     </td>
+                     <td className="sm:px-8 sm:py-4 sm:text-right flex justify-end sm:table-cell w-full">
+                       <button 
+                         onClick={() => toggleStatus(attendee.id, attendee.status)}
+                         className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-3 sm:px-4 sm:py-2 rounded-xl text-[10px] sm:text-[10px] font-black uppercase tracking-widest transition-all ${
+                           attendee.status === 'present' 
+                             ? 'bg-emerald-50 text-emerald-700 hover:bg-rose-50 hover:text-rose-600 border border-emerald-100 hover:border-rose-100' 
+                             : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900 shadow-sm'
+                         }`}
+                       >
+                         {attendee.status === 'present' ? (
+                           <>
+                             <CheckCircle2 size={16} className="sm:w-[14px] sm:h-[14px] group-hover:hidden" />
+                             <X size={16} className="sm:w-[14px] sm:h-[14px] hidden group-hover:block" />
+                             <span className="group-hover:hidden">Present</span>
+                             <span className="hidden group-hover:inline">Undo Check-in</span>
+                           </>
+                         ) : 'Mark Present'}
+                       </button>
+                     </td>
+                   </tr>
+                 ))
+               )}
+             </tbody>
+           </table>
         </div>
       </div>
     </div>
@@ -1570,12 +1864,12 @@ function AttendanceModule() {
 
 function AttendanceBar({ label, percent, count, color }: any) {
   return (
-    <div className="space-y-2">
-       <div className="flex justify-between items-center text-xs font-bold">
-         <span className="text-slate-600">{label}</span>
-         <span className="text-slate-900">{count} Present</span>
+    <div className="space-y-2 sm:space-y-1.5">
+       <div className="flex justify-between items-end text-[10px] font-black uppercase tracking-widest">
+         <span className="text-slate-500">{label}</span>
+         <span className="text-slate-900">{count}</span>
        </div>
-       <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+       <div className="h-2.5 sm:h-2 bg-slate-100 rounded-full overflow-hidden">
          <motion.div 
            initial={{ width: 0 }}
            animate={{ width: `${percent}%` }}

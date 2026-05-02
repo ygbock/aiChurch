@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Calendar as CalendarIcon, 
   Plus, 
@@ -37,12 +37,14 @@ interface EventData {
   time: string;
   location: string;
   type: string;
+  targetMinistry?: string;
 }
 
 export default function Events() {
   const { role } = useRole();
   const { profile } = useFirebase();
   const navigate = useNavigate();
+  const location = useLocation();
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -59,7 +61,8 @@ export default function Events() {
     date: format(new Date(), 'yyyy-MM-dd'),
     time: '09:00',
     location: '',
-    type: 'Service'
+    type: 'Service',
+    targetMinistry: 'All'
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -105,6 +108,23 @@ export default function Events() {
     return () => unsubscribe();
   }, [profile]);
 
+  useEffect(() => {
+    if (location.state?.createEventForMinistry && isAdmin) {
+      setEditingEvent(null);
+      setEventForm({
+        title: '',
+        description: '',
+        date: format(new Date(), 'yyyy-MM-dd'),
+        time: '09:00',
+        location: '',
+        type: 'Service',
+        targetMinistry: location.state.createEventForMinistry
+      });
+      setShowModal(true);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state, isAdmin, navigate, location.pathname]);
+
   const handleOpenCreateModal = () => {
     if (!isAdmin) return;
     setEditingEvent(null);
@@ -114,7 +134,8 @@ export default function Events() {
       date: format(new Date(), 'yyyy-MM-dd'),
       time: '09:00',
       location: '',
-      type: 'Service'
+      type: 'Service',
+      targetMinistry: 'All'
     });
     setShowModal(true);
   };
@@ -128,7 +149,8 @@ export default function Events() {
       date: format(event.date, 'yyyy-MM-dd'),
       time: event.time || '09:00',
       location: event.location || '',
-      type: event.type || 'Service'
+      type: event.type || 'Service',
+      targetMinistry: event.targetMinistry || 'All'
     });
     setShowModal(true);
   };
@@ -155,6 +177,7 @@ export default function Events() {
         time: eventForm.time,
         location: eventForm.location,
         type: eventForm.type,
+        targetMinistry: eventForm.targetMinistry,
         updatedAt: serverTimestamp()
       };
 
@@ -237,7 +260,7 @@ export default function Events() {
             className="flex-1 md:flex-none h-11 bg-white border border-slate-200 text-slate-700 px-6 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-sm active:scale-95"
           >
             <CalendarIcon size={18} />
-            Full Calendar View
+            Calendar
           </button>
           
           {isAdmin && (
@@ -246,23 +269,23 @@ export default function Events() {
               className="flex-1 md:flex-none h-11 bg-blue-600 text-white px-6 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-blue-700 transition-all flex items-center justify-center gap-3 shadow-lg shadow-blue-200 active:scale-95"
             >
               <Plus size={18} />
-              Initialize Activation
+              Create Event
             </button>
           )}
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {stats.map((stat, i) => (
-          <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm group hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-            <div className="flex justify-between items-start mb-4">
+          <div key={i} className="bg-white p-4 sm:p-6 rounded-[1.5rem] sm:rounded-3xl border border-slate-100 shadow-sm group hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+            <div className="flex justify-between items-start mb-2 sm:mb-4">
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{stat.label}</p>
-                <h3 className="text-3xl font-black text-slate-900 font-display">{stat.value}</h3>
+                <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">{stat.label}</p>
+                <h3 className="text-2xl sm:text-3xl font-black text-slate-900 font-display">{stat.value}</h3>
               </div>
-              <div className={`w-10 h-10 ${stat.color} text-white rounded-2xl flex items-center justify-center shadow-lg shadow-slate-100`}>
-                {stat.icon}
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 ${stat.color} text-white rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-slate-100 shrink-0`}>
+                {React.cloneElement(stat.icon as React.ReactElement, { size: 18 })}
               </div>
             </div>
             <div className="flex items-center justify-between pt-4 border-t border-slate-50">
@@ -289,18 +312,18 @@ export default function Events() {
               className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-6 py-4 text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all shadow-sm"
             />
           </div>
-          <div className="flex items-center gap-2 w-full md:w-auto">
-             <div className="flex bg-white rounded-xl border border-slate-200 p-1 shadow-sm h-11">
+          <div className="hidden md:flex items-center gap-2 w-full md:w-auto">
+             <div className="flex bg-white rounded-xl border border-slate-200 p-1 shadow-sm h-11 w-full md:w-auto">
               <button 
                 onClick={() => setViewMode('grid')}
-                className={`px-4 py-1.5 rounded-lg flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'grid' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`flex-1 md:flex-none justify-center px-4 py-1.5 rounded-lg flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'grid' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 <LayoutGrid size={16} />
                 Grid
               </button>
               <button 
                 onClick={() => setViewMode('list')}
-                className={`px-4 py-1.5 rounded-lg flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'list' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`flex-1 md:flex-none justify-center px-4 py-1.5 rounded-lg flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'list' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 <List size={16} />
                 List
@@ -310,8 +333,8 @@ export default function Events() {
         </div>
 
         {/* Tiered Filter Bullets */}
-        <div className="flex flex-wrap gap-4">
-          <div className="flex flex-wrap gap-2 p-1 bg-slate-50 border border-slate-100 rounded-2xl w-fit">
+        <div className="flex flex-col md:flex-row flex-wrap gap-4">
+          <div className="hidden md:flex flex-wrap gap-2 p-1 bg-slate-50 border border-slate-100 rounded-2xl w-fit">
             {['All', 'National', 'District', 'Branch'].map(scope => (
               <button 
                 key={scope}
@@ -322,7 +345,31 @@ export default function Events() {
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-2 p-1 bg-slate-50 border border-slate-100 rounded-2xl w-fit">
+
+          <div className="flex md:hidden gap-4 w-full">
+            <select 
+               className="w-1/2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-700 outline-none"
+               value={scopeFilter}
+               onChange={(e) => setScopeFilter(e.target.value)}
+            >
+               {['All', 'National', 'District', 'Branch'].map(scope => (
+                  <option key={scope} value={scope}>{scope}</option>
+               ))}
+            </select>
+            
+            <select 
+               className="w-1/2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-700 outline-none"
+               value={categoryFilter}
+               onChange={(e) => setCategoryFilter(e.target.value)}
+            >
+              <option value="All">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat.label} value={cat.label}>{cat.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="hidden md:flex flex-wrap gap-2 p-1 bg-slate-50 border border-slate-100 rounded-2xl w-fit">
             <button 
               onClick={() => setCategoryFilter('All')}
               className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${categoryFilter === 'All' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-500 hover:text-slate-900'}`}
@@ -370,42 +417,42 @@ export default function Events() {
                 >
                   <div className={`w-1 transition-all group-hover:w-2 ${scopeColor} absolute left-0 inset-y-0`}></div>
                   
-                  <div className="p-8 flex-1">
+                  <div className="p-5 md:p-8 flex-1">
                     <div className="flex flex-wrap gap-2 mb-4">
                       <span className={`px-3 py-1 ${scopeColor} text-white text-[9px] font-black rounded-lg tracking-widest uppercase`}>{scopeLabel}</span>
                       <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[9px] font-black rounded-lg tracking-widest uppercase border border-blue-100">{evt.type}</span>
                     </div>
 
-                    <div className="mb-6">
-                      <h3 className="text-2xl font-bold text-slate-900 font-display mb-1 group-hover:text-blue-600 transition-colors uppercase italic leading-tight">
+                    <div className="mb-4 md:mb-6">
+                      <h3 className="text-xl md:text-2xl font-bold text-slate-900 font-display mb-1 group-hover:text-blue-600 transition-colors uppercase italic leading-tight">
                         {evt.title}
                       </h3>
                       {evt.description && (
-                        <p className="text-sm text-slate-500 font-medium italic line-clamp-2">"{evt.description}"</p>
+                        <p className="text-xs md:text-sm text-slate-500 font-medium italic line-clamp-2">"{evt.description}"</p>
                       )}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon size={16} className="text-blue-600" />
+                    <div className="flex flex-wrap items-center gap-3 md:gap-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      <div className="flex items-center gap-1.5 md:gap-2">
+                        <CalendarIcon size={14} className="text-blue-600" />
                         {format(evt.date, 'yyyy-MM-dd')}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Clock size={16} className="text-blue-600" />
+                      <div className="flex items-center gap-1.5 md:gap-2">
+                        <Clock size={14} className="text-blue-600" />
                         {evt.time}
                       </div>
                       {evt.location && (
-                        <div className="flex items-center gap-2">
-                          <MapPin size={16} className="text-blue-600" />
+                        <div className="flex items-center gap-1.5 md:gap-2">
+                          <MapPin size={14} className="text-blue-600" />
                           {evt.location}
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className={`px-8 py-6 border-t md:border-t-0 md:border-l border-slate-50 bg-slate-50/30 flex items-center gap-3 ${viewMode === 'grid' ? 'justify-between' : 'justify-end md:w-64 shrink-0'}`}>
+                  <div className={`px-5 md:px-8 py-5 md:py-6 border-t md:border-t-0 md:border-l border-slate-50 bg-slate-50/30 flex items-center gap-3 ${viewMode === 'grid' ? 'justify-between' : 'justify-end md:w-64 shrink-0'}`}>
                     <button 
-                      onClick={() => handleOpenEditModal(evt)}
+                      onClick={() => navigate(`/programs/${evt.id}`, { state: { fromEvent: evt.id, programName: evt.title } })}
                       className="bg-white border text-slate-700 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-sm flex items-center gap-2"
                     >
                        <Eye size={16} /> View
@@ -441,30 +488,30 @@ export default function Events() {
       {/* Unified Modals */}
       <AnimatePresence>
         {showModal && (
-          <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div 
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-[2rem] shadow-2xl w-full max-w-xl overflow-hidden relative"
+              className="bg-white rounded-2xl sm:rounded-[2rem] shadow-2xl w-full max-w-xl overflow-hidden relative max-h-[95vh] flex flex-col"
             >
-              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div className="px-5 sm:px-8 py-5 sm:py-6 border-b border-slate-100 flex justify-between items-start sm:items-center bg-slate-50/50 shrink-0 gap-4">
                 <div>
-                  <h3 className="text-xl font-black text-slate-900 italic font-display lowercase tracking-tight">
+                  <h3 className="text-lg sm:text-xl font-black text-slate-900 italic font-display lowercase tracking-tight">
                     <span className="not-italic text-blue-600 mr-2">::</span>
                     {editingEvent ? 'Edit Event' : 'Schedule New Event'}
                   </h3>
-                  <p className="text-sm text-slate-500 font-medium">{editingEvent ? 'Modify existing schedule detail.' : 'Broadcast a new activity to the ministry.'}</p>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium">{editingEvent ? 'Modify existing schedule detail.' : 'Broadcast a new activity to the ministry.'}</p>
                 </div>
                 <button 
                   onClick={() => setShowModal(false)} 
-                  className="p-2 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-xl transition-all active:scale-95"
+                  className="p-2 text-slate-400 hover:text-slate-600 bg-white border border-slate-200 rounded-xl transition-all active:scale-95 shrink-0"
                 >
                   <X size={20} />
                 </button>
               </div>
 
-              <form onSubmit={handleSaveEvent} className="p-8 space-y-6">
+              <form onSubmit={handleSaveEvent} className="p-5 sm:p-8 space-y-6 overflow-y-auto flex-1">
                 <div className="space-y-4">
                   <div>
                     <label className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
@@ -474,17 +521,17 @@ export default function Events() {
                       required type="text"
                       value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})}
                       placeholder="e.g. Total Deliverance Crusade" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Date</label>
                       <input 
                         required type="date"
                         value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
                       />
                     </div>
                     <div>
@@ -492,17 +539,17 @@ export default function Events() {
                       <input 
                         required type="time"
                         value={eventForm.time} onChange={e => setEventForm({...eventForm, time: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Category</label>
                       <select 
                         value={eventForm.type} onChange={e => setEventForm({...eventForm, type: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm appearance-none"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm appearance-none"
                       >
                         {categories.map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
                       </select>
@@ -513,9 +560,23 @@ export default function Events() {
                         type="text"
                         value={eventForm.location} onChange={e => setEventForm({...eventForm, location: e.target.value})}
                         placeholder="e.g. Main Auditorium"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Organizing Ministry</label>
+                    <select 
+                      value={eventForm.targetMinistry} onChange={e => setEventForm({...eventForm, targetMinistry: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm appearance-none"
+                    >
+                      <option value="All">All Ministries (Church-wide)</option>
+                      <option value="youth">Youth & Young Adults</option>
+                      <option value="mens">Men's Ministry</option>
+                      <option value="womens">Women's Ministry</option>
+                      <option value="childrens">Children's Ministry</option>
+                    </select>
                   </div>
 
                   <div>
@@ -524,34 +585,34 @@ export default function Events() {
                       rows={3}
                       value={eventForm.description} onChange={e => setEventForm({...eventForm, description: e.target.value})}
                       placeholder="Tell members about the event..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm resize-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm resize-none"
                     ></textarea>
                   </div>
                 </div>
 
-                <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 mt-6">
                    {editingEvent && (
                      <button 
                        type="button" 
                        onClick={() => handleDeleteEvent(editingEvent.id)}
-                       className="w-full sm:w-auto text-rose-500 hover:text-rose-600 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 p-2"
+                       className="w-full sm:w-auto text-rose-500 hover:text-rose-600 text-[10px] sm:text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 p-2"
                      >
                        <Trash2 size={16} />
                        Delete Event
                      </button>
                    )}
-                   <div className="flex gap-3 w-full sm:w-auto ml-auto">
+                   <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto ml-auto">
                     <button 
                       type="button" 
                       onClick={() => setShowModal(false)} 
-                      className="flex-1 sm:flex-none px-6 py-3 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-2xl transition-all"
+                      className="w-full sm:w-auto flex-1 sm:flex-none px-6 py-3 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl sm:rounded-2xl transition-all"
                     >
                       Dismiss
                     </button>
                     <button 
                       disabled={isSaving} 
                       type="submit" 
-                      className="flex-1 sm:flex-none px-8 py-3 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all disabled:opacity-50 active:scale-95"
+                      className="w-full sm:w-auto flex-1 sm:flex-none px-6 sm:px-8 py-3 bg-blue-600 text-white rounded-xl sm:rounded-2xl font-black text-xs sm:text-sm uppercase tracking-widest shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all disabled:opacity-50 active:scale-95"
                     >
                       {isSaving ? 'Processing...' : (editingEvent ? 'Save Changes' : 'Schedule Event')}
                     </button>
