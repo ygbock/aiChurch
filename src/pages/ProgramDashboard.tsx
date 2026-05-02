@@ -3,6 +3,10 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useZxing } from 'react-zxing';
 import { useRole } from '../components/Layout';
+import { useFirebase } from '../components/FirebaseProvider';
+import { collection, onSnapshot, query, setDoc, doc, serverTimestamp, getDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { QRCodeSVG } from 'qrcode.react';
 import { 
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
@@ -95,6 +99,7 @@ export default function ProgramDashboard() {
   const { role } = useRole();
   const isAdmin = role === 'admin' || role === 'superadmin' || role === 'district';
   const { programId } = useParams();
+  const { profile } = useFirebase();
   const navigate = useNavigate();
   const location = useLocation();
   const fromMinistry = location.state?.fromMinistry || 'youth';
@@ -117,7 +122,22 @@ export default function ProgramDashboard() {
   };
 
   const programName = getProgramName(programId);
+  const [eventDetails, setEventDetails] = useState<any>(null);
   const programStatus = "PUBLISHED";
+
+  useEffect(() => {
+    if (!profile?.districtId || !profile?.branchId || !programId) return;
+    const fetchEvent = async () => {
+      const eventRef = doc(db, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}`);
+      try {
+        const snap = await getDoc(eventRef);
+        if (snap.exists()) {
+          setEventDetails({ id: snap.id, ...snap.data() });
+        }
+      } catch (err) {}
+    };
+    fetchEvent();
+  }, [profile, programId]);
 
   // Modules state (normally this would be fetched based on programId)
   const [modules, setModules] = useState<ProgramModule[]>([
@@ -163,6 +183,52 @@ export default function ProgramDashboard() {
 
   const handleUpdateStations = (moduleId: string, newStations: string[]) => {
     setModules(prev => prev.map(m => m.id === moduleId ? { ...m, stations: newStations } : m));
+  };
+
+  const handleExportData = async () => {
+    if (!profile?.districtId || !profile?.branchId || !programId) return;
+    
+    try {
+        if (activeModule === 'registration' || activeModule === 'attendance') {
+            const membersRef = collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/members`);
+            const membersSnap = await getDocs(membersRef);
+            const membersList = membersSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+
+            let csvContent = '';
+
+            if (activeModule === 'attendance') {
+                const attendanceRef = collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/attendance`);
+                const attSnap = await getDocs(attendanceRef);
+                const attRecords = attSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+
+                csvContent = 'ID,Name,Email,Status,Time\n';
+                membersList.forEach(m => {
+                    const record = attRecords.find(r => r.id === m.id);
+                    const status = record ? 'Present' : 'Pending';
+                    const time = record && record.timestamp?.toDate ? record.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                    csvContent += `"${m.id}","${m.fullName || ''}","${m.email || ''}","${status}","${time}"\n`;
+                });
+            } else if (activeModule === 'registration') {
+                csvContent = 'ID,Name,Email,Type,Status,Paid\n';
+                membersList.forEach(m => {
+                    csvContent += `"${m.id}","${m.fullName || ''}","${m.email || ''}","Member","Verified","Yes"\n`;
+                });
+            }
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute('download', `${activeModule}_data_${new Date().getTime()}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            alert("Export not implemented for this module yet.");
+        }
+    } catch (error) {
+        console.error("Export error:", error);
+        alert("Failed to export data.");
+    }
   };
 
   return (
@@ -234,6 +300,52 @@ export default function ProgramDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Protocol Details Summary */}
+      {eventDetails && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        >
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 group hover:border-blue-200 transition-colors">
+             <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shadow-sm">
+                <Users size={18} />
+             </div>
+             <div>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Attendance Mode</p>
+                <p className="text-xs font-bold text-slate-900">{eventDetails.attendanceRequirement || 'Not Specified'}</p>
+             </div>
+          </div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 group hover:border-rose-200 transition-colors">
+             <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center shadow-sm">
+                <Shield size={18} />
+             </div>
+             <div>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Registration</p>
+                <p className="text-xs font-bold text-slate-900">{eventDetails.registrationRequired ? 'REQUIRED' : 'OPEN ACCESS'}</p>
+             </div>
+          </div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 group hover:border-amber-200 transition-colors">
+             <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shadow-sm">
+                <CreditCard size={18} />
+             </div>
+             <div>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Protocol Fee</p>
+                <p className="text-xs font-bold text-slate-900">{eventDetails.cost || 'FREE'}</p>
+             </div>
+          </div>
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 group hover:border-emerald-200 transition-colors">
+             <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center shadow-sm">
+                <Bed size={18} />
+             </div>
+             <div>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Food & Lodging</p>
+                <p className="text-xs font-bold text-slate-900">{eventDetails.hasFoodLodging ? 'PROVIDED' : 'NOT APPLICABLE'}</p>
+             </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Navigation Tabs */}
       <div className="bg-white/50 backdrop-blur-sm p-1 rounded-2xl border border-slate-200 flex flex-wrap gap-1">
@@ -328,7 +440,7 @@ export default function ProgramDashboard() {
               </div>
               <div className="flex items-center gap-3 w-full sm:w-auto">
                  {isAdmin && (
-                   <button className="flex-1 sm:flex-none justify-center px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2">
+                   <button onClick={handleExportData} className="flex-1 sm:flex-none justify-center px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2">
                      <Download size={16} /> Export Data
                    </button>
                  )}
@@ -1331,22 +1443,101 @@ function AuditLogViewer({ logs }: { logs: AuditEntry[] }) {
 
 // --- MODULE: REGISTRATION ---
 function RegistrationModule() {
+  const { profile } = useFirebase();
+  const { programId } = useParams();
   const [view, setView] = useState<'Registrants' | 'FormDesigner'>('Registrants');
+  const [members, setMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isAddManualModalOpen, setIsAddManualModalOpen] = useState(false);
+  const [newMember, setNewMember] = useState({ fullName: '', email: '', phone: '', gender: 'Male', status: 'Active', level: 'Convert' });
+
+  useEffect(() => {
+    if (!profile?.districtId || !profile?.branchId) return;
+
+    const membersRef = collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/members`);
+    const unsub = onSnapshot(membersRef, (snap) => {
+        setMembers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setLoading(false);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, `districts/${profile.districtId}/branches/${profile.branchId}/members`));
+
+    return () => unsub();
+  }, [profile?.districtId, profile?.branchId]);
+
+  const handleAddManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile?.districtId || !profile?.branchId || !newMember.fullName) return;
+
+    const membersRef = collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/members`);
+    try {
+        await setDoc(doc(membersRef), {
+            ...newMember,
+            branchId: profile.branchId,
+            createdAt: serverTimestamp()
+        });
+        setIsAddManualModalOpen(false);
+        setNewMember({ fullName: '', email: '', phone: '', gender: 'Male', status: 'Active', level: 'Convert' });
+    } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, membersRef.path);
+    }
+  };
+
+  const filteredMembers = members.filter(m => 
+    (m.fullName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (m.email?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+  );
+  
+  const exportRegistrants = () => {
+    let csvContent = 'ID,Name,Email,Type,Status,Paid\n';
+    filteredMembers.forEach(m => {
+        csvContent += `"${m.id}","${m.fullName || ''}","${m.email || ''}","Member","Verified","Yes"\n`;
+    });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `registrants_${new Date().getTime()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
   
   return (
     <div className="space-y-8 flex flex-col h-full">
-      <div className="flex gap-4 p-1 bg-slate-100 rounded-xl w-fit">
-        {['Registrants', 'FormDesigner'].map(v => (
-          <button
-            key={v}
-            onClick={() => setView(v as any)}
-            className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
-              view === v ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            {v === 'FormDesigner' ? 'Form Designer' : 'Registrant List'}
-          </button>
-        ))}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex gap-2 sm:gap-4 p-1 bg-slate-100 rounded-xl w-fit overflow-x-auto">
+          {['Registrants', 'FormDesigner'].map(v => (
+            <button
+              key={v}
+              onClick={() => setView(v as any)}
+              className={`px-4 sm:px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                view === v ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              {v === 'FormDesigner' ? 'Form Designer' : 'Registrant List'}
+            </button>
+          ))}
+        </div>
+        {view === 'Registrants' && (
+          <div className="flex gap-2 sm:gap-4 items-center">
+             <div className="relative flex-1 sm:w-64">
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+               <input 
+                 type="text" 
+                 placeholder="Search registrants..." 
+                 value={searchQuery}
+                 onChange={(e) => setSearchQuery(e.target.value)}
+                 className="w-full pl-9 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+               />
+             </div>
+             <button 
+               onClick={() => setIsAddManualModalOpen(true)}
+               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-colors flex items-center gap-2 whitespace-nowrap"
+             >
+               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Manual</span>
+             </button>
+          </div>
+        )}
       </div>
 
       <div className="flex-1">
@@ -1356,26 +1547,26 @@ function RegistrationModule() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl">
                   <p className="text-[9px] font-bold text-blue-500 uppercase tracking-widest mb-0.5">Total Registered</p>
-                  <p className="text-xl font-black text-blue-900">452</p>
+                  <p className="text-xl font-black text-blue-900">{filteredMembers.length}</p>
                 </div>
                 <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
                   <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mb-0.5">Paid Status</p>
-                  <p className="text-xl font-black text-emerald-900">328</p>
+                  <p className="text-xl font-black text-emerald-900">{filteredMembers.length}</p>
                 </div>
                 <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
                   <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-0.5">Pending Review</p>
-                  <p className="text-xl font-black text-amber-900">12</p>
+                  <p className="text-xl font-black text-amber-900">0</p>
                 </div>
                 <div className="bg-white border border-slate-100 p-4 rounded-2xl flex flex-col justify-center items-center text-center">
-                   <button className="text-blue-600 font-bold flex items-center gap-2 hover:underline text-[10px] uppercase">
+                   <button onClick={exportRegistrants} className="text-blue-600 font-bold flex items-center gap-2 hover:underline text-[10px] uppercase">
                      <Download size={14} /> CSV
                    </button>
                 </div>
               </div>
             </CollapsibleSection>
 
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-              <table className="w-full text-left border-collapse">
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto shadow-sm">
+              <table className="w-full min-w-[600px] text-left border-collapse">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Registrant</th>
@@ -1386,12 +1577,115 @@ function RegistrationModule() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  <RegistrantRow name="Joseph Conteh" email="joseph@gmail.com" type="Full Guest" status="Verified" paid={true} />
-                  <RegistrantRow name="Philip Conteh" email="philip@gmail.com" type="Speaker" status="Verified" paid={true} />
-                  <RegistrantRow name="Mary Williams" email="mary@gmail.com" type="Early Bird" status="Pending" paid={false} />
+                  {loading ? (
+                    <tr><td colSpan={5} className="text-center py-8 text-slate-400 text-xs">Loading...</td></tr>
+                  ) : filteredMembers.map(member => (
+                    <RegistrantRow 
+                        key={member.id}
+                        name={member.fullName || 'Unknown'} 
+                        email={member.email || 'No email'} 
+                        type="Member" 
+                        status="Verified" 
+                        paid={true} 
+                        onView={() => setSelectedMember(member)}
+                    />
+                  ))}
+                  {filteredMembers.length === 0 && !loading && (
+                    <tr><td colSpan={5} className="text-center py-8 text-slate-400 text-xs">No registrants found.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {selectedMember && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl relative">
+                  <div className="bg-blue-600 p-6 text-center">
+                    <h2 className="text-white font-display text-2xl font-black uppercase tracking-wider">Event Pass</h2>
+                    <p className="text-blue-200 text-[10px] uppercase tracking-widest font-bold mt-1">Official Participant</p>
+                  </div>
+                  <div className="p-8 flex flex-col items-center">
+                    <div className="w-48 h-48 bg-white border-4 border-slate-50 rounded-2xl p-4 shadow-sm mb-6 flex items-center justify-center">
+                      <QRCodeSVG value={selectedMember.id} size={160} />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-1 text-center">{selectedMember.fullName || 'Unknown'}</h3>
+                    <p className="text-slate-500 text-xs text-center mb-6">{selectedMember.email || 'No email'}</p>
+                    
+                    <div className="w-full space-y-3">
+                      <button 
+                        onClick={() => window.print()}
+                        className="w-full bg-slate-900 text-white font-bold text-xs uppercase tracking-widest py-3 rounded-xl hover:bg-slate-800 transition-colors"
+                      >
+                        Download / Print ID
+                      </button>
+                      <button 
+                        onClick={() => setSelectedMember(null)}
+                        className="w-full bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-widest py-3 rounded-xl hover:bg-slate-200 transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Add Manual Modal */}
+            <AnimatePresence>
+              {isAddManualModalOpen && (
+                <div className="fixed inset-0 z-[10002] flex items-center justify-center p-4">
+                  <motion.div 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    exit={{ opacity: 0 }} 
+                    onClick={() => setIsAddManualModalOpen(false)} 
+                    className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
+                  />
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+                    animate={{ opacity: 1, scale: 1, y: 0 }} 
+                    exit={{ opacity: 0, scale: 0.95, y: 20 }} 
+                    className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-8"
+                  >
+                    <h3 className="text-2xl font-bold text-slate-900 mb-6 font-display">Add Manual Registrant</h3>
+                    <form onSubmit={handleAddManual} className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Full Name</label>
+                        <input required value={newMember.fullName} onChange={e => setNewMember({...newMember, fullName: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 text-sm font-bold bg-slate-50 focus:bg-white transition-all" placeholder="John Doe" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Email</label>
+                          <input type="email" value={newMember.email} onChange={e => setNewMember({...newMember, email: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 text-sm font-bold bg-slate-50 focus:bg-white transition-all" placeholder="john@example.com" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Phone</label>
+                          <input type="tel" value={newMember.phone} onChange={e => setNewMember({...newMember, phone: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 text-sm font-bold bg-slate-50 focus:bg-white transition-all" placeholder="+123..." />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Level</label>
+                          <select value={newMember.level} onChange={e => setNewMember({...newMember, level: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 text-sm font-bold bg-slate-50 focus:bg-white transition-all">
+                            {['Convert', 'Disciple', 'Worker', 'Leader'].map(l => <option key={l} value={l}>{l}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Status</label>
+                          <select value={newMember.status} onChange={e => setNewMember({...newMember, status: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 text-sm font-bold bg-slate-50 focus:bg-white transition-all">
+                            {['Active', 'Pending', 'Inactive'].map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="pt-4 flex gap-4">
+                        <button type="button" onClick={() => setIsAddManualModalOpen(false)} className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600">Cancel</button>
+                        <button type="submit" className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-200 hover:bg-blue-700">Add Member</button>
+                      </div>
+                    </form>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
           </div>
         ) : (
           <FormDesigner />
@@ -1401,7 +1695,7 @@ function RegistrationModule() {
   );
 }
 
-function RegistrantRow({ name, email, type, status, paid }: any) {
+function RegistrantRow({ name, email, type, status, paid, onView }: any) {
   return (
     <tr className="hover:bg-slate-50 transition-colors">
       <td className="px-6 py-4">
@@ -1430,7 +1724,7 @@ function RegistrantRow({ name, email, type, status, paid }: any) {
         )}
       </td>
       <td className="px-6 py-4 text-right">
-        <button className="text-blue-600 font-bold hover:underline py-1 px-3 rounded-lg hover:bg-blue-50 text-xs">View</button>
+        <button onClick={onView} className="text-blue-600 font-bold hover:underline py-1 px-3 rounded-lg hover:bg-blue-50 text-xs">View Pass</button>
       </td>
     </tr>
   );
@@ -1585,6 +1879,8 @@ function BarcodeScanner({ onScan, onBack, scannedResult }: { onScan: (code: stri
 
 // --- MODULE: ATTENDANCE ---
 function AttendanceModule() {
+  const { profile } = useFirebase();
+  const { programId } = useParams();
   const [sessionInfo, setSessionInfo] = useState('General Session');
   const [searchQuery, setSearchQuery] = useState('');
   const [isKioskMode, setIsKioskMode] = useState(false);
@@ -1592,28 +1888,54 @@ function AttendanceModule() {
   const [kioskCode, setKioskCode] = useState('');
   const [scannedResult, setScannedResult] = useState('');
 
-  // Mock list of attendees
-  const [attendees, setAttendees] = useState([
-    { id: '1', name: 'John Doe', email: 'john@example.com', status: 'present', time: '10:15 AM' },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com', status: 'pending', time: null },
-    { id: '3', name: 'Michael Johnson', email: 'michael@example.com', status: 'present', time: '10:20 AM' },
-    { id: '4', name: 'Sarah Williams', email: 'sarah@example.com', status: 'pending', time: null },
-    { id: '5', name: 'David Brown', email: 'david@example.com', status: 'pending', time: null },
-    { id: '6', name: 'Emily Davis', email: 'emily@example.com', status: 'present', time: '10:25 AM' },
-    { id: '7', name: 'Chris Wilson', email: 'chris@example.com', status: 'pending', time: null },
-  ]);
+  const [members, setMembers] = useState<any[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const toggleStatus = (id: string, currentStatus: string) => {
-    setAttendees(prev => prev.map(a => {
-      if (a.id === id) {
+  useEffect(() => {
+    if (!profile?.districtId || !profile?.branchId || !programId) return;
+
+    const membersRef = collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/members`);
+    const attendanceRef = collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/attendance`);
+
+    const unsubMembers = onSnapshot(membersRef, (snap) => {
+        setMembers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setLoading(false);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, `districts/${profile.districtId}/branches/${profile.branchId}/members`));
+
+    const unsubAttendance = onSnapshot(attendanceRef, (snap) => {
+        setAttendanceRecords(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/attendance`));
+
+    return () => {
+        unsubMembers();
+        unsubAttendance();
+    };
+  }, [profile?.districtId, profile?.branchId, programId]);
+
+  const attendees = members.map(m => {
+     const record = attendanceRecords.find(r => r.id === m.id);
+     return {
+         id: m.id,
+         name: m.fullName || 'Unknown',
+         email: m.email || '',
+         status: record ? 'present' : 'pending',
+         time: record ? new Date(record.timestamp?.toDate ? record.timestamp.toDate() : Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null
+     };
+  });
+
+  const toggleStatus = async (id: string, currentStatus: string) => {
+    if (!profile?.districtId || !profile?.branchId || !programId) return;
+    const ref = doc(db, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/attendance`, id);
+    try {
         if (currentStatus === 'pending') {
-          return { ...a, status: 'present', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+            await setDoc(ref, { timestamp: serverTimestamp(), recordedBy: profile.uid });
         } else {
-          return { ...a, status: 'pending', time: null };
+            await deleteDoc(ref);
         }
-      }
-      return a;
-    }));
+    } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, ref.path);
+    }
   };
 
   const processScannedCode = (code: string) => {
@@ -1883,28 +2205,102 @@ function AttendanceBar({ label, percent, count, color }: any) {
 
 // --- MODULE: QUEUE ---
 function QueueModule() {
+  const { profile } = useFirebase();
+  const { programId } = useParams();
+  const [queueEntries, setQueueEntries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!profile?.districtId || !profile?.branchId || !programId) return;
+
+    const queueRef = collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/queueEntries`);
+    const unsub = onSnapshot(queueRef, (snap) => {
+        setQueueEntries(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setLoading(false);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/queueEntries`));
+
+    return () => unsub();
+  }, [profile?.districtId, profile?.branchId, programId]);
+
+  const waiting = queueEntries.filter(q => q.status === 'waiting').sort((a, b) => (a.timestamp?.toMillis?.() || 0) - (b.timestamp?.toMillis?.() || 0));
+  const serving = queueEntries.filter(q => q.status === 'serving').sort((a, b) => (b.servedAt?.toMillis?.() || 0) - (a.servedAt?.toMillis?.() || 0));
+  const completed = queueEntries.filter(q => q.status === 'completed');
+
+  const currentlyServing = serving[0];
+
+  const addToQueue = async () => {
+     if (!profile?.districtId || !profile?.branchId || !programId) return;
+     const number = 'A-' + (queueEntries.length + 100);
+     const ref = doc(collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/queueEntries`));
+     try {
+         await setDoc(ref, {
+             ticketNumber: number,
+             status: 'waiting',
+             timestamp: serverTimestamp()
+         });
+     } catch (err) {
+         handleFirestoreError(err, OperationType.WRITE, ref.path);
+     }
+  };
+
+  const advanceQueue = async () => {
+     if (!profile?.districtId || !profile?.branchId || !programId) return;
+     if (waiting.length === 0) return;
+     
+     const next = waiting[0];
+     const ref = doc(db, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/queueEntries`, next.id);
+     
+     if (currentlyServing) {
+         const currRef = doc(db, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/queueEntries`, currentlyServing.id);
+         try { await setDoc(currRef, { status: 'completed' }, { merge: true }); } catch (err) {}
+     }
+
+     try {
+         await setDoc(ref, {
+             status: 'serving',
+             servedAt: serverTimestamp(),
+             counter: `Counter ${Math.floor(Math.random() * 5) + 1}`
+         }, { merge: true });
+     } catch (err) {
+         handleFirestoreError(err, OperationType.WRITE, ref.path);
+     }
+  };
+
+  if (loading) return <div className="p-8 text-center text-slate-400">Loading queue data...</div>;
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-slate-900 text-white p-8 rounded-3xl flex flex-col items-center justify-center text-center">
            <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Currently Serving</p>
-           <h3 className="text-6xl font-black font-display text-blue-400">A-242</h3>
-           <p className="text-xs mt-4 font-bold opacity-80">Proceed to Counter 4</p>
+           {currentlyServing ? (
+             <>
+               <h3 className="text-6xl font-black font-display text-blue-400">{currentlyServing.ticketNumber}</h3>
+               <p className="text-xs mt-4 font-bold opacity-80">Proceed to {currentlyServing.counter || 'Counter'}</p>
+             </>
+           ) : (
+             <h3 className="text-2xl font-black font-display text-slate-400 mt-2">Queue Empty</h3>
+           )}
         </div>
         <div className="bg-white border border-slate-200 p-8 rounded-3xl md:col-span-2">
-           <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6">Queue Overview</h4>
+           <div className="flex justify-between items-center mb-6">
+             <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Queue Overview</h4>
+             <button onClick={addToQueue} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-bold text-slate-700 transition-colors">
+               + Add Walk-in
+             </button>
+           </div>
            <div className="grid grid-cols-3 gap-4">
               <div className="p-4 bg-slate-50 rounded-2xl">
                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Waiting</p>
-                 <p className="text-2xl font-black text-slate-900">42</p>
+                 <p className="text-2xl font-black text-slate-900">{waiting.length}</p>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl">
                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Avg Wait</p>
-                 <p className="text-2xl font-black text-slate-900">12m</p>
+                 <p className="text-2xl font-black text-slate-900">{waiting.length * 2}m</p>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl">
                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Served</p>
-                 <p className="text-2xl font-black text-slate-900">1,240</p>
+                 <p className="text-2xl font-black text-slate-900">{completed.length}</p>
               </div>
            </div>
         </div>
@@ -1913,21 +2309,24 @@ function QueueModule() {
       <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
         <div className="px-8 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Next in Line</h4>
-           <button className="text-blue-600 text-xs font-bold hover:underline">Advance Queue</button>
+           <button onClick={advanceQueue} disabled={waiting.length === 0} className="text-white bg-blue-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors">Advance Queue</button>
         </div>
         <div className="divide-y divide-slate-100">
-          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="px-8 py-4 flex items-center justify-between">
+          {waiting.map((entry, idx) => (
+            <div key={entry.id} className="px-8 py-4 flex items-center justify-between">
                <div className="flex items-center gap-4">
-                  <span className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-black text-slate-900 text-sm">A-{242 + i}</span>
+                  <span className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-black text-slate-900 text-sm">{entry.ticketNumber}</span>
                   <div>
-                    <p className="text-sm font-bold text-slate-900">Check-in Booth {i}</p>
+                    <p className="text-sm font-bold text-slate-900">Walk-in Attendee</p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Priority: Standard</p>
                   </div>
                </div>
-               <span className="text-xs text-slate-400 font-bold italic">Wait: {i * 2}m</span>
+               <span className="text-xs text-slate-400 font-bold italic">Wait: {idx * 2}m</span>
             </div>
           ))}
+          {waiting.length === 0 && (
+            <div className="p-8 text-center text-slate-400 text-sm">No one is waiting in the queue.</div>
+          )}
         </div>
       </div>
     </div>

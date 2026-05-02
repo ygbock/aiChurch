@@ -135,12 +135,88 @@
         "branchId": { "type": "string" }
       },
       "required": ["title", "priority", "status", "assigneeId", "branchId"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Record of a member's attendance at an event.",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "recordedBy": { "type": "string", "description": "UID of the person who scanned the member" }
+      },
+      "required": ["timestamp", "recordedBy"]
+    },
+    "QueueEntry": {
+      "title": "Queue Entry",
+      "description": "An entry in a queue for an event.",
+      "type": "object",
+      "properties": {
+        "ticketNumber": { "type": "string" },
+        "status": { "type": "string", "enum": ["waiting", "serving", "completed", "cancelled"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "servedAt": { "type": "string", "format": "date-time" },
+        "counter": { "type": "string" }
+      },
+      "required": ["ticketNumber", "status", "timestamp"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Scheduled appointments with clients or members.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientEmail": { "type": "string", "format": "email" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "duration": { "type": "string" },
+        "location": { "type": "string" },
+        "type": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled", "completed"] },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "clientName", "date", "time", "status"]
+    },
+    "CalendarEvent": {
+      "title": "Calendar Event",
+      "description": "General events for the church calendar.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "location": { "type": "string" },
+        "type": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "date"]
+    },
+    "Reminder": {
+      "title": "Reminder",
+      "description": "Personal reminders for users.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed"] },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "date", "status", "userId"]
     }
   },
   "firestore": {
     "/users/{uid}": {
       "schema": "User",
       "description": "Private user profiles."
+    },
+    "/users/{uid}/reminders/{reminderId}": {
+      "schema": "Reminder",
+      "description": "Personal reminders for the user."
     },
     "/transfers/{transferId}": {
       "schema": "TransferRequest",
@@ -166,9 +242,25 @@
       "schema": "Event",
       "description": "Events scoped by branch."
     },
+    "/districts/{districtId}/branches/{branchId}/events/{eventId}/attendance/{attendeeId}": {
+      "schema": "Attendance",
+      "description": "Attendance records for an event."
+    },
+    "/districts/{districtId}/branches/{branchId}/events/{eventId}/queueEntries/{entryId}": {
+      "schema": "QueueEntry",
+      "description": "Queue entries for an event."
+    },
     "/districts/{districtId}/branches/{branchId}/tasks/{taskId}": {
       "schema": "Task",
       "description": "Tasks scoped by branch."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Collection of appointments."
+    },
+    "/calendar_events/{eventId}": {
+      "schema": "CalendarEvent",
+      "description": "Collection of global calendar events."
     }
   }
 }

@@ -147,7 +147,7 @@ export default function Dashboard() {
         assigneeName: profile?.fullName || ''
       });
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'tasks');
+      handleFirestoreError(error, OperationType.WRITE, `districts/${profile?.districtId}/branches/${profile?.branchId}/tasks`);
     } finally {
       setIsSavingTask(false);
     }

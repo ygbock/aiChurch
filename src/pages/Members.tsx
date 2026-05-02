@@ -91,7 +91,7 @@ export default function Members() {
       setMembers(docs);
       setLoading(false);
     }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'members');
+      handleFirestoreError(error, OperationType.LIST, isSuperAdmin ? 'members (collection group)' : `districts/${profile?.districtId}/branches/${profile?.branchId}/members`);
       setLoading(false);
     });
 

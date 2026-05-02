@@ -20,7 +20,8 @@ import {
   ChevronDown,
   Eye,
   Zap,
-  Database
+  Database,
+  BookOpen
 } from 'lucide-react';
 import { format, isSameDay, parseISO } from 'date-fns';
 import { useRole } from '../components/Layout';
@@ -38,7 +39,184 @@ interface EventData {
   location: string;
   type: string;
   targetMinistry?: string;
+  registrationRequired?: boolean;
+  cost?: string;
+  duration?: string;
+  attendanceRequirement?: 'Optional' | 'Required' | 'Not Required';
+  logistics?: string;
+  hasFoodLodging?: boolean;
 }
+
+const STANDARD_EVENTS_DIRECTORY = [
+  {
+    category: "Conference/Retreat (Larger convention-style events)",
+    frequency: "Yearly",
+    events: [
+      {
+        name: "Easter Retreat",
+        timing: "Every Easter season",
+        audience: "Open to the public",
+        registration: "Required",
+        cost: "Free for public, baptised pay initial fees and contributions",
+        duration: "4 to 5 days",
+        attendance: "Daily attendance is optional",
+        logistics: "Provide food and lodging. Tent of meeting (main tent for adults, youth tent, and children's)."
+      },
+      {
+        name: "Christmas Retreat",
+        timing: "Christmas seasons",
+        audience: "Open to the public",
+        registration: "Required",
+        cost: "Free for public, baptised pay initial fees and contributions",
+        duration: "4 to 5 days",
+        attendance: "Daily attendance is optional",
+        logistics: "Provide food and lodging. Tent of meeting (main tent for adults, youth tent, and children's)."
+      },
+      {
+        name: "Worker and discipleship Retreat",
+        timing: "Yearly",
+        audience: "Only for baptised members",
+        registration: "Required",
+        cost: "Members pay initial fees and contributions",
+        duration: "4 to 5 days",
+        attendance: "Daily attendance is required",
+        logistics: "Provide food and lodging for attendees."
+      },
+      {
+        name: "Youth conference",
+        timing: "Yearly",
+        audience: "Open to the public, only for youth and young adult",
+        registration: "Required",
+        cost: "Free for public, baptised pay initial fees and contributions",
+        duration: "4 to 5 days",
+        attendance: "Daily attendance is required",
+        logistics: "Provide food and lodging for attendees."
+      },
+      {
+        name: "Leadership conference",
+        timing: "Yearly",
+        audience: "For pastors and leader in the church",
+        registration: "Required",
+        cost: "Members pay initial fees and contributions",
+        duration: "4 to 5 days",
+        attendance: "Daily attendance is required",
+        logistics: "Provide food and lodging for attendees."
+      }
+    ]
+  },
+  {
+    category: "Service (Standard church services)",
+    frequency: "Yearly & Monthly",
+    events: [
+      {
+        name: "Covenant combine service",
+        timing: "First Sunday of January every year",
+        audience: "All district and branches fellowship in one location. Free and open to the public.",
+        registration: "No attendance and registration required",
+        cost: "Free",
+        duration: "One day service",
+        attendance: "Not required",
+        logistics: ""
+      },
+      {
+        name: "General combined service",
+        timing: "Second Sunday of every month except for January which is first Sunday",
+        audience: "All district and branches fellowship in one location. Free and open to the public.",
+        registration: "No attendance and registration required",
+        cost: "Free",
+        duration: "One day service",
+        attendance: "Not required",
+        logistics: ""
+      },
+      {
+        name: "Wonder sunday (branch level)",
+        timing: "First Sunday of every month except for January",
+        audience: "Free and open to the public",
+        registration: "Not required",
+        cost: "Free",
+        duration: "One day service",
+        attendance: "Attendance and head count required",
+        logistics: ""
+      },
+      {
+        name: "District combined (District level)",
+        timing: "First Sunday quarterly",
+        audience: "All branches with a district fellowship in one location. Free and open to the public.",
+        registration: "Not required",
+        cost: "Free",
+        duration: "One day service",
+        attendance: "Attendance and head count required",
+        logistics: ""
+      },
+      {
+        name: "Solution hour",
+        timing: "Every last wednesday, Thursday, and Friday of the month",
+        audience: "Open to the public",
+        registration: "Not required",
+        cost: "Free",
+        duration: "Three day revival prayer meeting",
+        attendance: "Not required",
+        logistics: ""
+      }
+    ]
+  },
+  {
+    category: "Service (Standard church services)",
+    frequency: "Weekly",
+    events: [
+      {
+        name: "Sunday devine service",
+        timing: "9am to 12pm on Sunday",
+        audience: "Open to the public",
+        registration: "Not required",
+        cost: "Free",
+        duration: "3 hours",
+        attendance: "Required",
+        logistics: ""
+      },
+      {
+        name: "Tuesday Bible study",
+        timing: "6-8pm on Tuesday",
+        audience: "Open to the public",
+        registration: "Not required",
+        cost: "Free",
+        duration: "2 hours",
+        attendance: "Required",
+        logistics: ""
+      },
+      {
+        name: "Thursday prayer meetings",
+        timing: "6-8pm on Thursday",
+        audience: "Open to the public",
+        registration: "Not required",
+        cost: "Free",
+        duration: "2 hours",
+        attendance: "Required",
+        logistics: ""
+      },
+      {
+        name: "Friday night vigil",
+        timing: "Friday night",
+        audience: "Open to the public",
+        registration: "Not required",
+        cost: "Free",
+        duration: "Overnight",
+        attendance: "Required",
+        logistics: ""
+      },
+      {
+        name: "Saturday home fellowship",
+        timing: "Saturday",
+        audience: "Members",
+        registration: "Not required",
+        cost: "Free",
+        duration: "Variable",
+        attendance: "Required",
+        logistics: ""
+      }
+    ]
+  }
+];
 
 export default function Events() {
   const { role } = useRole();
@@ -49,7 +227,7 @@ export default function Events() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'directory'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [scopeFilter, setScopeFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -62,7 +240,13 @@ export default function Events() {
     time: '09:00',
     location: '',
     type: 'Service',
-    targetMinistry: 'All'
+    targetMinistry: 'All',
+    registrationRequired: false,
+    cost: '',
+    duration: '',
+    attendanceRequirement: 'Not Required' as 'Optional' | 'Required' | 'Not Required',
+    logistics: '',
+    hasFoodLodging: false
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -101,7 +285,7 @@ export default function Events() {
       setEvents(docs);
       setLoading(false);
     }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'dashboard_events');
+      handleFirestoreError(error, OperationType.LIST, path);
       setLoading(false);
     });
 
@@ -118,7 +302,13 @@ export default function Events() {
         time: '09:00',
         location: '',
         type: 'Service',
-        targetMinistry: location.state.createEventForMinistry
+        targetMinistry: location.state.createEventForMinistry,
+        registrationRequired: false,
+        cost: '',
+        duration: '',
+        attendanceRequirement: 'Not Required',
+        logistics: '',
+        hasFoodLodging: false
       });
       setShowModal(true);
       navigate(location.pathname, { replace: true });
@@ -135,7 +325,13 @@ export default function Events() {
       time: '09:00',
       location: '',
       type: 'Service',
-      targetMinistry: 'All'
+      targetMinistry: 'All',
+      registrationRequired: false,
+      cost: '',
+      duration: '',
+      attendanceRequirement: 'Not Required',
+      logistics: '',
+      hasFoodLodging: false
     });
     setShowModal(true);
   };
@@ -150,9 +346,38 @@ export default function Events() {
       time: event.time || '09:00',
       location: event.location || '',
       type: event.type || 'Service',
-      targetMinistry: event.targetMinistry || 'All'
+      targetMinistry: event.targetMinistry || 'All',
+      registrationRequired: event.registrationRequired || false,
+      cost: event.cost || '',
+      duration: event.duration || '',
+      attendanceRequirement: event.attendanceRequirement || 'Not Required',
+      logistics: event.logistics || '',
+      hasFoodLodging: event.hasFoodLodging || false
     });
     setShowModal(true);
+  };
+
+  const scheduleFromDirectory = (event: any, category: string) => {
+    if (!isAdmin) return;
+    setEditingEvent(null);
+    setEventForm({
+      title: event.name,
+      description: event.audience,
+      date: format(new Date(), 'yyyy-MM-dd'),
+      time: '09:00',
+      location: '',
+      type: category.includes('Retreat') ? 'Conference' : 'Service',
+      targetMinistry: 'All',
+      registrationRequired: event.registration?.toLowerCase().includes('required'),
+      cost: event.cost,
+      duration: event.duration,
+      attendanceRequirement: event.attendance?.toLowerCase().includes('optional') ? 'Optional' : 
+                             event.attendance?.toLowerCase().includes('required') ? 'Required' : 'Not Required',
+      logistics: event.logistics,
+      hasFoodLodging: event.logistics?.toLowerCase().includes('food')
+    });
+    setShowModal(true);
+    toast.info(`Pre-filling form for ${event.name}`);
   };
 
   const handleSaveEvent = async (e: React.FormEvent) => {
@@ -178,6 +403,12 @@ export default function Events() {
         location: eventForm.location,
         type: eventForm.type,
         targetMinistry: eventForm.targetMinistry,
+        registrationRequired: eventForm.registrationRequired,
+        cost: eventForm.cost,
+        duration: eventForm.duration,
+        attendanceRequirement: eventForm.attendanceRequirement,
+        logistics: eventForm.logistics,
+        hasFoodLodging: eventForm.hasFoodLodging,
         updatedAt: serverTimestamp()
       };
 
@@ -195,7 +426,7 @@ export default function Events() {
 
       setShowModal(false);
     } catch (error) {
-      handleFirestoreError(error, editingEvent ? OperationType.UPDATE : OperationType.WRITE, 'dashboard_events');
+      handleFirestoreError(error, editingEvent ? OperationType.UPDATE : OperationType.WRITE, `districts/${profile?.districtId}/branches/${profile?.branchId}/events`);
     } finally {
       setIsSaving(false);
     }
@@ -212,7 +443,7 @@ export default function Events() {
       await deleteDoc(doc(db, path, eventId));
       toast.success('Event deleted');
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, 'dashboard_events');
+      handleFirestoreError(error, OperationType.DELETE, `districts/${profile?.districtId}/branches/${profile?.branchId}/events`);
     }
   };
 
@@ -256,7 +487,7 @@ export default function Events() {
 
         <div className="flex items-center gap-3 w-full md:w-auto">
           <button 
-            onClick={() => navigate('/calendar')}
+            onClick={() => navigate('/calendar', { state: { fromEvents: true } })}
             className="flex-1 md:flex-none h-11 bg-white border border-slate-200 text-slate-700 px-6 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-sm active:scale-95"
           >
             <CalendarIcon size={18} />
@@ -285,7 +516,7 @@ export default function Events() {
                 <h3 className="text-2xl sm:text-3xl font-black text-slate-900 font-display">{stat.value}</h3>
               </div>
               <div className={`w-8 h-8 sm:w-10 sm:h-10 ${stat.color} text-white rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-slate-100 shrink-0`}>
-                {React.cloneElement(stat.icon as React.ReactElement, { size: 18 })}
+                {React.cloneElement(stat.icon as React.ReactElement<any>, { size: 18 })}
               </div>
             </div>
             <div className="flex items-center justify-between pt-4 border-t border-slate-50">
@@ -327,6 +558,13 @@ export default function Events() {
               >
                 <List size={16} />
                 List
+              </button>
+              <button 
+                onClick={() => setViewMode('directory')}
+                className={`flex-1 md:flex-none justify-center px-4 py-1.5 rounded-lg flex items-center gap-2 text-xs font-black uppercase tracking-widest transition-all ${viewMode === 'directory' ? 'bg-slate-900 text-white' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                <BookOpen size={16} />
+                Directory
               </button>
             </div>
           </div>
@@ -397,9 +635,74 @@ export default function Events() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           layout
-          className={viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}
+          className={viewMode === 'grid' ? "grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6" : viewMode === 'directory' ? "col-span-full" : "space-y-4"}
         >
-          {loading ? (
+          {viewMode === 'directory' ? (
+             <div className="col-span-full space-y-12">
+               {STANDARD_EVENTS_DIRECTORY.map((categoryGroup, index) => (
+                  <div key={index} className="space-y-6">
+                    <div className="flex items-center gap-3 mb-6">
+                       <h2 className="text-xl sm:text-2xl font-black text-slate-900 font-display uppercase tracking-wider">{categoryGroup.category}</h2>
+                       <div className="h-px bg-slate-200 flex-1"></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {categoryGroup.events.map((event, idx) => (
+                         <div key={idx} className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm hover:shadow-xl transition-all h-full flex flex-col group">
+                            <div className="mb-4">
+                               <div className="flex justify-between items-start mb-2">
+                                  <h3 className="text-lg font-bold text-slate-900 font-display uppercase italic border-b-2 border-blue-100 inline-block pb-1 group-hover:text-blue-600 transition-colors">{event.name}</h3>
+                                  <span className="bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg shrink-0">{categoryGroup.frequency}</span>
+                               </div>
+                               <div className="flex items-center gap-1 text-[10px] text-slate-500 font-black uppercase tracking-widest italic opacity-80">
+                                 <Clock size={12} /> {event.timing}
+                               </div>
+                            </div>
+                            
+                            <div className="space-y-3 flex-1 mt-2">
+                               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 transition-colors group-hover:bg-white group-hover:border-slate-200">
+                                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><Globe size={10} /> Audience Details</p>
+                                  <p className="text-xs text-slate-700 font-bold">{event.audience}</p>
+                               </div>
+                               <div className="grid grid-cols-2 gap-3">
+                                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 transition-colors group-hover:bg-white group-hover:border-slate-200">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Registration</p>
+                                    <p className="text-xs text-slate-700 font-bold">{event.registration}</p>
+                                 </div>
+                                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 transition-colors group-hover:bg-white group-hover:border-slate-200">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Duration</p>
+                                    <p className="text-xs text-slate-700 font-bold">{event.duration}</p>
+                                 </div>
+                               </div>
+                               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 transition-colors group-hover:bg-white group-hover:border-slate-200">
+                                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Attendance Config</p>
+                                  <p className="text-xs text-slate-700 font-bold">{event.attendance}</p>
+                               </div>
+                             {event.logistics && (
+                                 <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50 transition-colors">
+                                    <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><Warehouse size={10} /> Logistics & Cost</p>
+                                    <p className="text-xs text-blue-900 font-bold leading-relaxed">{event.logistics}</p>
+                                    <div className="mt-2 text-[10px] text-blue-700 bg-blue-100/50 p-2 rounded-lg font-medium italic">
+                                      Cost: {event.cost}
+                                    </div>
+                                 </div>
+                               )}
+
+                               {isAdmin && (
+                                 <button 
+                                   onClick={() => scheduleFromDirectory(event, categoryGroup.category)}
+                                   className="w-full mt-4 bg-slate-900 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center justify-center gap-2 group"
+                                 >
+                                   <Zap size={14} className="text-blue-400 group-hover:text-white" /> Schedule Protocol
+                                 </button>
+                               )}
+                            </div>
+                         </div>
+                      ))}
+                    </div>
+                  </div>
+               ))}
+             </div>
+          ) : loading ? (
             <div className="col-span-full py-20 flex flex-col items-center justify-center space-y-4">
               <Loader2 size={40} className="animate-spin text-blue-600" />
               <p className="text-xs font-black uppercase tracking-widest text-slate-400">Restoring protocol data...</p>
@@ -413,55 +716,55 @@ export default function Events() {
                 <motion.div 
                   layout
                   key={evt.id}
-                  className={`bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden group transition-all hover:shadow-xl relative ${viewMode === 'grid' ? 'flex flex-col' : 'flex flex-col md:flex-row md:items-center'}`}
+                  className={`bg-white rounded-[1.5rem] sm:rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden group transition-all hover:shadow-xl relative ${viewMode === 'grid' ? 'flex flex-col' : 'flex flex-col md:flex-row md:items-center'}`}
                 >
                   <div className={`w-1 transition-all group-hover:w-2 ${scopeColor} absolute left-0 inset-y-0`}></div>
                   
-                  <div className="p-5 md:p-8 flex-1">
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      <span className={`px-3 py-1 ${scopeColor} text-white text-[9px] font-black rounded-lg tracking-widest uppercase`}>{scopeLabel}</span>
-                      <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[9px] font-black rounded-lg tracking-widest uppercase border border-blue-100">{evt.type}</span>
+                  <div className={`p-3 sm:p-5 md:p-8 flex-1 ${viewMode === 'grid' ? 'flex flex-col' : ''}`}>
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-2 sm:mb-4">
+                      <span className={`px-1.5 sm:px-3 py-0.5 sm:py-1 ${scopeColor} text-white text-[7px] sm:text-[9px] font-black rounded-md sm:rounded-lg tracking-widest uppercase`}>{scopeLabel}</span>
+                      <span className="px-1.5 sm:px-3 py-0.5 sm:py-1 bg-blue-50 text-blue-600 text-[7px] sm:text-[9px] font-black rounded-md sm:rounded-lg tracking-widest uppercase border border-blue-100">{evt.type}</span>
                     </div>
 
-                    <div className="mb-4 md:mb-6">
-                      <h3 className="text-xl md:text-2xl font-bold text-slate-900 font-display mb-1 group-hover:text-blue-600 transition-colors uppercase italic leading-tight">
+                    <div className="mb-2 sm:mb-4 md:mb-6">
+                      <h3 className="text-sm sm:text-xl md:text-2xl font-bold text-slate-900 font-display mb-1 group-hover:text-blue-600 transition-colors uppercase italic leading-tight line-clamp-2">
                         {evt.title}
                       </h3>
                       {evt.description && (
-                        <p className="text-xs md:text-sm text-slate-500 font-medium italic line-clamp-2">"{evt.description}"</p>
+                        <p className={`text-[9px] sm:text-xs md:text-sm text-slate-500 font-medium italic ${viewMode === 'grid' ? 'hidden sm:block line-clamp-1 sm:line-clamp-2' : ''}`}>"{evt.description}"</p>
                       )}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 md:gap-6 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                      <div className="flex items-center gap-1.5 md:gap-2">
-                        <CalendarIcon size={14} className="text-blue-600" />
-                        {format(evt.date, 'yyyy-MM-dd')}
+                    <div className={`flex ${viewMode === 'grid' ? 'flex-col sm:flex-row sm:flex-wrap mt-auto' : 'flex-wrap items-center'} gap-1.5 sm:gap-3 md:gap-6 text-[8px] sm:text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest`}>
+                      <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2">
+                        <CalendarIcon className="text-blue-600 sm:w-3.5 sm:h-3.5 w-3 h-3 shrink-0" />
+                        <span className="truncate">{format(evt.date, 'yyyy-MM-dd')}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 md:gap-2">
-                        <Clock size={14} className="text-blue-600" />
-                        {evt.time}
+                      <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2">
+                        <Clock className="text-blue-600 sm:w-3.5 sm:h-3.5 w-3 h-3 shrink-0" />
+                        <span className="truncate">{evt.time}</span>
                       </div>
                       {evt.location && (
-                        <div className="flex items-center gap-1.5 md:gap-2">
-                          <MapPin size={14} className="text-blue-600" />
-                          {evt.location}
+                        <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 w-full sm:w-auto">
+                          <MapPin className="text-blue-600 sm:w-3.5 sm:h-3.5 w-3 h-3 shrink-0" />
+                          <span className="truncate">{evt.location}</span>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className={`px-5 md:px-8 py-5 md:py-6 border-t md:border-t-0 md:border-l border-slate-50 bg-slate-50/30 flex items-center gap-3 ${viewMode === 'grid' ? 'justify-between' : 'justify-end md:w-64 shrink-0'}`}>
+                  <div className={`px-3 sm:px-5 md:px-8 py-3 sm:py-4 md:py-6 border-t md:border-t-0 md:border-l border-slate-50 bg-slate-50/30 flex items-center gap-1.5 sm:gap-3 ${viewMode === 'grid' ? 'justify-between' : 'justify-end md:w-64 shrink-0'}`}>
                     <button 
                       onClick={() => navigate(`/programs/${evt.id}`, { state: { fromEvent: evt.id, programName: evt.title } })}
-                      className="bg-white border text-slate-700 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-sm flex items-center gap-2"
+                      className="bg-white border text-slate-700 px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-sm flex items-center gap-1 sm:gap-2 justify-center flex-1 sm:flex-none"
                     >
-                       <Eye size={16} /> View
+                       <Eye className="sm:w-4 sm:h-4 w-3 h-3" /> View
                     </button>
                     <button 
                       onClick={() => handleOpenEditModal(evt)}
-                      className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-blue-600 transition-colors"
+                      className="w-7 h-7 sm:w-10 sm:h-10 flex items-center justify-center text-slate-400 hover:text-blue-600 transition-colors shrink-0 bg-white sm:bg-transparent rounded-lg sm:rounded-none border sm:border-transparent border-slate-200"
                     >
-                       <MoreVertical size={20} />
+                       <MoreVertical className="sm:w-5 sm:h-5 w-3.5 h-3.5" />
                     </button>
                   </div>
                 </motion.div>
@@ -577,6 +880,73 @@ export default function Events() {
                       <option value="womens">Women's Ministry</option>
                       <option value="childrens">Children's Ministry</option>
                     </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                        <input 
+                          type="checkbox" 
+                          id="regReq"
+                          checked={eventForm.registrationRequired}
+                          onChange={e => setEventForm({...eventForm, registrationRequired: e.target.checked})}
+                          className="w-5 h-5 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <label htmlFor="regReq" className="text-[10px] font-black text-slate-700 uppercase tracking-widest cursor-pointer">Registration Required</label>
+                    </div>
+                    <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                        <input 
+                          type="checkbox" 
+                          id="foodLog"
+                          checked={eventForm.hasFoodLodging}
+                          onChange={e => setEventForm({...eventForm, hasFoodLodging: e.target.checked})}
+                          className="w-5 h-5 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <label htmlFor="foodLog" className="text-[10px] font-black text-slate-700 uppercase tracking-widest cursor-pointer">Food & Lodging Provided</label>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Attendance Requirement</label>
+                      <select 
+                        value={eventForm.attendanceRequirement}
+                        onChange={e => setEventForm({...eventForm, attendanceRequirement: e.target.value as any})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm appearance-none"
+                      >
+                        <option value="Not Required">Not Required (Standard/Service)</option>
+                        <option value="Optional">Optional (Conferences/Retreats)</option>
+                        <option value="Required">Strictly Required (Leadership/Worker)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Cost / Contribution</label>
+                      <input 
+                        type="text"
+                        value={eventForm.cost} onChange={e => setEventForm({...eventForm, cost: e.target.value})}
+                        placeholder="e.g. Free or NLE 50"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Event Duration</label>
+                    <input 
+                       type="text" 
+                       value={eventForm.duration} onChange={e => setEventForm({...eventForm, duration: e.target.value})}
+                       placeholder="e.g. 4 to 5 days or 3 hours"
+                       className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Logistics Note</label>
+                    <textarea 
+                      rows={2}
+                      value={eventForm.logistics} onChange={e => setEventForm({...eventForm, logistics: e.target.value})}
+                      placeholder="Special instructions for logistics..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm resize-none"
+                    ></textarea>
                   </div>
 
                   <div>

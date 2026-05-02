@@ -30,7 +30,8 @@ import {
   LayoutGrid,
   TrendingUp,
   X,
-  Flame
+  Flame,
+  CalendarDays
 } from 'lucide-react';
 import { APP_MODULES, Role } from '../constants/modules';
 import { useFirebase } from './FirebaseProvider';
@@ -179,7 +180,8 @@ export default function Layout() {
             <div>
               {!isCollapsed && <p className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Spiritual</p>}
               <nav className="space-y-0.5">
-                <NavItem to="/events" icon={<Calendar size={18} />} label="Events" active={location.pathname.startsWith('/events')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
+                <NavItem to="/calendar" icon={<Calendar size={18} />} label="Calendar" active={location.pathname === '/calendar'} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
+                <NavItem to="/events" icon={<Flame size={18} />} label="Live Events" active={location.pathname === '/events'} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
                 <NavItem to="/bible-school" icon={<BookOpen size={18} />} label="Bible School" active={location.pathname.startsWith('/bible-school')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
                 <NavItem to="/streaming" icon={<Video size={18} />} label="Live Stream" active={location.pathname.startsWith('/streaming')} isCollapsed={isCollapsed} onClick={() => setIsSidebarOpen(false)} />
               </nav>
