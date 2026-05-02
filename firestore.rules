@@ -102,7 +102,9 @@ service cloud.firestore {
              data.clientName is string && data.clientName.size() <= 100 &&
              data.date is string &&
              data.time is string &&
-             data.status in ['pending', 'confirmed', 'cancelled', 'completed'];
+             data.status in ['pending', 'confirmed', 'cancelled', 'completed'] &&
+             (!data.keys().contains('staffId') || (data.staffId is string || data.staffId == null)) &&
+             (!data.keys().contains('requesterId') || (data.requesterId is string || data.requesterId == null));
     }
 
     function isValidCalendarEvent(data) {
@@ -206,8 +208,8 @@ service cloud.firestore {
     match /appointments/{appointmentId} {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && isVerified() && isValidAppointment(incoming());
-      allow update: if (isSuperAdmin() || isDistrictLeader('any')) && isVerified() && isValidAppointment(incoming());
-      allow delete: if isSuperAdmin() && isVerified();
+      allow update: if (isSuperAdmin() || isDistrictLeader('any') || (isSignedIn() && existing().get('requesterId', '') == request.auth.uid)) && isVerified() && isValidAppointment(incoming());
+      allow delete: if (isSuperAdmin() || (isSignedIn() && existing().get('requesterId', '') == request.auth.uid)) && isVerified();
     }
 
     match /calendar_events/{eventId} {

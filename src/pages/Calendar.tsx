@@ -53,7 +53,7 @@ import {
 } from 'date-fns';
 import { useFirebase } from '../components/FirebaseProvider';
 import { useRole } from '../components/Layout';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, updateDoc, where, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { toast } from 'sonner';
 
@@ -79,6 +79,9 @@ interface Appointment {
   type: string;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   notes?: string;
+  staffId?: string;
+  staffName?: string;
+  requesterId?: string;
 }
 
 interface Reminder {
@@ -159,7 +162,80 @@ export default function Calendar() {
     time: '09:00',
     status: 'pending' as 'pending' | 'completed'
   });
+  const [showBookingModal, setShowBookingModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+  const [bookableStaff, setBookableStaff] = useState<any[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [bookingDate, setBookingDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [bookingForm, setBookingForm] = useState({
+    title: 'Consultation Session',
+    notes: ''
+  });
+
+  useEffect(() => {
+    if (!db) return;
+    // For now, any non-member is a potential counselor/pastor
+    const q = query(collection(db, 'users'), where('role', 'in', ['admin', 'superadmin', 'district']));
+    return onSnapshot(q, (snapshot) => {
+       const staff = snapshot.docs
+         .map(doc => ({ id: doc.id, ...doc.data() }))
+         .filter((s: any) => s.id !== profile?.uid);
+       setBookableStaff(staff);
+    }, (err) => {
+      console.warn("Failed to fetch staff:", err);
+    });
+  }, [db]);
+
+  // Generate slots for a staff member on a specific date
+  useEffect(() => {
+    if (!bookingDate || !selectedStaff) return;
+
+    const generateSlots = () => {
+      const slots = [];
+      const startHour = 9; // 9 AM
+      const endHour = 17; // 5 PM
+      
+      // Standard 30 min slots
+      for (let h = startHour; h < endHour; h++) {
+        slots.push(`${h.toString().padStart(2, '0')}:00`);
+        slots.push(`${h.toString().padStart(2, '0')}:30`);
+      }
+
+      // Filter out slots that conflict with existing appointments for THIS staff member
+      const staffAppointments = appointments.filter(a => 
+        a.staffId === selectedStaff.id && 
+        a.date === bookingDate && 
+        a.status !== 'cancelled'
+      );
+
+      const bookedTimes = staffAppointments.map(a => a.time);
+      
+      // Also filter out church events for that time? 
+      // (Simplified: for now just other appointments for that staff)
+      
+      return slots.filter(s => !bookedTimes.includes(s));
+    };
+
+    setAvailableSlots(generateSlots());
+    setSelectedSlot(null);
+  }, [bookingDate, selectedStaff, appointments]);
+
+
+  const updateAppointmentStatus = async (id: string, status: 'confirmed' | 'cancelled' | 'completed' | 'pending') => {
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, 'appointments', id), { 
+        status,
+        updatedAt: serverTimestamp() 
+      });
+      toast.success(`Appointment ${status}`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'appointments');
+    }
+  };
 
   const isAdmin = role === 'admin' || role === 'superadmin' || role === 'district';
 
@@ -197,6 +273,46 @@ export default function Calendar() {
     return all;
   }, [events, reminders, selectedCategories]);
 
+  const handleSetEventReminder = async (event: EventData) => {
+    if (!profile || !db) {
+      toast.error('Please sign in to set reminders');
+      return;
+    }
+
+    try {
+      const path = `users/${profile.uid}/reminders`;
+      
+      // Check if reminder already exists for this event
+      // (Simple check by title and date)
+      const existingQuery = query(
+        collection(db, path), 
+        where('title', '==', `Reminder: ${event.title}`),
+        where('date', '==', format(event.date, 'yyyy-MM-dd'))
+      );
+      const snapshot = await getDocs(existingQuery);
+      
+      if (!snapshot.empty) {
+        toast.info('Reminder already set for this event');
+        return;
+      }
+
+      await addDoc(collection(db, path), {
+        title: `Reminder: ${event.title}`,
+        description: `Linked to event at ${event.location || 'Church'}`,
+        date: format(event.date, 'yyyy-MM-dd'),
+        time: event.time || '09:00',
+        status: 'pending',
+        userId: profile.uid,
+        createdAt: serverTimestamp(),
+        eventId: event.id // Reference back to event
+      });
+
+      toast.success('Event reminder set!');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `users/${profile.uid}/reminders`);
+    }
+  };
+
   const categories = [
     // Church Calendars
     { label: 'Service', color: 'bg-emerald-500', section: 'CHURCH CALENDARS' },
@@ -213,7 +329,8 @@ export default function Calendar() {
     
     // Other Calendars
     { label: 'Outreach', color: 'bg-violet-500', section: 'OTHER CALENDARS' },
-    { label: 'Holidays', color: 'bg-orange-400', section: 'OTHER CALENDARS' }
+    { label: 'Holidays', color: 'bg-orange-400', section: 'OTHER CALENDARS' },
+    { label: 'Personal Session', color: 'bg-amber-600', section: 'MY CALENDARS' }
   ];
 
   useEffect(() => {
@@ -262,18 +379,35 @@ export default function Calendar() {
 
   useEffect(() => {
     if (!profile || !db) return;
-    const q = query(collection(db, 'appointments'), orderBy('date', 'desc'), orderBy('time', 'asc'));
+    
+    // Admins/Districts see all (or use more granular branch filtering if needed)
+    // Members only see their own bookings
+    const isStaff = role === 'admin' || role === 'superadmin' || role === 'district';
+    
+    let q;
+    if (isStaff) {
+      q = query(collection(db, 'appointments'), orderBy('date', 'desc'), orderBy('time', 'asc'));
+    } else {
+      q = query(
+        collection(db, 'appointments'), 
+        where('requesterId', '==', profile.uid),
+        orderBy('date', 'desc'), 
+        orderBy('time', 'asc')
+      );
+    }
+
     setLoadingAppts(true);
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
       setAppointments(data);
       setLoadingAppts(false);
     }, (error) => {
+      if (error.message.includes('offline')) return;
       handleFirestoreError(error, OperationType.LIST, 'appointments');
       setLoadingAppts(false);
     });
     return unsubscribe;
-  }, [profile, db]);
+  }, [profile, db, role]);
 
   useEffect(() => {
     if (!profile || !db) return;
@@ -397,16 +531,6 @@ export default function Calendar() {
       handleFirestoreError(error, OperationType.WRITE, 'appointments');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const updateAppointmentStatus = async (id: string, status: Appointment['status']) => {
-    if (!db) return;
-    try {
-      await updateDoc(doc(db, 'appointments', id), { status });
-      toast.success(`Appointment ${status}`);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `appointments/${id}`);
     }
   };
 
@@ -934,9 +1058,10 @@ export default function Calendar() {
                       {!isReminder && (
                         <div className="flex items-center gap-4">
                           <button 
-                            className="text-xs font-black uppercase tracking-widest text-[#2563EB] bg-[#2563EB]/5 px-4 py-2 rounded-full hover:bg-[#2563EB]/10 transition-all active:scale-95"
+                            onClick={(e) => { e.stopPropagation(); handleSetEventReminder(item as any); }}
+                            className="text-xs font-black uppercase tracking-widest text-[#2563EB] bg-[#2563EB]/5 px-4 py-2 rounded-full hover:bg-[#2563EB]/10 transition-all active:scale-95 flex items-center gap-2"
                           >
-                            Add to My Calendar
+                            <Bell size={12} /> Remind Me
                           </button>
                           <button className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">
                             Share Event
@@ -1024,7 +1149,16 @@ export default function Calendar() {
                 >
                   <div className={`absolute top-0 right-0 w-32 h-32 -mr-8 -mt-8 rounded-full opacity-[0.03] pointer-events-none transition-transform group-hover:scale-150 ${appt.status === 'confirmed' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
                   
-                  <div className="flex justify-between items-start mb-6">
+                  {appt.staffName && (
+                    <div className="flex items-center gap-2 mb-4 bg-amber-50/50 py-1.5 px-3 rounded-full border border-amber-100/50 w-fit">
+                      <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center text-white">
+                        <User size={12} />
+                      </div>
+                      <span className="text-[10px] font-bold text-amber-700">Guide: {appt.staffName}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-start mb-4">
                     <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
                       appt.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600' : 
                       appt.status === 'pending' ? 'bg-amber-50 text-amber-600' : 
@@ -1384,28 +1518,83 @@ export default function Calendar() {
             ))}
           </div>
 
-          <div className="mt-auto pt-6 space-y-3 font-sans">
+          <div className="mt-auto pt-6 border-t border-slate-100 relative px-2">
             <button 
-              onClick={() => setViewMode('appointments')}
-              className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all text-sm font-bold active:scale-95 ${viewMode === 'appointments' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50'}`}
+              onClick={() => setIsActionMenuOpen(!isActionMenuOpen)}
+              className={`w-full flex items-center justify-center gap-3 px-4 py-4 rounded-2xl transition-all text-sm font-black active:scale-95 shadow-xl ${isActionMenuOpen ? 'bg-slate-900 text-white shadow-slate-200' : 'bg-[#2563EB] text-white shadow-blue-100 hover:bg-blue-700'}`}
             >
-              <CalendarDays size={18} />
-              Appointments
+              <Plus size={20} className={`transition-transform duration-300 ${isActionMenuOpen ? 'rotate-45' : ''}`} />
+              Quick Action
+              <ChevronDown size={14} className={`ml-auto transition-transform duration-300 ${isActionMenuOpen ? 'rotate-180' : ''}`} />
             </button>
-            <button 
-              onClick={() => setViewMode('reminders')}
-              className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition-all text-sm font-bold active:scale-95 ${viewMode === 'reminders' ? 'bg-rose-500 text-white shadow-lg' : 'bg-white border border-rose-200 text-rose-500 hover:bg-rose-50'}`}
-            >
-              <Bell size={18} />
-              Reminders
-            </button>
-            <button 
-              onClick={() => handleOpenCreateModal()}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#2563EB] text-white rounded-xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all text-sm font-bold active:scale-95"
-            >
-              <Plus size={18} />
-              New Event
-            </button>
+
+            <AnimatePresence>
+              {isActionMenuOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-[60]" 
+                    onClick={() => setIsActionMenuOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute bottom-full left-0 w-full mb-3 bg-white rounded-[24px] shadow-2xl border border-slate-100 p-2 z-[70] overflow-hidden"
+                  >
+                    <button 
+                      onClick={() => {
+                        setViewMode('appointments');
+                        setIsActionMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${viewMode === 'appointments' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${viewMode === 'appointments' ? 'bg-indigo-100' : 'bg-slate-50'}`}>
+                        <CalendarDays size={16} />
+                      </div>
+                      Appointments
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setViewMode('reminders');
+                        setIsActionMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${viewMode === 'reminders' ? 'bg-rose-50 text-rose-600' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${viewMode === 'reminders' ? 'bg-rose-100' : 'bg-slate-50'}`}>
+                        <Bell size={16} />
+                      </div>
+                      Reminders
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setShowBookingModal(true);
+                        setIsActionMenuOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <CalendarIcon size={16} />
+                      </div>
+                      Book Session
+                    </button>
+                    {isAdmin && (
+                      <button 
+                        onClick={() => {
+                          handleOpenCreateModal();
+                          setIsActionMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                          <Plus size={16} />
+                        </div>
+                        New Event
+                      </button>
+                    )}
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         </aside>
 
@@ -1428,6 +1617,196 @@ export default function Calendar() {
           )}
         </main>
       </div>
+
+      {/* Booking Modal */}
+      <AnimatePresence>
+        {showBookingModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-amber-500/10 text-amber-600 rounded-2xl flex items-center justify-center">
+                    <CalendarDays size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">Schedule Session</h3>
+                    <p className="text-sm text-slate-500">Connect with a Pastor, Mentor or Counselor</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowBookingModal(false)} className="p-3 hover:bg-white rounded-2xl text-slate-400 transition-all shadow-sm border border-slate-100">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
+                <div className="space-y-8">
+                  {/* Step 1: Select Staff */}
+                  <section className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Step 1: Choose Your Guide</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {bookableStaff.map(staff => (
+                        <button
+                          key={staff.id}
+                          onClick={() => setSelectedStaff(staff)}
+                          className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${selectedStaff?.id === staff.id ? 'border-amber-500 bg-amber-50 ring-4 ring-amber-50' : 'border-slate-100 hover:border-slate-200 bg-white'}`}
+                        >
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${selectedStaff?.id === staff.id ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                            {staff.fullName[0]}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900">{staff.fullName}</p>
+                            <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">{staff.role}</p>
+                          </div>
+                          {selectedStaff?.id === staff.id && <div className="ml-auto bg-amber-500 text-white rounded-full p-1"><Check size={14} /></div>}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  {/* Step 2: Date & Slots */}
+                  {selectedStaff && (
+                    <motion.section 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-6 pt-4 border-t border-slate-100"
+                    >
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Step 2: Pick Your Time</h4>
+                      
+                      <div className="flex flex-col sm:flex-row gap-6">
+                        <div className="flex-1 space-y-2">
+                          <label className="text-xs font-bold text-slate-500 ml-1">Preferred Date</label>
+                          <input
+                            type="date"
+                            min={format(new Date(), 'yyyy-MM-dd')}
+                            value={bookingDate}
+                            onChange={(e) => setBookingDate(e.target.value)}
+                            className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-amber-500 transition-all"
+                          />
+                        </div>
+                        
+                        <div className="flex-[2] space-y-2">
+                          <label className="text-xs font-bold text-slate-500 ml-1">Available Slots</label>
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            {availableSlots.length > 0 ? (
+                              availableSlots.map(slot => (
+                                <button
+                                  key={slot}
+                                  onClick={() => setSelectedSlot(slot)}
+                                  className={`py-3 rounded-xl text-xs font-black transition-all ${selectedSlot === slot ? 'bg-amber-500 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                >
+                                  {slot}
+                                </button>
+                              ))
+                            ) : (
+                              <div className="col-span-full py-4 text-center text-slate-400 text-xs font-medium">No free slots on this day.</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </motion.section>
+                  )}
+
+                  {/* Step 3: Details */}
+                  {selectedSlot && (
+                    <motion.section 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-4 pt-4 border-t border-slate-100"
+                    >
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Step 3: Notes for Session</h4>
+                      <input
+                        type="text"
+                        placeholder="Session Purpose (e.g. Life Guidance, Prayer)"
+                        value={bookingForm.title}
+                        onChange={(e) => setBookingForm({...bookingForm, title: e.target.value})}
+                        className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-amber-500"
+                      />
+                      <textarea
+                        rows={3}
+                        placeholder="Any specific background or topics you'd like to discuss?"
+                        value={bookingForm.notes}
+                        onChange={(e) => setBookingForm({...bookingForm, notes: e.target.value})}
+                        className="w-full bg-slate-50 border-none rounded-[20px] px-5 py-4 text-sm font-medium text-slate-600 focus:ring-2 focus:ring-amber-500 resize-none"
+                      />
+                    </motion.section>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+                <div className="text-slate-500">
+                  {selectedSlot && (
+                    <p className="text-xs font-bold flex items-center gap-2">
+                      <Clock size={14} className="text-amber-500" />
+                      <span>{format(parseISO(bookingDate), 'MMM d')} @ {selectedSlot}</span>
+                    </p>
+                  )}
+                </div>
+                <button
+                  disabled={!selectedSlot || !selectedStaff || isSaving}
+                  onClick={async () => {
+                    if (!profile || !db) return;
+                    setIsSaving(true);
+                    try {
+                      const appointmentData = {
+                        title: bookingForm.title,
+                        clientName: profile.fullName,
+                        clientEmail: profile.email,
+                        date: bookingDate,
+                        time: selectedSlot,
+                        duration: '30 mins',
+                        location: 'Staff Office / Virtual',
+                        type: 'Personal Session',
+                        status: 'pending',
+                        notes: bookingForm.notes,
+                        staffId: selectedStaff.id,
+                        staffName: selectedStaff.fullName,
+                        requesterId: profile.uid,
+                        createdAt: serverTimestamp()
+                      };
+                      
+                      await addDoc(collection(db, 'appointments'), appointmentData);
+                      
+                      // Also add to global calendar as a personal reminder or private event logic
+                      const districtId = profile?.districtId || 'default-district';
+                      const branchId = profile?.branchId || 'default-branch';
+                      const path = `districts/${districtId}/branches/${branchId}/events`;
+                      
+                      await addDoc(collection(db, path), {
+                        title: `Session: ${bookingForm.title} (${selectedStaff.fullName})`,
+                        date: new Date(`${bookingDate}T${selectedSlot}`),
+                        time: selectedSlot || '10:00',
+                        location: 'Meeting Room',
+                        type: 'Personal Session',
+                        description: `Session with ${selectedStaff.fullName}`,
+                        createdAt: serverTimestamp()
+                      });
+
+                      toast.success('Session request sent!');
+                      setShowBookingModal(false);
+                      // Clear state
+                      setSelectedStaff(null);
+                      setSelectedSlot(null);
+                    } catch (error) {
+                      handleFirestoreError(error, OperationType.WRITE, 'appointments');
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }}
+                  className={`px-10 py-4 rounded-2xl text-sm font-black transition-all active:scale-95 shadow-xl ${(!selectedSlot || isSaving) ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-100'}`}
+                >
+                  {isSaving ? 'Scheduling...' : 'Confirm Session'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Day Detail Modal */}
       <AnimatePresence>
@@ -1502,6 +1881,14 @@ export default function Calendar() {
                               <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[11px] text-slate-500 font-medium">
                                 <span className="flex items-center gap-1"><Clock size={12} className="text-slate-400" /> {item.time}</span>
                                 {item.calendarType === 'event' && (item as any).location && <span className="flex items-center gap-1"><MapPin size={12} className="text-slate-400" /> {(item as any).location}</span>}
+                                {!isReminder && (
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); handleSetEventReminder(item as any); }}
+                                    className="flex items-center gap-1 text-[#2563EB] hover:underline"
+                                  >
+                                    <Bell size={12} /> Set Reminder
+                                  </button>
+                                )}
                               </div>
                             </div>
                             <button 

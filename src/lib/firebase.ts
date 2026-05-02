@@ -1,22 +1,34 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  doc, 
+  getDoc, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Enable Firestore persistence for offline support
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+}, firebaseConfig.firestoreDatabaseId);
+
 export const googleProvider = new GoogleAuthProvider();
 
 // Connection Test
 const testConnection = async () => {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    // Use getDoc instead of getDocFromServer to allow cached results if offline
+    await getDoc(doc(db, 'test', 'connection'));
     console.log("Firebase connection established successfully.");
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration: Firestore client is offline.");
+    if (error instanceof Error && (error.message.includes('the client is offline') || error.message.includes('offline'))) {
+      console.info("Firestore is currently in offline mode. Changes will be synced when connection is restored.");
     } else {
       console.warn("Initial connection test result:", error);
     }
@@ -54,13 +66,17 @@ interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const isOfflineError = errorMessage.toLowerCase().includes('offline') || 
+                         errorMessage.toLowerCase().includes('failed to get document because the client is offline');
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errorMessage,
     authInfo: {
-      userId: auth.currentUser?.uid,
+      userId: auth.currentUser?.uid || undefined,
       email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
+      emailVerified: auth.currentUser?.emailVerified || false,
+      isAnonymous: auth.currentUser?.isAnonymous || false,
       tenantId: auth.currentUser?.tenantId,
       providerInfo: auth.currentUser?.providerData.map(provider => ({
         providerId: provider.providerId,
@@ -72,6 +88,13 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
+
+  if (isOfflineError) {
+    console.warn('Firestore is offline. Operation backgrounded:', JSON.stringify(errInfo));
+    // We don't throw for offline errors to allow the app to function with cached data
+    return;
+  }
+
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }

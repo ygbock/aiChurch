@@ -174,6 +174,8 @@
         "type": { "type": "string" },
         "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled", "completed"] },
         "notes": { "type": "string" },
+        "staffId": { "type": "string", "description": "UID of the pastor/staff member being booked" },
+        "requesterId": { "type": "string", "description": "UID of the member who booked the session" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "clientName", "date", "time", "status"]

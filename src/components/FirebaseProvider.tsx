@@ -3,6 +3,7 @@ import { onAuthStateChanged, User, signInWithPopup, signInWithEmailAndPassword, 
 import { doc, onSnapshot, getDoc, setDoc, collection, query, where, getDocs, collectionGroup, serverTimestamp, addDoc, limit } from 'firebase/firestore';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Role } from '../constants/modules';
+import { toast } from 'sonner';
 
 interface UserProfile {
   uid: string;
@@ -64,19 +65,34 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   const [memberProfile, setMemberProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [provisioningStatus, setProvisioningStatus] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success('Connection restored. Syncing data...');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.error('You are offline. Changes will be saved locally and synced later.');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (!currentUser) {
         setProfile(null);
         setLoading(false);
-      } else {
-        // We handle user profile subscription in the next effect.
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      unsubscribeAuth();
+    };
   }, []);
 
   useEffect(() => {
@@ -86,6 +102,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         if (snapshot.exists()) {
           const profileData = snapshot.data() as UserProfile;
           setProfile(profileData);
+          
+          if (snapshot.metadata.fromCache) {
+            console.log("Profile loaded from local cache.");
+          }
           
           // Fetch member profile if available
           if (profileData.email) {
@@ -103,7 +123,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
               }
               setLoading(false);
             }, (err) => {
-              console.warn("Failed to listen to member profile:", err);
+              // Gracefully handle offline errors for non-critical lookups
+              if (err.message.includes('offline')) {
+                console.warn("Member cache is empty and client is offline.");
+              } else {
+                console.warn("Failed to listen to member profile:", err);
+              }
               setLoading(false);
             });
 
@@ -115,9 +140,19 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           // If the profile doesn't exist, we must attempt to provision it.
-          await attemptProvisioning(user);
+          // Only attempt provisioning if online, otherwise we'll fail with "offline" error
+          if (navigator.onLine) {
+            await attemptProvisioning(user);
+          } else {
+            setLoading(false);
+            setProvisioningStatus('Registration requires an active connection. Please go online to continue.');
+          }
         }
       }, (error) => {
+        if (error.message.includes('offline')) {
+          console.info("Firestore profile listener is in offline mode.");
+          return;
+        }
         handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
       });
 
@@ -126,6 +161,10 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const attemptProvisioning = async (authUser: User, retryCount = 0) => {
+    if (!navigator.onLine) {
+      console.warn("Provisioning skipped: Client is offline.");
+      return;
+    }
     try {
       if (!authUser.email) throw new Error("No email associated with account.");
       

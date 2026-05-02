@@ -36,8 +36,10 @@ import {
 import { APP_MODULES, Role } from '../constants/modules';
 import { useFirebase } from './FirebaseProvider';
 import Login from '../pages/Login';
-import { setDoc, doc } from 'firebase/firestore';
+import { setDoc, doc, collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import NotificationManager from './NotificationManager';
+import { format } from 'date-fns';
 
 interface RoleContextType {
   role: Role;
@@ -74,6 +76,22 @@ export default function Layout() {
   const currentModule = APP_MODULES.find(m => location.pathname === m.path || (m.path !== '/' && location.pathname.startsWith(m.path)));
   
   const isAdmin = role === 'admin' || role === 'superadmin' || role === 'district';
+  const [pendingRemindersCount, setPendingRemindersCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const q = query(
+      collection(db, `users/${user.uid}/reminders`),
+      where('date', '==', todayStr),
+      where('status', '==', 'pending')
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      setPendingRemindersCount(snapshot.size);
+    });
+  }, [user]);
 
   if (loading) {
     return (
@@ -104,6 +122,7 @@ export default function Layout() {
 
   return (
     <RoleContext.Provider value={{ role, setRole: () => {} }}>
+      <NotificationManager />
       <div className="min-h-screen bg-slate-50 flex font-sans text-slate-800">
         {/* Sidebar Overlay */}
         {isSidebarOpen && (
@@ -247,9 +266,16 @@ export default function Layout() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <button className="p-2 text-slate-500 hover:bg-slate-100 transition-colors rounded-full relative">
+              <button 
+                onClick={() => navigate('/calendar')}
+                className="p-2 text-slate-500 hover:bg-slate-100 transition-colors rounded-full relative"
+              >
                 <Bell size={20} />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-blue-600 rounded-full"></span>
+                {pendingRemindersCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-rose-500 text-white text-[9px] font-black flex items-center justify-center rounded-full border-2 border-white animate-in zoom-in slide-in-from-top-1">
+                    {pendingRemindersCount}
+                  </span>
+                )}
               </button>
               <Link to="/settings" className="p-2 text-slate-500 hover:bg-slate-100 transition-colors rounded-full">
                 <Settings size={20} />
