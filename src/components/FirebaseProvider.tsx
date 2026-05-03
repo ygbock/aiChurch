@@ -12,6 +12,18 @@ interface UserProfile {
   role: Role;
   districtId?: string;
   branchId?: string;
+  availability?: {
+    enabled: boolean;
+    days: string[];
+    startTime: string;
+    endTime: string;
+  };
+  notificationPrefs?: {
+    bookings: boolean;
+    reminders: boolean;
+    events: boolean;
+    news: boolean;
+  };
 }
 
 interface FirebaseContextType {
@@ -127,7 +139,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
               if (err.message.includes('offline')) {
                 console.warn("Member cache is empty and client is offline.");
               } else {
-                console.warn("Failed to listen to member profile:", err);
+                handleFirestoreError(err, OperationType.LIST, 'members (collectionGroup)');
               }
               setLoading(false);
             });

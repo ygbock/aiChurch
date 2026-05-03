@@ -155,3 +155,12 @@
     @apply font-sans;
   }
 }
+
+@keyframes scan {
+  from { transform: translateY(-130px); }
+  to { transform: translateY(130px); }
+}
+
+.animate-scan {
+  animation: scan 2s infinite ease-in-out;
+}

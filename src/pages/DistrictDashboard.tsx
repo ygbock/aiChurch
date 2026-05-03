@@ -222,10 +222,7 @@ export default function DistrictDashboard() {
       });
       setBranches(results);
     }, (error) => {
-      console.warn("Snapshot error (branches):", error);
-      if (!error.message.toLowerCase().includes('permission')) {
-        handleFirestoreError(error, OperationType.LIST, 'branches');
-      }
+      handleFirestoreError(error, OperationType.LIST, 'branches');
     });
 
     // Listen to district document for realtime stats
@@ -243,10 +240,7 @@ export default function DistrictDashboard() {
         });
       }
     }, (error) => {
-      console.warn("Snapshot error (district):", error);
-      if (!error.message.toLowerCase().includes('permission')) {
-        handleFirestoreError(error, OperationType.GET, 'districts');
-      }
+      handleFirestoreError(error, OperationType.GET, 'districts');
     });
 
     // Listen to district leadership
@@ -259,10 +253,7 @@ export default function DistrictDashboard() {
       });
       setLeaders(results);
     }, (error) => {
-      console.warn("Snapshot error (accessControl):", error);
-      if (!error.message.toLowerCase().includes('permission')) {
-        handleFirestoreError(error, OperationType.LIST, 'accessControl');
-      }
+      handleFirestoreError(error, OperationType.LIST, 'accessControl');
     });
 
     // Listen to all members in this district
@@ -277,10 +268,7 @@ export default function DistrictDashboard() {
       });
       setMembers(results);
     }, (error) => {
-      console.warn("Snapshot error (members):", error);
-      if (!error.message.toLowerCase().includes('permission')) {
-        handleFirestoreError(error, OperationType.LIST, 'members');
-      }
+      handleFirestoreError(error, OperationType.LIST, 'members');
     });
 
     // Listen to baptism requests (members in this district with baptismStatus)
@@ -299,7 +287,7 @@ export default function DistrictDashboard() {
       });
       setBaptismRequests(results);
     }, (error) => {
-      console.warn("Snapshot error (baptism):", error);
+      handleFirestoreError(error, OperationType.LIST, 'baptism (collectionGroup)');
     });
 
     return () => {

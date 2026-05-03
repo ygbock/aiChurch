@@ -11,6 +11,24 @@
         "role": { "type": "string", "enum": ["superadmin", "admin", "district", "member"] },
         "districtId": { "type": "string", "description": "Required if role is district" },
         "branchId": { "type": "string", "description": "Required if role is admin or member" },
+        "availability": {
+          "type": "object",
+          "properties": {
+             "enabled": { "type": "boolean" },
+             "days": { "type": "array", "items": { "type": "string" } },
+             "startTime": { "type": "string" },
+             "endTime": { "type": "string" }
+          }
+        },
+        "notificationPrefs": {
+          "type": "object",
+          "properties": {
+             "bookings": { "type": "boolean" },
+             "reminders": { "type": "boolean" },
+             "events": { "type": "boolean" },
+             "news": { "type": "boolean" }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "fullName", "email", "role"]
@@ -62,9 +80,30 @@
         "time": { "type": "string" },
         "location": { "type": "string" },
         "branchId": { "type": "string" },
-        "type": { "type": "string", "enum": ["Service", "Youth", "Conference", "Meetings", "Outreach"] }
+        "type": { "type": "string", "enum": ["Service", "Youth", "Conference", "Meetings", "Outreach"] },
+        "recurrence": {
+          "type": "object",
+          "properties": {
+            "isRecurring": { "type": "boolean" },
+            "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
+            "days": { "type": "array", "items": { "type": "string" } },
+            "until": { "type": "string", "format": "date" }
+          }
+        }
       },
       "required": ["title", "date", "branchId"]
+    },
+    "EventAttendance": {
+      "title": "Event Attendance",
+      "description": "Records representing a member's attendance at a specific event instance.",
+      "type": "object",
+      "properties": {
+        "memberId": { "type": "string" },
+        "memberName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["present", "late", "excused"] }
+      },
+      "required": ["memberId", "memberName", "timestamp"]
     },
     "Branch": {
       "title": "Branch",
@@ -172,13 +211,40 @@
         "duration": { "type": "string" },
         "location": { "type": "string" },
         "type": { "type": "string" },
+        "sessionFormat": { "type": "string", "enum": ["physical", "virtual", "phone"] },
+        "duration": { "type": "string", "enum": ["30 mins", "1 hour", "1.5 hours"] },
         "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled", "completed"] },
         "notes": { "type": "string" },
         "staffId": { "type": "string", "description": "UID of the pastor/staff member being booked" },
+        "staffName": { "type": "string" },
+        "staffFeedback": { "type": "string", "description": "Notes from the pastor during approval/decline" },
         "requesterId": { "type": "string", "description": "UID of the member who booked the session" },
+        "growthSteps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "completed": { "type": "boolean" },
+              "dueDate": { "type": "string", "format": "date" }
+            }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "clientName", "date", "time", "status"]
+    },
+    "StaffNote": {
+      "title": "Staff Note",
+      "description": "Private sensitive notes from a counselor or guide.",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["content", "authorId"]
     },
     "CalendarEvent": {
       "title": "Calendar Event",
@@ -191,6 +257,15 @@
         "time": { "type": "string" },
         "location": { "type": "string" },
         "type": { "type": "string" },
+        "recurrence": {
+          "type": "object",
+          "properties": {
+            "isRecurring": { "type": "boolean" },
+            "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
+            "days": { "type": "array", "items": { "type": "string" } },
+            "until": { "type": "string", "format": "date" }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "date"]
@@ -209,12 +284,43 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "date", "status", "userId"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "A conversation between users.",
+      "type": "object",
+      "properties": {
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "lastMessage": { "type": "string" },
+        "lastMessageAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["participants"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A message within a chat.",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "text", "createdAt"]
     }
   },
   "firestore": {
     "/users/{uid}": {
       "schema": "User",
       "description": "Private user profiles."
+    },
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Chat meta-data between users."
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Individual messages in a chat."
     },
     "/users/{uid}/reminders/{reminderId}": {
       "schema": "Reminder",

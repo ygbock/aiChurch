@@ -23,7 +23,12 @@ import {
   User,
   Check,
   MoreVertical,
-  Filter
+  Filter,
+  FileText,
+  CheckCircle2,
+  Target,
+  Send,
+  Star
 } from 'lucide-react';
 import { 
   format, 
@@ -33,6 +38,7 @@ import {
   subWeeks, 
   addDays, 
   subDays, 
+  addHours,
   addYears, 
   subYears, 
   startOfMonth, 
@@ -65,6 +71,12 @@ interface EventData {
   time: string;
   location: string;
   type: string;
+  recurrence?: {
+    isRecurring: boolean;
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    days?: string[];
+    until?: string;
+  };
 }
 
 interface Appointment {
@@ -77,10 +89,12 @@ interface Appointment {
   duration: string;
   location: string;
   type: string;
+  sessionFormat?: 'physical' | 'virtual' | 'phone';
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   notes?: string;
   staffId?: string;
   staffName?: string;
+  staffFeedback?: string;
   requesterId?: string;
 }
 
@@ -114,12 +128,20 @@ export default function Calendar() {
   const [activeReminderTab, setActiveReminderTab] = useState<'all' | 'pending' | 'completed'>('pending');
   const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
+  const [apptFeedback, setApptFeedback] = useState<string>('');
+  const [actingOnId, setActingOnId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['Service', 'Youth', 'Conference', 'Meetings', 'Outreach', 'District', 'Weekly', 'Member Portal', 'Holidays', 'Appointment', 'Reminder']);
   const [expandedSections, setExpandedSections] = useState<string[]>(['MY CALENDARS', 'CHURCH CALENDARS', 'OTHER CALENDARS']);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showDayDetail, setShowDayDetail] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [showAppointmentDetail, setShowAppointmentDetail] = useState(false);
+  const [newGrowthStep, setNewGrowthStep] = useState('');
+  const [staffNotes, setStaffNotes] = useState<any[]>([]);
+  const [newStaffNote, setNewStaffNote] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => 
@@ -140,7 +162,10 @@ export default function Calendar() {
     date: format(new Date(), 'yyyy-MM-dd'),
     time: '09:00',
     location: '',
-    type: 'Service'
+    type: 'Service',
+    isRecurring: false,
+    frequency: 'weekly' as 'daily' | 'weekly' | 'monthly' | 'yearly',
+    until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
   });
 
   const [appointmentForm, setAppointmentForm] = useState({
@@ -172,7 +197,9 @@ export default function Calendar() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [bookingForm, setBookingForm] = useState({
     title: 'Consultation Session',
-    notes: ''
+    notes: '',
+    format: 'physical' as 'physical' | 'virtual' | 'phone',
+    duration: '30 mins'
   });
 
   useEffect(() => {
@@ -182,12 +209,12 @@ export default function Calendar() {
     return onSnapshot(q, (snapshot) => {
        const staff = snapshot.docs
          .map(doc => ({ id: doc.id, ...doc.data() }))
-         .filter((s: any) => s.id !== profile?.uid);
+         .filter((s: any) => s.id !== profile?.uid && s.availability?.enabled);
        setBookableStaff(staff);
     }, (err) => {
-      console.warn("Failed to fetch staff:", err);
+      handleFirestoreError(err, OperationType.LIST, 'users (staff availability)');
     });
-  }, [db]);
+  }, [db, profile]);
 
   // Generate slots for a staff member on a specific date
   useEffect(() => {
@@ -195,13 +222,30 @@ export default function Calendar() {
 
     const generateSlots = () => {
       const slots = [];
-      const startHour = 9; // 9 AM
-      const endHour = 17; // 5 PM
+      const avail = selectedStaff.availability || { 
+        startTime: '09:00', 
+        endTime: '17:00', 
+        days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] 
+      };
+
+      // Check if selected date is an available day
+      const dayName = format(parseISO(bookingDate), 'EEEE');
+      if (!avail.days.includes(dayName)) return [];
+
+      const [startH, startM] = (avail.startTime || '09:00').split(':').map(Number);
+      const [endH, endM] = (avail.endTime || '17:00').split(':').map(Number);
       
-      // Standard 30 min slots
-      for (let h = startHour; h < endHour; h++) {
-        slots.push(`${h.toString().padStart(2, '0')}:00`);
-        slots.push(`${h.toString().padStart(2, '0')}:30`);
+      let currentH = startH;
+      let currentM = startM;
+
+      while (currentH < endH || (currentH === endH && currentM < endM)) {
+        slots.push(`${currentH.toString().padStart(2, '0')}:${currentM.toString().padStart(2, '0')}`);
+        
+        currentM += 30;
+        if (currentM >= 60) {
+          currentH += 1;
+          currentM = 0;
+        }
       }
 
       // Filter out slots that conflict with existing appointments for THIS staff member
@@ -213,9 +257,6 @@ export default function Calendar() {
 
       const bookedTimes = staffAppointments.map(a => a.time);
       
-      // Also filter out church events for that time? 
-      // (Simplified: for now just other appointments for that staff)
-      
       return slots.filter(s => !bookedTimes.includes(s));
     };
 
@@ -223,12 +264,135 @@ export default function Calendar() {
     setSelectedSlot(null);
   }, [bookingDate, selectedStaff, appointments]);
 
+  // Fetch staff notes for selected appointment
+  useEffect(() => {
+    if (!selectedAppointment?.id || !db || !profile) return;
+    
+    const isStaffOrAdmin = profile.role === 'admin' || profile.role === 'superadmin' || selectedAppointment.staffId === profile.uid;
+    if (!isStaffOrAdmin) return;
 
-  const updateAppointmentStatus = async (id: string, status: 'confirmed' | 'cancelled' | 'completed' | 'pending') => {
+    const notesRef = collection(db, `appointments/${selectedAppointment.id}/staffNotes`);
+    const q = query(notesRef, orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setStaffNotes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      // Users who aren't authorized to see notes will get a permission error which is expected
+      if (!error.message.includes('permission-denied')) {
+        handleFirestoreError(error, OperationType.GET, `appointments/${selectedAppointment.id}/staffNotes`);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [selectedAppointment, db, profile]);
+
+  // Automated Reminder System (Simulation for Preview)
+  useEffect(() => {
+    if (!profile || !db) return;
+    
+    const checkReminders = () => {
+      const now = new Date();
+      const windowEnd = addHours(now, 2); // Check for sessions in next 2 hours
+      
+      const upcoming = appointments.filter(app => {
+        try {
+          const appDate = parseISO(`${app.date}T${app.time}`);
+          return app.status === 'confirmed' && appDate >= now && appDate <= windowEnd;
+        } catch (e) { return false; }
+      });
+
+      upcoming.forEach(app => {
+        const key = `church-rem-${app.id}`;
+        if (!sessionStorage.getItem(key)) {
+          toast(`Upcoming Session: ${app.title}`, {
+            description: `Starts at ${app.time} with ${app.staffName || 'selected guide'}.`,
+            icon: <Bell size={16} className="text-amber-500" />,
+            duration: 8000,
+          });
+          sessionStorage.setItem(key, 'notified');
+        }
+      });
+    };
+
+    // Check immediately and then every minute
+    checkReminders();
+    const interval = setInterval(checkReminders, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [appointments, profile]);
+
+  const handleAddGrowthStep = async () => {
+    if (!newGrowthStep.trim() || !selectedAppointment || !db) return;
+    try {
+      const steps = selectedAppointment.growthSteps || [];
+      const newStep = {
+        id: Math.random().toString(36).substr(2, 9),
+        title: newGrowthStep,
+        completed: false,
+        dueDate: format(addDays(new Date(), 7), 'yyyy-MM-dd')
+      };
+      
+      const apptRef = doc(db, 'appointments', selectedAppointment.id);
+      await updateDoc(apptRef, {
+        growthSteps: [...steps, newStep],
+        updatedAt: serverTimestamp()
+      });
+      
+      setNewGrowthStep('');
+      // Update local state if needed (onSnapshot usually handles it but the dependency on selectedAppointment might be stale)
+      setSelectedAppointment({
+        ...selectedAppointment,
+        growthSteps: [...steps, newStep]
+      });
+      toast.success('Growth step assigned');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'appointments');
+    }
+  };
+
+  const toggleGrowthStep = async (stepId: string) => {
+    if (!selectedAppointment || !db) return;
+    try {
+      const steps = selectedAppointment.growthSteps.map((s: any) => 
+        s.id === stepId ? { ...s, completed: !s.completed } : s
+      );
+      
+      const apptRef = doc(db, 'appointments', selectedAppointment.id);
+      await updateDoc(apptRef, {
+        growthSteps: steps,
+        updatedAt: serverTimestamp()
+      });
+      
+      setSelectedAppointment({ ...selectedAppointment, growthSteps: steps });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'appointments');
+    }
+  };
+
+  const handleAddStaffNote = async () => {
+    if (!newStaffNote.trim() || !selectedAppointment || !db || !profile) return;
+    setIsSavingNote(true);
+    try {
+      const notesRef = collection(db, `appointments/${selectedAppointment.id}/staffNotes`);
+      await addDoc(notesRef, {
+        content: newStaffNote,
+        authorId: profile.uid,
+        createdAt: serverTimestamp()
+      });
+      setNewStaffNote('');
+      toast.success('Counselor note saved');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `appointments/${selectedAppointment.id}/staffNotes`);
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
+  const updateAppointmentStatus = async (id: string, status: 'confirmed' | 'cancelled' | 'completed' | 'pending', feedback?: string) => {
     if (!db) return;
     try {
       await updateDoc(doc(db, 'appointments', id), { 
         status,
+        ...(feedback ? { staffFeedback: feedback } : {}),
         updatedAt: serverTimestamp() 
       });
       toast.success(`Appointment ${status}`);
@@ -240,14 +404,51 @@ export default function Calendar() {
   const isAdmin = role === 'admin' || role === 'superadmin' || role === 'district';
 
   const combinedEvents = React.useMemo(() => {
-    const e = events
-      .filter(evt => selectedCategories.includes(evt.type))
-      .map(evt => ({ 
-        ...evt, 
+    const expandedEvents: any[] = [];
+    
+    events.forEach(evt => {
+      if (!selectedCategories.includes(evt.type)) return;
+
+      const baseEvent = {
+        ...evt,
         calendarType: 'event' as const,
         status: undefined,
-        original: undefined
-      }));
+        original: evt
+      };
+
+      if (!evt.recurrence?.isRecurring) {
+        expandedEvents.push(baseEvent);
+        return;
+      }
+
+      // Expand recurring event within visible range
+      const start = evt.date instanceof Date ? evt.date : new Date(evt.date);
+      const untilLimit = evt.recurrence.until ? parseISO(evt.recurrence.until) : addYears(start, 1);
+      
+      let current = start;
+      const freq = evt.recurrence.frequency || 'weekly';
+
+      // We expand some months before and after to handle view transitions
+      const windowStart = subMonths(currentDate, 3);
+      const windowEnd = addMonths(currentDate, 6);
+      const finalLimit = untilLimit < windowEnd ? untilLimit : windowEnd;
+
+      while (current <= finalLimit) {
+        if (current >= windowStart) {
+          expandedEvents.push({
+            ...baseEvent,
+            date: new Date(current),
+            id: `${evt.id}-${format(current, 'yyyy-MM-dd')}`
+          });
+        }
+
+        if (freq === 'daily') current = addDays(current, 1);
+        else if (freq === 'weekly') current = addWeeks(current, 1);
+        else if (freq === 'monthly') current = addMonths(current, 1);
+        else if (freq === 'yearly') current = addYears(current, 1);
+        else break;
+      }
+    });
     
     const r = reminders
       .filter(rem => selectedCategories.includes('Reminder'))
@@ -262,7 +463,7 @@ export default function Calendar() {
         original: rem
       }));
     
-    const all = [...e, ...r].sort((a, b) => {
+    const all = [...expandedEvents, ...r].sort((a, b) => {
         const dateA = a.date instanceof Date ? a.date : new Date(a.date);
         const dateB = b.date instanceof Date ? b.date : new Date(b.date);
         const diff = dateA.getTime() - dateB.getTime();
@@ -271,7 +472,7 @@ export default function Calendar() {
     });
 
     return all;
-  }, [events, reminders, selectedCategories]);
+  }, [events, reminders, selectedCategories, currentDate]);
 
   const handleSetEventReminder = async (event: EventData) => {
     if (!profile || !db) {
@@ -304,7 +505,9 @@ export default function Calendar() {
         status: 'pending',
         userId: profile.uid,
         createdAt: serverTimestamp(),
-        eventId: event.id // Reference back to event
+        eventId: event.id,
+        targetPath: '/calendar',
+        category: 'event'
       });
 
       toast.success('Event reminder set!');
@@ -439,6 +642,7 @@ export default function Calendar() {
         time: reminderForm.time,
         status: reminderForm.status,
         userId: profile.uid,
+        category: 'personal',
         updatedAt: serverTimestamp()
       };
 
@@ -573,7 +777,10 @@ export default function Calendar() {
       date: date ? format(date, 'yyyy-MM-dd') : format(currentDate, 'yyyy-MM-dd'),
       time: '09:00',
       location: '',
-      type: 'Service'
+      type: 'Service',
+      isRecurring: false,
+      frequency: 'weekly',
+      until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
     });
     setShowModal(true);
   };
@@ -587,7 +794,10 @@ export default function Calendar() {
       date: format(event.date, 'yyyy-MM-dd'),
       time: event.time || '09:00',
       location: event.location || '',
-      type: event.type || 'Service'
+      type: event.type || 'Service',
+      isRecurring: event.recurrence?.isRecurring || false,
+      frequency: event.recurrence?.frequency as any || 'weekly',
+      until: event.recurrence?.until || format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
     });
     setShowModal(true);
   };
@@ -600,11 +810,11 @@ export default function Calendar() {
     }
 
     setIsSaving(true);
+    const districtId = profile?.districtId || 'default-district';
+    const branchId = profile?.branchId || 'default-branch';
+    const path = `districts/${districtId}/branches/${branchId}/events`;
+    
     try {
-      const districtId = profile?.districtId || 'default-district';
-      const branchId = profile?.branchId || 'default-branch';
-      const path = `districts/${districtId}/branches/${branchId}/events`;
-      
       const eventDateTime = new Date(`${eventForm.date}T${eventForm.time}`);
 
       const data = {
@@ -614,6 +824,12 @@ export default function Calendar() {
         time: eventForm.time,
         location: eventForm.location,
         type: eventForm.type,
+        recurrence: eventForm.isRecurring ? {
+          isRecurring: true,
+          frequency: eventForm.frequency,
+          until: eventForm.until
+        } : null,
+        branchId: branchId,
         updatedAt: serverTimestamp()
       };
 
@@ -631,7 +847,7 @@ export default function Calendar() {
 
       setShowModal(false);
     } catch (error) {
-      handleFirestoreError(error, editingEvent ? OperationType.UPDATE : OperationType.WRITE, 'calendar_events');
+      handleFirestoreError(error, editingEvent ? OperationType.UPDATE : OperationType.WRITE, path);
     } finally {
       setIsSaving(false);
     }
@@ -640,15 +856,15 @@ export default function Calendar() {
   const handleDeleteEvent = async (eventId: string) => {
     if (!window.confirm('Are you sure you want to delete this event?')) return;
 
+    const districtId = profile?.districtId || 'default-district';
+    const branchId = profile?.branchId || 'default-branch';
+    const path = `districts/${districtId}/branches/${branchId}/events`;
+
     try {
-      const districtId = profile?.districtId || 'default-district';
-      const branchId = profile?.branchId || 'default-branch';
-      const path = `districts/${districtId}/branches/${branchId}/events`;
-      
       await deleteDoc(doc(db, path, eventId));
       toast.success('Event deleted');
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, 'calendar_events');
+      handleFirestoreError(error, OperationType.DELETE, path);
     }
   };
 
@@ -1159,21 +1375,76 @@ export default function Calendar() {
                   )}
 
                   <div className="flex justify-between items-start mb-4">
-                    <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
-                      appt.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600' : 
-                      appt.status === 'pending' ? 'bg-amber-50 text-amber-600' : 
-                      'bg-slate-50 text-slate-500'
-                    }`}>
-                      {appt.status}
-                    </span>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full w-fit ${
+                          appt.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600' : 
+                          appt.status === 'pending' ? 'bg-amber-50 text-amber-600' : 
+                          'bg-slate-50 text-slate-500'
+                        }`}>
+                          {appt.status}
+                        </span>
+                        {appt.sessionFormat && (
+                          <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg">
+                            {appt.sessionFormat}
+                          </span>
+                        )}
+                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 bg-slate-100 text-slate-500 rounded-lg">
+                          {appt.duration}
+                        </span>
+                      </div>
+                      {isAdmin && appt.clientName && (
+                        <p className="text-[10px] font-bold text-slate-400 mt-1">Requester: {appt.clientName}</p>
+                      )}
+                    </div>
                     <div className="flex gap-2">
-                      {appt.status === 'pending' && (
-                        <button 
-                          onClick={() => updateAppointmentStatus(appt.id, 'confirmed')}
-                          className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
-                        >
-                          <Check size={16} />
-                        </button>
+                      {appt.status === 'pending' && (isAdmin || appt.staffId === profile?.uid) && (
+                        <>
+                          {actingOnId === appt.id ? (
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="text"
+                                placeholder="Add optional note..."
+                                value={apptFeedback}
+                                onChange={(e) => setApptFeedback(e.target.value)}
+                                className="text-[10px] bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 w-40"
+                                autoFocus
+                              />
+                              <button 
+                                onClick={() => {
+                                  updateAppointmentStatus(appt.id, 'confirmed', apptFeedback);
+                                  setActingOnId(null);
+                                  setApptFeedback('');
+                                }}
+                                className="p-1.5 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 shadow-sm"
+                                title="Approve with note"
+                              >
+                                <Check size={14} />
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  updateAppointmentStatus(appt.id, 'cancelled', apptFeedback);
+                                  setActingOnId(null);
+                                  setApptFeedback('');
+                                }}
+                                className="p-1.5 bg-rose-500 text-white rounded-lg hover:bg-rose-600 shadow-sm"
+                                title="Decline with note"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <button 
+                                onClick={() => setActingOnId(appt.id)}
+                                className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm"
+                                title="Decision & Feedback"
+                              >
+                                <Check size={16} />
+                              </button>
+                            </>
+                          )}
+                        </>
                       )}
                       <button className="p-2 text-slate-300 hover:text-slate-600 transition-colors">
                         <MoreVertical size={18} />
@@ -1182,6 +1453,14 @@ export default function Calendar() {
                   </div>
 
                   <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors mb-2 line-clamp-1">{appt.title}</h3>
+                  
+                  {appt.staffFeedback && (
+                    <div className="mb-4 p-3 bg-amber-50/50 rounded-xl border border-amber-100 italic text-[11px] text-amber-700">
+                      <p className="font-black uppercase tracking-widest text-[8px] mb-1 opacity-60">Staff Feedback</p>
+                      "{appt.staffFeedback}"
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
                       <User size={16} />
@@ -1192,7 +1471,7 @@ export default function Calendar() {
                     </div>
                   </div>
 
-                  <div className="space-y-2.5 pt-4 border-t border-slate-100">
+                  <div className="space-y-2.5 pt-4 border-t border-slate-100 mb-6">
                     <div className="flex items-center gap-3 text-slate-600">
                       <CalendarIcon size={14} className="text-indigo-400" />
                       <span className="text-[13px] font-medium">{format(parseISO(appt.date), 'EEE, MMM d, yyyy')}</span>
@@ -1202,6 +1481,16 @@ export default function Calendar() {
                       <span className="text-[13px] font-medium">{appt.time} ({appt.duration})</span>
                     </div>
                   </div>
+
+                  <button 
+                    onClick={() => {
+                      setSelectedAppointment(appt);
+                      setShowAppointmentDetail(true);
+                    }}
+                    className="w-full py-3 bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-transparent hover:border-indigo-100"
+                  >
+                    View Details & Follow-up
+                  </button>
                 </motion.div>
               ))}
             </div>
@@ -1647,25 +1936,85 @@ export default function Calendar() {
                 <div className="space-y-8">
                   {/* Step 1: Select Staff */}
                   <section className="space-y-4">
-                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Step 1: Choose Your Guide</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {bookableStaff.map(staff => (
-                        <button
-                          key={staff.id}
-                          onClick={() => setSelectedStaff(staff)}
-                          className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${selectedStaff?.id === staff.id ? 'border-amber-500 bg-amber-50 ring-4 ring-amber-50' : 'border-slate-100 hover:border-slate-200 bg-white'}`}
+                    <div className="flex justify-between items-center px-1">
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Step 1: Choose Your Guide</h4>
+                      {selectedStaff && (
+                        <button 
+                          onClick={() => setSelectedStaff(null)}
+                          className="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 transition-colors"
                         >
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${selectedStaff?.id === staff.id ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                            {staff.fullName[0]}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900">{staff.fullName}</p>
-                            <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">{staff.role}</p>
-                          </div>
-                          {selectedStaff?.id === staff.id && <div className="ml-auto bg-amber-500 text-white rounded-full p-1"><Check size={14} /></div>}
+                          Show All Staff
                         </button>
-                      ))}
+                      )}
                     </div>
+                    
+                    {!selectedStaff ? (
+                      <div className="grid grid-cols-1 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                        {bookableStaff.map(staff => {
+                          const dayName = format(parseISO(bookingDate), 'EEEE');
+                          const avail = staff.availability || { startTime: '09:00', endTime: '17:00', days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] };
+                          const isAvailableToday = avail.days.includes(dayName);
+                          
+                          // Mocking slots for the preview to show how it would look
+                          const nextSlot = isAvailableToday ? '10:00 AM' : 'Available Monday';
+
+                          return (
+                            <button
+                              key={staff.id}
+                              onClick={() => setSelectedStaff(staff)}
+                              className="group bg-white border-2 border-slate-100 hover:border-indigo-200 p-6 rounded-[2.5rem] transition-all hover:shadow-2xl hover:shadow-indigo-100/50 text-left flex items-center gap-6 relative overflow-hidden"
+                            >
+                              <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest">Select</div>
+                              </div>
+                              <div className="w-20 h-20 rounded-[2rem] bg-slate-50 flex items-center justify-center text-slate-300 group-hover:text-indigo-500 group-hover:bg-indigo-50 transition-all duration-300 relative">
+                                <User size={40} strokeWidth={1} />
+                                {isAvailableToday && (
+                                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full"></div>
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-lg font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase leading-none">{staff.fullName}</p>
+                                </div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{staff.role}</p>
+                                
+                                <div className="flex items-center gap-4 mt-6">
+                                  <div className="flex flex-col">
+                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Status</span>
+                                    <span className={`text-[10px] font-bold ${isAvailableToday ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                      {isAvailableToday ? 'On Duty' : 'Away'}
+                                    </span>
+                                  </div>
+                                  <div className="w-px h-6 bg-slate-100" />
+                                  <div className="flex flex-col">
+                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Next Slot</span>
+                                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
+                                      {nextSlot}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-4 bg-amber-50/50 p-6 rounded-[2.5rem] border border-amber-100 shadow-sm relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4">
+                           <div className="w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
+                              <Check size={16} strokeWidth={3} />
+                           </div>
+                        </div>
+                        <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center text-amber-500 shadow-sm">
+                          <User size={32} strokeWidth={1.5} />
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold text-slate-900">{selectedStaff.fullName}</p>
+                          <p className="text-xs font-black text-amber-600 uppercase tracking-[0.2em]">{selectedStaff.role}</p>
+                        </div>
+                      </div>
+                    )}
                   </section>
 
                   {/* Step 2: Date & Slots */}
@@ -1716,23 +2065,56 @@ export default function Calendar() {
                     <motion.section 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="space-y-4 pt-4 border-t border-slate-100"
+                      className="space-y-6 pt-4 border-t border-slate-100"
                     >
-                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Step 3: Notes for Session</h4>
-                      <input
-                        type="text"
-                        placeholder="Session Purpose (e.g. Life Guidance, Prayer)"
-                        value={bookingForm.title}
-                        onChange={(e) => setBookingForm({...bookingForm, title: e.target.value})}
-                        className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-amber-500"
-                      />
-                      <textarea
-                        rows={3}
-                        placeholder="Any specific background or topics you'd like to discuss?"
-                        value={bookingForm.notes}
-                        onChange={(e) => setBookingForm({...bookingForm, notes: e.target.value})}
-                        className="w-full bg-slate-50 border-none rounded-[20px] px-5 py-4 text-sm font-medium text-slate-600 focus:ring-2 focus:ring-amber-500 resize-none"
-                      />
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Step 3: Session Details</h4>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 ml-1">Session Format</label>
+                          <div className="flex bg-slate-50 p-1 rounded-2xl">
+                            {(['physical', 'virtual', 'phone'] as const).map(f => (
+                              <button
+                                key={f}
+                                onClick={() => setBookingForm({...bookingForm, format: f})}
+                                className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${bookingForm.format === f ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                              >
+                                {f}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 ml-1">Duration</label>
+                          <select
+                            value={bookingForm.duration}
+                            onChange={(e) => setBookingForm({...bookingForm, duration: e.target.value})}
+                            className="w-full bg-slate-50 border-none rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-amber-500"
+                          >
+                            <option value="30 mins">30 Minutes</option>
+                            <option value="1 hour">1 Hour</option>
+                            <option value="1.5 hours">1.5 Hours</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <input
+                          type="text"
+                          placeholder="Session Purpose (e.g. Life Guidance, Prayer)"
+                          value={bookingForm.title}
+                          onChange={(e) => setBookingForm({...bookingForm, title: e.target.value})}
+                          className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-amber-500"
+                        />
+                        <textarea
+                          rows={3}
+                          placeholder="Any specific background or topics you'd like to discuss?"
+                          value={bookingForm.notes}
+                          onChange={(e) => setBookingForm({...bookingForm, notes: e.target.value})}
+                          className="w-full bg-slate-50 border-none rounded-[20px] px-5 py-4 text-sm font-medium text-slate-600 focus:ring-2 focus:ring-amber-500 resize-none"
+                        />
+                      </div>
                     </motion.section>
                   )}
                 </div>
@@ -1759,8 +2141,9 @@ export default function Calendar() {
                         clientEmail: profile.email,
                         date: bookingDate,
                         time: selectedSlot,
-                        duration: '30 mins',
-                        location: 'Staff Office / Virtual',
+                        duration: bookingForm.duration,
+                        sessionFormat: bookingForm.format,
+                        location: bookingForm.format === 'virtual' ? 'Google Meet / Zoom' : 'Staff Office',
                         type: 'Personal Session',
                         status: 'pending',
                         notes: bookingForm.notes,
@@ -2100,6 +2483,178 @@ export default function Calendar() {
           </div>
         )}
 
+        {showAppointmentDetail && selectedAppointment && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden font-sans flex flex-col max-h-[90vh]"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-indigo-500">
+                    <CalendarDays size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">{selectedAppointment.title}</h2>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedAppointment.status} • {selectedAppointment.type}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowAppointmentDetail(false)} className="p-2 hover:bg-white rounded-full transition-colors text-slate-400 shadow-sm">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 no-scrollbar bg-white">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                  <div className="space-y-4">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Session Info</h3>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-3 text-slate-600">
+                        <CalendarIcon size={16} className="text-indigo-400" />
+                        <span className="text-sm font-bold">{format(parseISO(selectedAppointment.date), 'PPPP')}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-slate-600">
+                        <Clock size={16} className="text-indigo-400" />
+                        <span className="text-sm font-bold">{selectedAppointment.time} ({selectedAppointment.duration})</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-slate-600">
+                        <MapPin size={16} className="text-indigo-400" />
+                        <span className="text-sm font-bold">{selectedAppointment.location || 'Church Office'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Participants</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                          <User size={16} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-900 uppercase">Client</p>
+                          <p className="text-[10px] text-slate-500 font-bold">{selectedAppointment.clientName}</p>
+                        </div>
+                      </div>
+                      {selectedAppointment.staffName && (
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-500">
+                            <Star size={16} />
+                          </div>
+                          <div>
+                            <p className="text-xs font-black text-amber-600 uppercase">Guide</p>
+                            <p className="text-[10px] text-amber-500 font-bold">{selectedAppointment.staffName}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-8">
+                  {/* Growth Steps - Both see this */}
+                  <div className="bg-indigo-50/30 p-6 rounded-[2rem] border border-indigo-100/50">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                        <Target size={16} /> Growth Steps
+                      </h3>
+                      <span className="text-[9px] font-black bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full uppercase">Action Items</span>
+                    </div>
+                    
+                    <div className="space-y-2 mb-4">
+                      {selectedAppointment.growthSteps?.length > 0 ? (
+                        selectedAppointment.growthSteps.map((step: any) => (
+                          <div key={step.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-indigo-100/50 group">
+                            <div className="flex items-center gap-3">
+                              <button 
+                                onClick={() => toggleGrowthStep(step.id)}
+                                className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${step.completed ? 'bg-indigo-500 border-indigo-500 text-white' : 'border-slate-300 hover:border-indigo-400'}`}
+                              >
+                                {step.completed && <Check size={12} strokeWidth={4} />}
+                              </button>
+                              <span className={`text-sm font-bold ${step.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{step.title}</span>
+                            </div>
+                            <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Due: {step.dueDate}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[10px] text-slate-400 italic text-center py-4">No follow-up steps assigned yet.</p>
+                      )}
+                    </div>
+
+                    {(isAdmin || selectedAppointment.staffId === profile?.uid) && (
+                      <div className="flex gap-2">
+                        <input 
+                          type="text"
+                          value={newGrowthStep}
+                          onChange={(e) => setNewGrowthStep(e.target.value)}
+                          placeholder="Assign a growth step..."
+                          className="flex-1 bg-white border border-indigo-100 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-indigo-500"
+                        />
+                        <button 
+                          onClick={handleAddGrowthStep}
+                          className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all"
+                        >
+                          Assign
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Private Staff Notes - Only Staff/Admin see this */}
+                  {(isAdmin || selectedAppointment.staffId === profile?.uid) && (
+                    <div className="bg-rose-50/30 p-6 rounded-[2rem] border border-rose-100/50">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-[10px] font-black text-rose-600 uppercase tracking-widest flex items-center gap-2">
+                          <FileText size={16} /> Counselor Notes
+                        </h3>
+                        <span className="text-[8px] font-black bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
+                          <CheckCircle2 size={10} /> Private
+                        </span>
+                      </div>
+
+                      <div className="space-y-4 mb-4 max-h-[200px] overflow-y-auto no-scrollbar">
+                        {staffNotes.length > 0 ? (
+                          staffNotes.map(note => (
+                            <div key={note.id} className="bg-white p-4 rounded-2xl border border-rose-100/30 shadow-sm">
+                              <p className="text-sm text-slate-700 leading-relaxed font-medium">{note.content}</p>
+                              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-50">
+                                <span className="text-[8px] font-black text-rose-400 uppercase tracking-widest">
+                                  {note.createdAt?.seconds ? format(new Date(note.createdAt.seconds * 1000), 'MMM d, h:mm a') : 'Just now'}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-[10px] text-slate-400 italic text-center py-4">No private observations recorded.</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <textarea 
+                          value={newStaffNote}
+                          onChange={(e) => setNewStaffNote(e.target.value)}
+                          placeholder="Record private observations, prayer points, or counseling notes..."
+                          className="w-full bg-white border border-rose-100 rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:border-rose-400 min-h-[100px] resize-none"
+                        />
+                        <button 
+                          disabled={isSavingNote || !newStaffNote.trim()}
+                          onClick={handleAddStaffNote}
+                          className="w-full bg-rose-500 text-white py-3 rounded-xl text-sm font-bold hover:bg-rose-600 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          {isSavingNote ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                          Save Private Note
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {showModal && (
           <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div 
@@ -2160,6 +2715,69 @@ export default function Calendar() {
                     >
                       {categories.map(c => <option key={c.label} value={c.label}>{c.label}</option>)}
                     </select>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-100">
+                    <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4">
+                        <input 
+                          type="checkbox" 
+                          id="isRecurringCal"
+                          checked={eventForm.isRecurring}
+                          onChange={e => setEventForm({...eventForm, isRecurring: e.target.checked})}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                        />
+                        <label htmlFor="isRecurringCal" className="text-xs font-bold text-slate-700 uppercase tracking-widest cursor-pointer">Set as Recurring Event</label>
+                    </div>
+
+                    {eventForm.isRecurring && (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Frequency</label>
+                            <select 
+                              value={eventForm.frequency}
+                              onChange={e => setEventForm({...eventForm, frequency: e.target.value as any})}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            >
+                              <option value="daily">Daily</option>
+                              <option value="weekly">Weekly</option>
+                              <option value="monthly">Monthly</option>
+                              <option value="yearly">Yearly</option>
+                            </select>
+                          </div>
+                          <div className={!!(eventForm.until && parseInt(eventForm.until.split('-')[0]) > 2060) ? 'opacity-40 pointer-events-none' : ''}>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Repeat Until</label>
+                            <input 
+                              type="date"
+                              value={eventForm.until}
+                              onChange={e => setEventForm({...eventForm, until: e.target.value})}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 bg-blue-50/50 p-4 rounded-xl border border-blue-100/50 mt-4">
+                            <input 
+                              type="checkbox" 
+                              id="noEndDateCal"
+                              checked={!!(eventForm.until && parseInt(eventForm.until.split('-')[0]) > 2060)}
+                              onChange={e => {
+                                const farFuture = format(addYears(new Date(), 50), 'yyyy-MM-dd');
+                                const defaultFuture = format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd');
+                                setEventForm({
+                                  ...eventForm, 
+                                  until: e.target.checked ? farFuture : defaultFuture
+                                })
+                              }}
+                              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                            />
+                            <div>
+                              <label htmlFor="noEndDateCal" className="text-xs font-bold text-slate-700 uppercase tracking-widest cursor-pointer block">Continuous (Permanent Event)</label>
+                              <p className="text-[10px] text-blue-600/70 font-medium">This event will repeat indefinitely.</p>
+                            </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 

@@ -18,25 +18,21 @@ service cloud.firestore {
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
 
     function getEmail() {
-      // Standard Firebase Auth email field is preferred first
+      // Robust email extraction
       return string(request.auth.token.get('email', request.auth.token.get('email_address', ''))).lower();
     }
 
     function getUserData() {
-      // Safe fetch with fallback for non-existent users
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
     
     function hasUserRole(role) {
-      return isSignedIn() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == role;
     }
 
     function isSuperAdmin() {
       return isSignedIn() && (
         getEmail() == "ygbock@gmail.com" ||
-        request.auth.token.get('email', '') == "ygbock@gmail.com" ||
         hasUserRole("superadmin")
       );
     }
@@ -70,14 +66,14 @@ service cloud.firestore {
              data.uid == request.auth.uid &&
              data.fullName is string && data.fullName.size() <= 100 &&
              data.email == getEmail() &&
-             (!data.keys().contains('availability') || (
+             (!('' in data) || (
                data.availability is map &&
                data.availability.enabled is bool &&
                (data.availability.days is list || data.availability.days == null) &&
                (data.availability.startTime is string || data.availability.startTime == null) &&
                (data.availability.endTime is string || data.availability.endTime == null)
              )) &&
-             (!data.keys().contains('notificationPrefs') || (
+             (!('' in data) || (
                data.notificationPrefs is map &&
                data.notificationPrefs.bookings is bool &&
                data.notificationPrefs.reminders is bool &&
@@ -104,16 +100,7 @@ service cloud.firestore {
     function isValidEvent(data) {
       return data.keys().hasAll(['title', 'date', 'branchId']) &&
              data.title is string && data.title.size() <= 200 &&
-             data.branchId is string &&
-             (!('recurrence' in data) || (
-               data.recurrence == null || (
-                 data.recurrence is map &&
-                 data.recurrence.isRecurring is bool &&
-                 (data.recurrence.frequency in ['daily', 'weekly', 'monthly', 'yearly'] || data.recurrence.frequency == null) &&
-                 (data.recurrence.days is list || data.recurrence.days == null) &&
-                 (data.recurrence.until is string || data.recurrence.until == null)
-               )
-             ));
+             data.branchId is string;
     }
 
     function isValidQueueEntry(data) {
@@ -129,14 +116,20 @@ service cloud.firestore {
              data.clientName is string && data.clientName.size() <= 100 &&
              data.date is string &&
              data.time is string &&
-             (!('sessionFormat' in data) || data.sessionFormat in ['physical', 'virtual', 'phone']) &&
-             (!('duration' in data) || data.duration in ['30 mins', '1 hour', '1.5 hours']) &&
+             (!('' in data) || data.sessionFormat in ['physical', 'virtual', 'phone']) &&
+             (!('' in data) || data.duration in ['30 mins', '1 hour', '1.5 hours']) &&
              data.status in ['pending', 'confirmed', 'cancelled', 'completed'] &&
-             (!('staffId' in data) || (data.staffId is string || data.staffId == null)) &&
-             (!('staffName' in data) || (data.staffName is string || data.staffName == null)) &&
-             (!('staffFeedback' in data) || (data.staffFeedback is string || data.staffFeedback == null)) &&
-             (!('requesterId' in data) || (data.requesterId is string || data.requesterId == null)) &&
-             (!('growthSteps' in data) || data.growthSteps is list);
+             (!('' in data) || (data.staffId is string || data.staffId == null)) &&
+             (!('' in data) || (data.staffName is string || data.staffName == null)) &&
+             (!('' in data) || (data.staffFeedback is string || data.staffFeedback == null)) &&
+             (!('' in data) || (data.requesterId is string || data.requesterId == null)) &&
+             (!('' in data) || data.growthSteps is list);
+    }
+
+    function isValidAttendance(data) {
+      return data.keys().hasAll(['memberId', 'memberName', 'timestamp']) &&
+             data.memberId is string && data.memberName is string &&
+             data.timestamp is string;
     }
 
     function isValidStaffNote(data) {
@@ -148,16 +141,7 @@ service cloud.firestore {
     function isValidCalendarEvent(data) {
       return data.keys().hasAll(['title', 'date']) &&
              data.title is string && data.title.size() <= 200 &&
-             data.date is string &&
-             (!('recurrence' in data) || (
-               data.recurrence == null || (
-                 data.recurrence is map &&
-                 data.recurrence.isRecurring is bool &&
-                 (data.recurrence.frequency in ['daily', 'weekly', 'monthly', 'yearly'] || data.recurrence.frequency == null) &&
-                 (data.recurrence.days is list || data.recurrence.days == null) &&
-                 (data.recurrence.until is string || data.recurrence.until == null)
-               )
-             ));
+             data.date is string;
     }
 
     function isValidReminder(data) {
@@ -200,15 +184,11 @@ service cloud.firestore {
         allow read, list, delete: if isSignedIn() && request.auth.uid == uid;
         allow create, update: if isSignedIn() && request.auth.uid == uid && isValidReminder(incoming());
       }
-
-      match /notifications/{notificationId} {
-        allow read, list, write: if isSignedIn() && request.auth.uid == uid;
-      }
     }
 
     match /districts/{districtId} {
       allow read, list: if isSignedIn();
-      allow create: if isSuperAdmin();
+      allow create: if isSuperAdmin() && isVerified();
       allow update: if (isSuperAdmin() || isDistrictLeader(districtId)) && isVerified();
       
       match /branches/{branchId} {
@@ -235,8 +215,7 @@ service cloud.firestore {
 
         match /events/{eventId} {
           allow read, list: if isSignedIn();
-          allow create, update: if isBranchAdmin(districtId, branchId) && isVerified() && isValidEvent(incoming());
-          allow delete: if isBranchAdmin(districtId, branchId) && isVerified();
+          allow write: if isBranchAdmin(districtId, branchId) && isVerified() && isValidEvent(incoming());
 
           match /attendance/{attendeeId} {
             allow read, list: if isBranchAdmin(districtId, branchId) || (isSignedIn() && attendeeId == request.auth.uid);

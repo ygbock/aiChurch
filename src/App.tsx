@@ -31,6 +31,8 @@ import DistrictDashboard from './pages/DistrictDashboard';
 import DepartmentMemberProfile from './pages/DepartmentMemberProfile';
 import AdminRegistration from './pages/AdminRegistration';
 import ProgramDashboard from './pages/ProgramDashboard';
+import Directory from './pages/Directory';
+import Messages from './pages/Messages';
 import { FirebaseProvider } from './components/FirebaseProvider';
 import { Toaster } from 'sonner';
 
@@ -77,6 +79,9 @@ export default function App() {
             <Route path="volunteers" element={<Volunteers />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="transfers" element={<TransferManagement />} />
+            <Route path="directory" element={<Directory />} />
+            <Route path="messages" element={<Messages />} />
+            <Route path="messages/:chatId" element={<Messages />} />
             <Route path="superadmin" element={<SuperadminDashboard />} />
             <Route path="member-portal" element={<MemberPortal />} />
             <Route path="district" element={<DistrictDashboard />}>

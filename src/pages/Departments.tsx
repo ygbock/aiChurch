@@ -20,7 +20,7 @@ import {
 import NewDepartment from './NewDepartment';
 import { useFirebase } from '../components/FirebaseProvider';
 import { collection, onSnapshot, query } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface DepartmentData {
   id: string;
@@ -48,6 +48,8 @@ export default function Departments() {
         results.push({ id: doc.id, ...doc.data() } as DepartmentData);
       });
       setDepartments(results);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'departments');
     });
 
     return () => unsubscribe();

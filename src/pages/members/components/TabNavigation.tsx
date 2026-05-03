@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Users, UserPlus, Flame } from 'lucide-react';
+import { Users, UserPlus, Flame, Shield, Briefcase, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MemberLevel } from '@/types/membership';
 
@@ -11,6 +11,7 @@ interface TabNavigationProps {
     Member: number;
     Visitor: number;
     Convert: number;
+    [key: string]: number;
   };
 }
 
@@ -22,7 +23,7 @@ export const TabNavigation = ({ activeTab, onTabChange, counts }: TabNavigationP
   ];
 
   return (
-    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full max-w-full overflow-x-auto no-scrollbar sm:w-fit justify-start">
+    <div className="flex flex-wrap items-center gap-1 w-full max-w-full justify-start">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         const Icon = tab.icon;
@@ -32,7 +33,7 @@ export const TabNavigation = ({ activeTab, onTabChange, counts }: TabNavigationP
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             className={cn(
-              "relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap shrink-0",
+              "relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap",
               isActive ? "text-slate-900" : "text-slate-500 hover:text-slate-700"
             )}
           >
@@ -50,7 +51,7 @@ export const TabNavigation = ({ activeTab, onTabChange, counts }: TabNavigationP
                 "px-1.5 py-0.5 rounded-md text-[10px] font-bold",
                 isActive ? cn(tab.bg, tab.color) : "bg-slate-200 text-slate-500"
               )}>
-                {counts[tab.id as keyof typeof counts]}
+                {counts[tab.id as keyof typeof counts] || 0}
               </span>
             </span>
           </button>

@@ -21,9 +21,12 @@ import {
   Eye,
   Zap,
   Database,
-  BookOpen
+  BookOpen,
+  QrCode,
+  Download
 } from 'lucide-react';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { QRCodeCanvas } from 'qrcode.react';
+import { format, isSameDay, parseISO, addYears } from 'date-fns';
 import { useRole } from '../components/Layout';
 import { useFirebase } from '../components/FirebaseProvider';
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
@@ -45,6 +48,12 @@ interface EventData {
   attendanceRequirement?: 'Optional' | 'Required' | 'Not Required';
   logistics?: string;
   hasFoodLodging?: boolean;
+  recurrence?: {
+    isRecurring: boolean;
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    days?: string[];
+    until?: string;
+  };
 }
 
 const STANDARD_EVENTS_DIRECTORY = [
@@ -226,6 +235,20 @@ export default function Events() {
   const [events, setEvents] = useState<EventData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedEventQR, setSelectedEventQR] = useState<any>(null);
+
+  const downloadQRCode = () => {
+    const canvas = document.getElementById('qr-code-canvas') as HTMLCanvasElement;
+    if (canvas) {
+      const url = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `qr-${selectedEventQR?.title.toLowerCase().replace(/\s+/g, '-')}.png`;
+      link.href = url;
+      link.click();
+    }
+  };
+
   const [editingEvent, setEditingEvent] = useState<EventData | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'directory'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -246,7 +269,12 @@ export default function Events() {
     duration: '',
     attendanceRequirement: 'Not Required' as 'Optional' | 'Required' | 'Not Required',
     logistics: '',
-    hasFoodLodging: false
+    hasFoodLodging: false,
+    recurrence: {
+      isRecurring: false,
+      frequency: 'weekly' as 'daily' | 'weekly' | 'monthly' | 'yearly',
+      until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+    }
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -308,7 +336,12 @@ export default function Events() {
         duration: '',
         attendanceRequirement: 'Not Required',
         logistics: '',
-        hasFoodLodging: false
+        hasFoodLodging: false,
+        recurrence: {
+          isRecurring: false,
+          frequency: 'weekly',
+          until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+        }
       });
       setShowModal(true);
       navigate(location.pathname, { replace: true });
@@ -331,7 +364,12 @@ export default function Events() {
       duration: '',
       attendanceRequirement: 'Not Required',
       logistics: '',
-      hasFoodLodging: false
+      hasFoodLodging: false,
+      recurrence: {
+        isRecurring: false,
+        frequency: 'weekly',
+        until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+      }
     });
     setShowModal(true);
   };
@@ -352,7 +390,15 @@ export default function Events() {
       duration: event.duration || '',
       attendanceRequirement: event.attendanceRequirement || 'Not Required',
       logistics: event.logistics || '',
-      hasFoodLodging: event.hasFoodLodging || false
+      hasFoodLodging: event.hasFoodLodging || false,
+      recurrence: event.recurrence ? {
+        ...event.recurrence,
+        until: event.recurrence.until || format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+      } as any : {
+        isRecurring: false,
+        frequency: 'weekly' as any,
+        until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+      }
     });
     setShowModal(true);
   };
@@ -374,7 +420,12 @@ export default function Events() {
       attendanceRequirement: event.attendance?.toLowerCase().includes('optional') ? 'Optional' : 
                              event.attendance?.toLowerCase().includes('required') ? 'Required' : 'Not Required',
       logistics: event.logistics,
-      hasFoodLodging: event.logistics?.toLowerCase().includes('food')
+      hasFoodLodging: event.logistics?.toLowerCase().includes('food'),
+      recurrence: {
+        isRecurring: false,
+        frequency: 'weekly',
+        until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+      }
     });
     setShowModal(true);
     toast.info(`Pre-filling form for ${event.name}`);
@@ -388,11 +439,11 @@ export default function Events() {
     }
 
     setIsSaving(true);
+    const districtId = profile?.districtId || 'default-district';
+    const branchId = profile?.branchId || 'default-branch';
+    const path = `districts/${districtId}/branches/${branchId}/events`;
+
     try {
-      const districtId = profile?.districtId || 'default-district';
-      const branchId = profile?.branchId || 'default-branch';
-      const path = `districts/${districtId}/branches/${branchId}/events`;
-      
       const eventDateTime = new Date(`${eventForm.date}T${eventForm.time}`);
 
       const data = {
@@ -409,6 +460,8 @@ export default function Events() {
         attendanceRequirement: eventForm.attendanceRequirement,
         logistics: eventForm.logistics,
         hasFoodLodging: eventForm.hasFoodLodging,
+        recurrence: eventForm.recurrence.isRecurring ? eventForm.recurrence : null,
+        branchId: branchId,
         updatedAt: serverTimestamp()
       };
 
@@ -426,7 +479,7 @@ export default function Events() {
 
       setShowModal(false);
     } catch (error) {
-      handleFirestoreError(error, editingEvent ? OperationType.UPDATE : OperationType.WRITE, `districts/${profile?.districtId}/branches/${profile?.branchId}/events`);
+      handleFirestoreError(error, editingEvent ? OperationType.UPDATE : OperationType.WRITE, path);
     } finally {
       setIsSaving(false);
     }
@@ -435,15 +488,15 @@ export default function Events() {
   const handleDeleteEvent = async (eventId: string) => {
     if (!window.confirm('Are you sure you want to delete this event?')) return;
 
+    const districtId = profile?.districtId || 'default-district';
+    const branchId = profile?.branchId || 'default-branch';
+    const path = `districts/${districtId}/branches/${branchId}/events`;
+
     try {
-      const districtId = profile?.districtId || 'default-district';
-      const branchId = profile?.branchId || 'default-branch';
-      const path = `districts/${districtId}/branches/${branchId}/events`;
-      
       await deleteDoc(doc(db, path, eventId));
       toast.success('Event deleted');
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `districts/${profile?.districtId}/branches/${profile?.branchId}/events`);
+      handleFirestoreError(error, OperationType.DELETE, path);
     }
   };
 
@@ -753,7 +806,14 @@ export default function Events() {
                     </div>
                   </div>
 
-                  <div className={`px-3 sm:px-5 md:px-8 py-3 sm:py-4 md:py-6 border-t md:border-t-0 md:border-l border-slate-50 bg-slate-50/30 flex items-center gap-1.5 sm:gap-3 ${viewMode === 'grid' ? 'justify-between' : 'justify-end md:w-64 shrink-0'}`}>
+                  <div className={`px-3 sm:px-5 md:px-8 py-3 sm:py-4 md:py-6 border-t md:border-t-0 md:border-l border-slate-50 bg-slate-50/30 flex items-center gap-1.5 sm:gap-3 ${viewMode === 'grid' ? 'justify-between' : 'justify-end md:w-80 shrink-0'}`}>
+                    <button 
+                      onClick={() => { setSelectedEventQR(evt); setShowQRModal(true); }}
+                      className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all shrink-0 rounded-xl border border-slate-200 bg-white"
+                      title="Attendance QR"
+                    >
+                       <QrCode className="sm:w-5 sm:h-5 w-4 h-4" />
+                    </button>
                     <button 
                       onClick={() => navigate(`/programs/${evt.id}`, { state: { fromEvent: evt.id, programName: evt.title } })}
                       className="bg-white border text-slate-700 px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl font-black text-[8px] sm:text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-sm flex items-center gap-1 sm:gap-2 justify-center flex-1 sm:flex-none"
@@ -958,6 +1018,85 @@ export default function Events() {
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl px-4 sm:px-5 py-3 sm:py-4 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm resize-none"
                     ></textarea>
                   </div>
+
+                  <div className="pt-4 border-t border-slate-100">
+                    <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-4">
+                        <input 
+                          type="checkbox" 
+                          id="isRecurring"
+                          checked={eventForm.recurrence.isRecurring}
+                          onChange={e => setEventForm({...eventForm, recurrence: {...eventForm.recurrence, isRecurring: e.target.checked}})}
+                          className="w-5 h-5 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <label htmlFor="isRecurring" className="text-[10px] font-black text-slate-700 uppercase tracking-widest cursor-pointer">Set as Recurring Event</label>
+                    </div>
+
+                    <AnimatePresence>
+                      {eventForm.recurrence.isRecurring && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="space-y-4 overflow-hidden"
+                        >
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Frequency</label>
+                               <select 
+                                 value={eventForm.recurrence.frequency}
+                                 onChange={e => setEventForm({...eventForm, recurrence: {...eventForm.recurrence, frequency: e.target.value as any}})}
+                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
+                               >
+                                 <option value="daily">Daily</option>
+                                 <option value="weekly">Weekly</option>
+                                 <option value="monthly">Monthly</option>
+                                 <option value="yearly">Yearly</option>
+                               </select>
+                            </div>
+                            <div className={!!(eventForm.recurrence.until && parseInt(eventForm.recurrence.until.split('-')[0]) > 2060) ? 'opacity-40 pointer-events-none' : ''}>
+                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Repeat Until</label>
+                               <input 
+                                 type="date"
+                                 value={eventForm.recurrence.until}
+                                 onChange={e => setEventForm({...eventForm, recurrence: {...eventForm.recurrence, until: e.target.value}})}
+                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all shadow-sm"
+                               />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50">
+                              <input 
+                                type="checkbox" 
+                                id="noEndDate"
+                                checked={!!(eventForm.recurrence.until && parseInt(eventForm.recurrence.until.split('-')[0]) > 2060)}
+                                onChange={e => {
+                                  const farFuture = format(addYears(new Date(), 50), 'yyyy-MM-dd');
+                                  const defaultFuture = format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd');
+                                  setEventForm({
+                                    ...eventForm, 
+                                    recurrence: {
+                                      ...eventForm.recurrence, 
+                                      until: e.target.checked ? farFuture : defaultFuture
+                                    }
+                                  })
+                                }}
+                                className="w-5 h-5 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <div>
+                                <label htmlFor="noEndDate" className="text-[10px] font-black text-slate-700 uppercase tracking-widest cursor-pointer block">Continuous (Permanent Event)</label>
+                                <p className="text-[9px] text-blue-600/70 font-medium lowercase tracking-normal">Enable this for services that never end (e.g. Sunday Service).</p>
+                              </div>
+                          </div>
+
+                          <p className="text-[10px] text-slate-400 italic">
+                            {!!(eventForm.recurrence.until && parseInt(eventForm.recurrence.until.split('-')[0]) > 2060) 
+                              ? "This event is marked as permanent and will persist in the system indefinitely."
+                              : "This will cause the event to populate the calendar automatically until the specified date."}
+                          </p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
                 <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 mt-6">
@@ -989,6 +1128,67 @@ export default function Events() {
                    </div>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+
+        {showQRModal && selectedEventQR && (
+          <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-[2.5rem] shadow-2xl p-8 w-full max-w-sm text-center font-sans"
+            >
+              <div className="flex justify-between items-center mb-8">
+                <div className="text-left">
+                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Event Access</h3>
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Attendance QR Key</p>
+                </div>
+                <button onClick={() => setShowQRModal(false)} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
+                  <X size={20} className="text-slate-400" />
+                </button>
+              </div>
+
+              <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 flex items-center justify-center mb-8">
+                <div className="bg-white p-4 rounded-3xl shadow-xl shadow-blue-50">
+                  <QRCodeCanvas 
+                    id="qr-code-canvas"
+                    value={JSON.stringify({
+                      type: 'event-checkin',
+                      eventId: selectedEventQR.id,
+                      branchId: selectedEventQR.branchId,
+                      districtId: profile?.districtId || 'district1', // Fallback for safety
+                      title: selectedEventQR.title,
+                      timestamp: new Date().toISOString()
+                    })}
+                    size={200}
+                    level="H"
+                    includeMargin={true}
+                  />
+                </div>
+              </div>
+
+              <h4 className="text-lg font-black text-slate-900 uppercase mb-2 leading-tight">{selectedEventQR.title}</h4>
+              <p className="text-xs text-slate-500 font-medium mb-8 leading-relaxed px-4">
+                Display this code at the venue. Members can scan this to mark their attendance automatically.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={downloadQRCode}
+                  className="w-full h-12 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95"
+                >
+                  <Download size={18} />
+                  Download PNG
+                </button>
+                <button 
+                  onClick={() => setShowQRModal(false)}
+                  className="w-full h-12 bg-slate-50 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:text-slate-600 transition-all"
+                >
+                  Close
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

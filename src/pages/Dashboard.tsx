@@ -21,13 +21,15 @@ import {
   Clock,
   CheckCircle2,
   X,
-  Loader2
+  Loader2,
+  MessageSquare,
+  Smartphone
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import CollapsibleSection from '../components/CollapsibleSection';
 import { useFirebase } from '../components/FirebaseProvider';
-import { doc, getDoc, collection, query, limit, onSnapshot, orderBy, where, addDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, limit, onSnapshot, orderBy, where, addDoc, serverTimestamp, getDocs, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { toast } from 'sonner';
 
@@ -40,6 +42,28 @@ export default function Dashboard() {
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setShowInstallBanner(false);
+    }
+    setDeferredPrompt(null);
+  };
 
   // New Task Form State
   const [taskForm, setTaskForm] = useState({
@@ -52,6 +76,43 @@ export default function Dashboard() {
     assigneeName: ''
   });
   const [isSavingTask, setIsSavingTask] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin' || profile?.role === 'district';
+
+  useEffect(() => {
+    if (!profile?.uid || !isAdmin) return;
+    
+    // Listen for pending appointments assigned to this user (staff member)
+    const q = query(
+      collection(db, 'appointments'),
+      where('status', '==', 'pending'),
+      where('staffId', '==', profile.uid),
+      orderBy('createdAt', 'desc'),
+      limit(5)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setPendingApprovals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'adminRequests');
+    });
+
+    return () => unsubscribe();
+  }, [profile, isAdmin]);
+
+  const updateAppointmentStatus = async (id: string, status: string, feedback?: string) => {
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, 'appointments', id), { 
+        status,
+        ...(feedback ? { staffFeedback: feedback } : {}),
+        updatedAt: serverTimestamp() 
+      });
+      toast.success(`Request ${status}`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `appointments/${id}`);
+    }
+  };
 
   useEffect(() => {
     async function fetchBranch() {
@@ -81,6 +142,8 @@ export default function Dashboard() {
     const membersQ = query(collection(db, membersPath), orderBy('createdAt', 'desc'), limit(5));
     const unsubscribeMembers = onSnapshot(membersQ, (snapshot) => {
       setRecentMembers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, membersPath);
     });
 
     // Fetch My Tasks
@@ -95,7 +158,7 @@ export default function Dashboard() {
       setMyTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoadingTasks(false);
     }, (error) => {
-       console.error("Error fetching tasks:", error);
+       handleFirestoreError(error, OperationType.LIST, tasksPath);
        setLoadingTasks(false);
     });
 
@@ -122,9 +185,12 @@ export default function Dashboard() {
     }
 
     setIsSavingTask(true);
+    const districtId = profile?.districtId || 'default-district';
+    const branchId = profile?.branchId || 'default-branch';
+    const path = `districts/${districtId}/branches/${branchId}/tasks`;
+
     try {
       const selectedUser = users.find(u => u.uid === taskForm.assigneeId);
-      const path = `districts/${profile?.districtId}/branches/${profile?.branchId}/tasks`;
       
       await addDoc(collection(db, path), {
         ...taskForm,
@@ -147,7 +213,7 @@ export default function Dashboard() {
         assigneeName: profile?.fullName || ''
       });
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `districts/${profile?.districtId}/branches/${profile?.branchId}/tasks`);
+      handleFirestoreError(error, OperationType.WRITE, path);
     } finally {
       setIsSavingTask(false);
     }
@@ -168,6 +234,43 @@ export default function Dashboard() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-10 pb-12"
     >
+      <AnimatePresence>
+        {showInstallBanner && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="bg-indigo-600 rounded-[2rem] p-6 sm:p-8 text-white flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl shadow-indigo-200">
+              <div className="flex items-center gap-6 text-center sm:text-left">
+                <div className="w-16 h-16 bg-white/20 rounded-[1.5rem] flex items-center justify-center shrink-0 backdrop-blur-md">
+                  <Smartphone size={32} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-tight">Install FaithFlow</h3>
+                  <p className="text-indigo-100 text-sm font-medium mt-1">Add to your home screen for instant access to sermons, signals, and the church calendar.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <button 
+                  onClick={handleInstall}
+                  className="flex-1 sm:flex-none px-8 py-4 bg-white text-indigo-600 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-indigo-50 transition-all shadow-lg"
+                >
+                  Install Now
+                </button>
+                <button 
+                  onClick={() => setShowInstallBanner(false)}
+                  className="p-4 bg-indigo-500/50 hover:bg-indigo-500 rounded-2xl transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Top Banner / Welcome */}
       <div className="relative group">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-[2rem] sm:rounded-[2.5rem] blur-xl sm:blur-2xl opacity-10 group-hover:opacity-20 transition-opacity" />
@@ -188,25 +291,85 @@ export default function Dashboard() {
              </p>
           </div>
 
-          <div className="relative z-10 grid grid-cols-2 gap-3 sm:gap-4 w-full md:w-auto">
-            <button 
-              onClick={() => navigate('/members')}
-              className="p-4 sm:p-6 bg-slate-50 hover:bg-slate-100 rounded-[1.5rem] sm:rounded-3xl transition-all group flex flex-col items-center gap-2 sm:gap-3 border border-transparent hover:border-slate-200"
-            >
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-[1rem] sm:rounded-2xl flex items-center justify-center shadow-sm text-blue-600 group-hover:scale-110 transition-transform">
-                <Users size={20} className="sm:w-6 sm:h-6 w-5 h-5" />
+          <div className="relative z-10 w-full md:w-auto">
+            {pendingApprovals.length > 0 ? (
+              <motion.div 
+                initial={{ x: 20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                className="bg-white/90 backdrop-blur-md p-4 rounded-3xl border border-white shadow-xl min-w-[280px]"
+              >
+                <div className="flex items-center gap-2 mb-3 border-b border-slate-100 pb-2">
+                  <Clock size={14} className="text-amber-500" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Action Required</span>
+                </div>
+                <div className="space-y-2">
+                  {pendingApprovals.map(app => (
+                    <div key={app.id} className="flex items-center justify-between gap-3 p-2 hover:bg-slate-50 rounded-xl transition-colors">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold text-slate-900 truncate">{app.clientName}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{app.time} • {app.title}</p>
+                          {app.sessionFormat && (
+                            <span className="text-[7px] font-black uppercase text-indigo-500 bg-indigo-50 px-1 rounded tracking-tighter">{app.sessionFormat}</span>
+                          )}
+                          <span className="text-[7px] font-black uppercase text-slate-400 bg-slate-50 px-1 rounded tracking-tighter">{app.duration}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <button 
+                          onClick={() => updateAppointmentStatus(app.id, 'confirmed')}
+                          className="w-6 h-6 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center hover:bg-emerald-500 hover:text-white transition-all"
+                        >
+                          <CheckCircle2 size={12} />
+                        </button>
+                        <button 
+                          onClick={() => updateAppointmentStatus(app.id, 'cancelled')}
+                          className="w-6 h-6 bg-rose-50 text-rose-600 rounded-lg flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button 
+                  onClick={() => navigate('/calendar')}
+                  className="w-full mt-3 py-2 text-[9px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                >
+                  View Approval Queue
+                </button>
+              </motion.div>
+            ) : (
+              <div className="relative z-10 grid grid-cols-2 gap-3 sm:gap-4 w-full md:w-auto">
+                <button 
+                  onClick={() => navigate('/members')}
+                  className="p-4 sm:p-6 bg-slate-50 hover:bg-slate-100 rounded-[1.5rem] sm:rounded-3xl transition-all group flex flex-col items-center gap-2 sm:gap-3 border border-transparent hover:border-slate-200"
+                >
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-[1rem] sm:rounded-2xl flex items-center justify-center shadow-sm text-blue-600 group-hover:scale-110 transition-transform">
+                    <Users size={20} className="sm:w-6 sm:h-6 w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Directory</span>
+                </button>
+                <button 
+                  onClick={() => navigate('/messages')}
+                  className="p-4 sm:p-6 bg-slate-50 hover:bg-slate-100 rounded-[1.5rem] sm:rounded-3xl transition-all group flex flex-col items-center gap-2 sm:gap-3 border border-transparent hover:border-slate-200"
+                >
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-[1rem] sm:rounded-2xl flex items-center justify-center shadow-sm text-indigo-600 group-hover:scale-110 transition-transform">
+                    <MessageSquare size={20} className="sm:w-6 sm:h-6 w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Signals</span>
+                </button>
+                <button 
+                  onClick={openTaskModal}
+                  className="p-4 sm:p-6 bg-slate-50 hover:bg-slate-100 rounded-[1.5rem] sm:rounded-3xl transition-all group flex flex-col items-center gap-2 sm:gap-3 border border-transparent hover:border-slate-200"
+                >
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-[1rem] sm:rounded-2xl flex items-center justify-center shadow-sm text-indigo-600 group-hover:scale-110 transition-transform">
+                    <CheckSquare size={20} className="sm:w-6 sm:h-6 w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Assign Task</span>
+                </button>
               </div>
-              <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Directory</span>
-            </button>
-            <button 
-              onClick={openTaskModal}
-              className="p-4 sm:p-6 bg-slate-50 hover:bg-slate-100 rounded-[1.5rem] sm:rounded-3xl transition-all group flex flex-col items-center gap-2 sm:gap-3 border border-transparent hover:border-slate-200"
-            >
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-[1rem] sm:rounded-2xl flex items-center justify-center shadow-sm text-indigo-600 group-hover:scale-110 transition-transform">
-                <CheckSquare size={20} className="sm:w-6 sm:h-6 w-5 h-5" />
-              </div>
-              <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Assign Task</span>
-            </button>
+            )}
           </div>
         </div>
       </div>

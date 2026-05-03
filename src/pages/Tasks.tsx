@@ -159,13 +159,29 @@ export default function Tasks() {
         await updateDoc(doc(db, path, editingTask.id), data);
         toast.success('Task updated');
       } else {
-        await addDoc(collection(db, path), {
+        const newTaskRef = await addDoc(collection(db, path), {
           ...data,
           status: 'pending',
           createdBy: profile?.uid,
           branchId,
           createdAt: serverTimestamp()
         });
+        
+        // Send notification to assignee if not sending to self
+        if (taskForm.assigneeId !== profile?.uid) {
+          await addDoc(collection(db, `users/${taskForm.assigneeId}/reminders`), {
+            title: 'New Task Assigned',
+            description: `You have been assigned a new task: "${taskForm.title}"`,
+            date: taskForm.dueDate,
+            time: '09:00',
+            status: 'pending',
+            userId: taskForm.assigneeId,
+            category: 'task',
+            targetPath: '/tasks',
+            createdAt: serverTimestamp()
+          });
+        }
+        
         toast.success('Task created');
       }
 

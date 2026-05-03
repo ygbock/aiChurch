@@ -20,21 +20,48 @@ export default function MemberManagementPage() {
   const { profile } = useFirebase();
   const { members, loading } = useMembers();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
-  const { 
-    searchQuery, 
-    setSearchQuery, 
-    activeTab, 
-    setActiveTab, 
-    filteredMembers,
-    filters,
-    setFilters
-  } = useMemberFilters(members);
+  const { searchQuery, setSearchQuery, activeTab, setActiveTab, filteredMembers, filters, setFilters } = useMemberFilters(members, profile?.role || 'member');
 
-  const counts = useMemo(() => ({
-    Member: members.filter(m => m.level !== 'Visitor' && m.level !== 'Convert').length,
-    Visitor: members.filter(m => m.level === 'Visitor').length,
-    Convert: members.filter(m => m.level === 'Convert').length,
-  }), [members]);
+  const counts = useMemo(() => {
+    let baseMembers = members;
+    
+    // For superadmin, the tabs serve as sub-filters for the district/branch selection
+    if (profile?.role === 'superadmin') {
+      if (filters.district !== 'All') {
+        baseMembers = baseMembers.filter(m => m.districtId === filters.district);
+      }
+      if (filters.branch !== 'All') {
+        baseMembers = baseMembers.filter(m => m.branchId === filters.branch);
+      }
+      
+      const activeMembers = baseMembers.filter(m => m.level !== 'Visitor' && m.level !== 'Convert');
+      return {
+        'All Member': activeMembers.length,
+        Member: activeMembers.length,
+        Visitor: baseMembers.filter(m => m.level === 'Visitor').length,
+        Convert: baseMembers.filter(m => m.level === 'Convert').length,
+        Leader: activeMembers.filter(m => m.baptizedSubLevel?.toLowerCase() === 'leader').length,
+        Worker: activeMembers.filter(m => m.baptizedSubLevel?.toLowerCase() === 'worker').length,
+        Disciple: activeMembers.filter(m => m.baptizedSubLevel?.toLowerCase() === 'disciple').length,
+      };
+    }
+    
+    return {
+      'All Member': baseMembers.length,
+      Member: baseMembers.filter(m => m.level !== 'Visitor' && m.level !== 'Convert').length,
+      Visitor: baseMembers.filter(m => m.level === 'Visitor').length,
+      Convert: baseMembers.filter(m => m.level === 'Convert').length,
+    };
+  }, [members, profile?.role, filters.district, filters.branch]);
+
+  const uniqueDistricts = useMemo(() => Array.from(new Set(members.map(m => m.districtId).filter(Boolean))), [members]);
+  const uniqueBranches = useMemo(() => {
+    let bps = members;
+    if (filters.district !== 'All') {
+      bps = members.filter(m => m.districtId === filters.district);
+    }
+    return Array.from(new Set(bps.map(m => m.branchId).filter(Boolean)));
+  }, [members, filters.district]);
 
   const handleDelete = async (member: MemberData) => {
     if (!window.confirm(`Are you sure you want to delete ${member.fullName}?`)) return;
@@ -93,13 +120,15 @@ export default function MemberManagementPage() {
             <Send size={18} />
             Bulk Notify
           </Button>
-          <Button 
-            onClick={handleAddClick}
-            className="w-full sm:flex-1 md:flex-none justify-center bg-slate-900 text-white rounded-xl px-6 h-11 font-bold flex items-center gap-2 shadow-lg shadow-slate-200 hover:shadow-xl hover:translate-y-[-1px] transition-all"
-          >
-            <Plus size={18} />
-            {activeTab === 'Member' ? 'Add Member' : activeTab === 'Visitor' ? 'Add First Timer' : 'Add Convert'}
-          </Button>
+          {profile?.role !== 'superadmin' && (
+            <Button 
+              onClick={handleAddClick}
+              className="w-full sm:flex-1 md:flex-none justify-center bg-slate-900 text-white rounded-xl px-6 h-11 font-bold flex items-center gap-2 shadow-lg shadow-slate-200 hover:shadow-xl hover:translate-y-[-1px] transition-all"
+            >
+              <Plus size={18} />
+              {activeTab === 'Member' ? 'Add Member' : activeTab === 'Visitor' ? 'Add First Timer' : 'Add Convert'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -108,12 +137,7 @@ export default function MemberManagementPage() {
 
       {/* Main Content Area */}
       <div className="flex flex-col gap-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <TabNavigation 
-            activeTab={activeTab} 
-            onTabChange={setActiveTab} 
-            counts={counts}
-          />
+        <div className="flex flex-col w-full gap-4">
           <MemberToolbar 
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -122,7 +146,56 @@ export default function MemberManagementPage() {
             onViewModeChange={setViewMode}
             filters={filters}
             onFilterChange={setFilters}
-          />
+            showGlobalFilters={profile?.role === 'superadmin'}
+          >
+            {profile?.role === 'superadmin' ? (
+              <div className="flex flex-row flex-nowrap items-center gap-3 sm:gap-4 px-1 sm:px-4 w-full overflow-x-auto no-scrollbar">
+                <div className="flex flex-col shrink-0 min-w-[120px]">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-px">District</label>
+                  <select 
+                    className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer w-full"
+                    value={filters.district}
+                    onChange={(e) => setFilters({...filters, district: e.target.value, branch: 'All'})}
+                  >
+                    <option value="All">All Districts</option>
+                    {uniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div className="h-8 w-px bg-slate-200 shrink-0"></div>
+                <div className="flex flex-col shrink-0 min-w-[120px]">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-px">Branch</label>
+                  <select 
+                    className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer w-full"
+                    value={filters.branch}
+                    onChange={(e) => setFilters({...filters, branch: e.target.value})}
+                  >
+                    <option value="All">All Branches</option>
+                    {uniqueBranches.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+                <div className="h-8 w-px bg-slate-200 shrink-0"></div>
+                <div className="flex flex-col shrink-0 min-w-[140px]">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-px">Role</label>
+                  <select 
+                    className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer w-full"
+                    value={activeTab}
+                    onChange={(e) => setActiveTab(e.target.value)}
+                  >
+                    <option value="All Member">All Members ({counts['All Member']})</option>
+                    <option value="Leader">Leaders ({counts['Leader']})</option>
+                    <option value="Worker">Workers ({counts['Worker']})</option>
+                    <option value="Disciple">Disciples ({counts['Disciple']})</option>
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <TabNavigation 
+                activeTab={activeTab} 
+                onTabChange={setActiveTab} 
+                counts={counts}
+              />
+            )}
+          </MemberToolbar>
         </div>
 
         <motion.div

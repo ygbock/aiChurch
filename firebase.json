@@ -1,0 +1,5 @@
+{
+  "firestore": {
+    "rules": "DRAFT_firestore.rules"
+  }
+}

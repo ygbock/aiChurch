@@ -28,7 +28,7 @@ export default function Login() {
       await login();
     } catch (e: any) {
       console.error("Login failed", e);
-      setErrorMsg(e.message || "Failed to log in with Google.");
+      setErrorMsg(translateAuthError(e));
     } finally {
       setIsAuthenticating(false);
     }
@@ -93,6 +93,12 @@ export default function Login() {
         return 'Email/Password login is not enabled in the Firebase Console. Please enable it in Authentication > Sign-in method.';
       case 'auth/user-not-found':
         return 'No user found with this email address.';
+      case 'auth/network-request-failed':
+        return 'Network request failed. If you are using an ad-blocker, tracking protection (e.g. Brave Shields), or an incognito window, please disable it or open the app in a new tab to sign in.';
+      case 'auth/popup-closed-by-user':
+        return 'The sign-in popup was closed before completion. Please try again.';
+      case 'auth/unauthorized-domain':
+        return 'This domain is not authorized for OAuth operations in Firebase. Please add it to your Firebase Console settings.';
       default:
         return err.message || "Authentication failed.";
     }
@@ -296,6 +302,10 @@ export default function Login() {
                     >
                       {isSignUp ? 'Already have an account? Log In' : "Don't have an account? Register Now"}
                     </button>
+                    
+                    <p className="mt-6 text-[9px] text-slate-300 font-medium">
+                      Note: If you experience login issues in the preview window, please open the application in a new tab.
+                    </p>
                   </div>
                 </>
               )}
