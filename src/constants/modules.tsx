@@ -37,6 +37,15 @@ export const APP_MODULES: AppModule[] = [
     allowedRoles: ['superadmin', 'admin', 'district']
   },
   {
+    id: 'districts',
+    name: 'Districts',
+    description: 'Global district management and analytics.',
+    icon: <Map size={24} />,
+    path: '/districts',
+    color: 'bg-purple-600',
+    allowedRoles: ['superadmin']
+  },
+  {
     id: 'members',
     name: 'Members',
     description: 'Manage congregation registry and profiles.',

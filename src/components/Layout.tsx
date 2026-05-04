@@ -437,6 +437,16 @@ export default function Layout() {
                   </p>
                 )}
                 <nav className="space-y-0.5">
+                  {role === 'superadmin' && (
+                    <NavItem
+                      to="/districts"
+                      icon={<Map size={18} />}
+                      label="Districts"
+                      active={location.pathname.startsWith("/districts")}
+                      isCollapsed={isCollapsed}
+                      onClick={() => setIsSidebarOpen(false)}
+                    />
+                  )}
                   <NavItem
                     to="/transfers"
                     icon={<ArrowLeftRight size={18} />}

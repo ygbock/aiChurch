@@ -258,24 +258,24 @@ export default function SuperadminDashboard() {
           <h2 className="text-2xl font-bold text-slate-900">Global Oversight</h2>
           <p className="text-slate-500 text-sm">System-wide statistics and metrics across all live districts.</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+        <div className="flex flex-row gap-2 w-full sm:w-auto">
           <button 
             onClick={() => {
               setLeaderDistrictId('');
               setLeaderRole('superadmin');
               setIsLeadershipModalOpen(true);
             }}
-            className="w-full sm:w-auto justify-center bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg font-medium text-sm hover:bg-slate-50 transition-colors flex items-center gap-2"
+            className="flex-1 sm:flex-none justify-center bg-white border border-slate-200 text-slate-600 px-2 sm:px-4 py-2 rounded-lg font-medium text-[11px] sm:text-sm hover:bg-slate-50 transition-colors flex items-center gap-1.5 sm:gap-2 truncate"
           >
-            <Shield size={18} />
-            Provision Admin Access
+            <Shield size={16} className="flex-shrink-0" />
+            <span className="truncate">Provision Admin</span>
           </button>
           <button 
             onClick={() => setIsDistrictModalOpen(true)}
-            className="w-full sm:w-auto justify-center bg-slate-900 text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-sm"
+            className="flex-1 sm:flex-none justify-center bg-slate-900 text-white px-2 sm:px-4 py-2 rounded-lg font-medium text-[11px] sm:text-sm hover:bg-slate-800 transition-colors flex items-center gap-1.5 sm:gap-2 shadow-sm truncate"
           >
-            <Plus size={18} />
-            New District
+            <Plus size={16} className="flex-shrink-0" />
+            <span className="truncate">New District</span>
           </button>
         </div>
       </div>
@@ -511,7 +511,6 @@ export default function SuperadminDashboard() {
       <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 gap-6 sm:gap-8 pb-px">
         {[
           { id: 'overview', label: 'Global Overview', icon: <Globe size={18} /> },
-          { id: 'districts', label: 'Districts', icon: <Map size={18} /> },
           { id: 'leadership', label: 'Leadership', icon: <Shield size={18} /> },
           { id: 'baptism', label: 'Baptism Queue', icon: <div className="relative"><CheckCircle2 size={18} />{baptismRequests.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white">{baptismRequests.length}</span>}</div> }
         ].map(tab => (
@@ -625,57 +624,6 @@ export default function SuperadminDashboard() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'districts' && (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-          <div className="px-4 sm:px-6 py-4 border-b border-slate-200">
-            <h3 className="text-base font-bold text-slate-900">District Performance</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[500px]">
-              <thead>
-                <tr className="bg-slate-50">
-                  <th className="px-4 py-3 sm:px-6 sm:py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">District Name</th>
-                  <th className="px-4 py-3 sm:px-6 sm:py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Branches</th>
-                  <th className="px-4 py-3 sm:px-6 sm:py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">Members</th>
-                  <th className="px-4 py-3 sm:px-6 sm:py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Growth</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 sm:px-6 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="animate-spin text-blue-600" size={24} />
-                        <span className="text-sm text-slate-500">Loading districts...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : districts.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-sm text-slate-500">
-                      No districts found. Create your first district to get started.
-                    </td>
-                  </tr>
-                ) : (
-                  districts.map((district) => (
-                    <DistrictRow 
-                      key={district.id}
-                      name={district.name} 
-                      branches={district.branchesCount || 0} 
-                      members={district.membersCount?.toLocaleString() || "0"} 
-                      growth={district.growth || "0%"} 
-                      onAssign={(name) => { setSelectedDistrict(name); setLeaderDistrictId(district.id); setIsLeadershipModalOpen(true); }}
-                      onEdit={() => handleEditClick(district)}
-                      onView={() => { navigate(`/district/${district.id}`); }} 
-                    />
-                  ))
-                )}
-              </tbody>
-            </table>
           </div>
         </div>
       )}
@@ -845,58 +793,5 @@ function AlertItem({ title, desc, type }: { title: string, desc: string, type: '
         <p className="text-[10px] opacity-80 leading-relaxed">{desc}</p>
       </div>
     </div>
-  );
-}
-
-interface DistrictRowProps {
-  name: string;
-  branches: number;
-  members: string;
-  growth: string;
-  onAssign: (name: string) => void;
-  onEdit: () => void;
-  onView: () => void;
-}
-
-const DistrictRow: React.FC<DistrictRowProps> = ({ name, branches, members, growth, onAssign, onEdit, onView }) => {
-  return (
-    <tr className="hover:bg-slate-50 transition-colors group">
-      <td className="px-4 py-3 sm:px-6 sm:py-4">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-[10px] sm:text-xs">
-            {name.charAt(0)}
-          </div>
-          <span className="text-xs sm:text-sm font-semibold text-slate-800 group-hover:text-blue-600 transition-colors truncate max-w-[120px] sm:max-w-[200px]">{name}</span>
-        </div>
-      </td>
-      <td className="px-4 py-3 sm:px-6 sm:py-4 text-xs sm:text-sm text-slate-600">{branches}</td>
-      <td className="px-4 py-3 sm:px-6 sm:py-4 text-xs sm:text-sm text-slate-600">{members}</td>
-      <td className="px-4 py-3 sm:px-6 sm:py-4 text-right">
-        <div className="flex items-center justify-end gap-1 sm:gap-2">
-          <span className="text-xs sm:text-sm font-bold text-emerald-600 mr-2 sm:mr-4">{growth}</span>
-          <button 
-            onClick={onEdit}
-            className="p-1 sm:p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-            title="Edit District"
-          >
-            <Edit2 size={16} className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
-          <button 
-            onClick={() => onAssign(name)}
-            className="p-1 sm:p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-            title="Assign Leadership"
-          >
-            <UserPlus size={16} className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
-          <button 
-            onClick={onView}
-            className="p-1 sm:p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
-            title="View District Dashboard"
-          >
-            <ChevronRight size={16} className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
-        </div>
-      </td>
-    </tr>
   );
 }

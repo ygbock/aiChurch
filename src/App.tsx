@@ -28,6 +28,7 @@ import SuperadminDashboard from './pages/SuperadminDashboard';
 import MemberPortal from './pages/MemberPortal';
 import MemberProfile from './pages/MemberProfile';
 import DistrictDashboard from './pages/DistrictDashboard';
+import AdminDistricts from './pages/AdminDistricts';
 import DepartmentMemberProfile from './pages/DepartmentMemberProfile';
 import AdminRegistration from './pages/AdminRegistration';
 import ProgramDashboard from './pages/ProgramDashboard';
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardDispatcher />} />
+            <Route path="districts" element={<AdminDistricts />} />
             <Route path="members" element={<MemberManagementPage />} />
             <Route path="members/registry" element={<Navigate to="/members" replace />} />
             <Route path="members/profile/:memberId" element={<MemberProfile />} />
