@@ -1018,7 +1018,7 @@ export default function BaptismManagement() {
                               onClick={() =>
                                 setActivePipelineStage(stage.id as any)
                               }
-                              className={`flex-shrink-0 w-[calc(85vw/2)] sm:w-[calc(50%-0.25rem)] md:w-[calc(33.333%-0.33rem)] lg:w-[calc(25%-0.38rem)] flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 rounded-xl transition-all snap-center gap-2 sm:gap-0 ${
+                              className={`flex-shrink-0 w-[calc(85vw/2)] sm:w-[calc(50%-0.25rem)] md:w-[calc(33.333%-0.33rem)] lg:w-[calc(25%-0.38rem)] flex flex-row items-center justify-between p-2.5 sm:p-3.5 rounded-xl transition-all snap-center gap-1.5 sm:gap-2 ${
                                 isActive
                                   ? stage.color === "slate"
                                     ? "bg-slate-800 text-white shadow-md shadow-slate-500/20"
@@ -1036,9 +1036,9 @@ export default function BaptismManagement() {
                                         : "bg-white border border-slate-200 text-slate-600 hover:border-emerald-400 hover:bg-emerald-50 shadow-sm"
                               }`}
                             >
-                              <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
                                 <span
-                                  className={`flex items-center justify-center w-6 h-6 rounded-md text-xs font-bold ${
+                                  className={`flex-shrink-0 flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-md text-[10px] sm:text-xs font-bold ${
                                     isActive
                                       ? "bg-white/20 text-white"
                                       : stage.color === "slate"
@@ -1052,12 +1052,12 @@ export default function BaptismManagement() {
                                 >
                                   {idx + 1}
                                 </span>
-                                <span className="font-bold text-sm tracking-tight">
+                                <span className="font-bold text-[11px] sm:text-sm tracking-tight truncate">
                                   {stage.label}
                                 </span>
                               </div>
                               <span
-                                className={`px-2 py-0.5 rounded-md text-xs font-bold ${
+                                className={`flex-shrink-0 px-1.5 sm:px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-bold ${
                                   isActive
                                     ? "bg-white/20 text-white"
                                     : "bg-slate-100 text-slate-500"
