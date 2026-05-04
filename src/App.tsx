@@ -25,6 +25,7 @@ import Volunteers from './pages/Volunteers';
 import Tasks from './pages/Tasks';
 import TransferManagement from './pages/TransferManagement';
 import SuperadminDashboard from './pages/SuperadminDashboard';
+import SystemAlerts from './pages/SystemAlerts';
 import MemberPortal from './pages/MemberPortal';
 import MemberProfile from './pages/MemberProfile';
 import DistrictDashboard from './pages/DistrictDashboard';
@@ -89,6 +90,7 @@ export default function App() {
             <Route path="messages" element={<Messages />} />
             <Route path="messages/:chatId" element={<Messages />} />
             <Route path="superadmin" element={<SuperadminDashboard />} />
+            <Route path="system-alerts" element={<SystemAlerts />} />
             <Route path="member-portal" element={<MemberPortal />} />
             <Route path="district" element={<DistrictDashboard />}>
               <Route path=":districtId" element={<DistrictDashboard />} />

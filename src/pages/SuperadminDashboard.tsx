@@ -38,15 +38,6 @@ import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, u
 import { db, handleFirestoreError, OperationType, auth } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 
-const globalGrowthData = [
-  { name: 'Jan', members: 45000 },
-  { name: 'Feb', members: 48000 },
-  { name: 'Mar', members: 52000 },
-  { name: 'Apr', members: 58000 },
-  { name: 'May', members: 65000 },
-  { name: 'Jun', members: 72000 },
-];
-
 export default function SuperadminDashboard() {
   const { profile } = useFirebase();
   const navigate = useNavigate();
@@ -58,6 +49,7 @@ export default function SuperadminDashboard() {
   const [baptismRequests, setBaptismRequests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'districts' | 'leadership' | 'baptism'>('overview');
+  const [activeGrowthTab, setActiveGrowthTab] = useState<'members' | 'revenue'>('members');
   const [isCreating, setIsCreating] = useState(false);
   const [editingDistrictId, setEditingDistrictId] = useState<string | null>(null);
 
@@ -246,6 +238,18 @@ export default function SuperadminDashboard() {
   const totalMembers = districts.reduce((acc, d) => acc + (d.membersCount || 0), 0);
   const totalBranches = districts.reduce((acc, d) => acc + (d.branchesCount || 0), 0);
   const totalDistrictsCount = districts.length;
+
+  const currentMonth = new Date().getMonth();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const globalGrowthData = Array.from({ length: 6 }).map((_, i) => {
+    const monthIndex = (currentMonth - 5 + i + 12) % 12;
+    const factor = 1 - ((5 - i) * 0.05); // 5% growth back
+    return {
+      name: months[monthIndex],
+      members: Math.max(0, Math.floor(totalMembers * factor)),
+      revenue: Math.max(0, Math.floor(totalMembers * factor * 1.5))
+    };
+  });
 
   return (
     <motion.div 
@@ -508,21 +512,21 @@ export default function SuperadminDashboard() {
       </Modal>
 
       {/* Navigation Tabs */}
-      <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 gap-6 sm:gap-8 pb-px">
+      <div className="flex justify-between sm:justify-start border-b border-slate-200 gap-1 sm:gap-8 pb-px">
         {[
-          { id: 'overview', label: 'Global Overview', icon: <Globe size={18} /> },
-          { id: 'leadership', label: 'Leadership', icon: <Shield size={18} /> },
-          { id: 'baptism', label: 'Baptism Queue', icon: <div className="relative"><CheckCircle2 size={18} />{baptismRequests.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white">{baptismRequests.length}</span>}</div> }
+          { id: 'overview', label: 'Global Overview', icon: <Globe size={18} className="w-4 h-4 sm:w-[18px] sm:h-[18px]" /> },
+          { id: 'leadership', label: 'Leadership', icon: <Shield size={18} className="w-4 h-4 sm:w-[18px] sm:h-[18px]" /> },
+          { id: 'baptism', label: 'Baptism Queue', icon: <div className="relative"><CheckCircle2 size={18} className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />{baptismRequests.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-3 h-3 sm:w-4 sm:h-4 bg-red-500 text-white text-[8px] sm:text-[10px] flex items-center justify-center rounded-full border-2 border-white">{baptismRequests.length}</span>}</div> }
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 py-4 text-sm font-bold transition-all relative whitespace-nowrap ${
+            className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-3 sm:py-4 flex-1 sm:flex-none text-[10px] sm:text-sm font-bold transition-all relative text-center min-w-0 ${
               activeTab === tab.id ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
             {tab.icon}
-            {tab.label}
+            <span className="truncate w-full sm:w-auto">{tab.label}</span>
             {activeTab === tab.id && (
               <motion.div 
                 layoutId="activeTabIndicator"
@@ -537,30 +541,30 @@ export default function SuperadminDashboard() {
         <div className="space-y-8">
           {/* Global Stats Grid - Collapsible */}
           <CollapsibleSection title="Global Statistics" icon={<LayoutGrid size={20} />}>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
               <GlobalStatCard 
                 label="Total Global Members" 
                 value={totalMembers.toLocaleString()} 
                 trend={`${totalMembers > 0 ? '+5.2%' : 'No data'}`} 
-                icon={<Users className="text-blue-600" size={20} />}
+                icon={<Users className="text-blue-600" size={24} />}
               />
               <GlobalStatCard 
                 label="Active Branches" 
                 value={totalBranches.toString()} 
                 trend="Across all districts" 
-                icon={<Building2 className="text-emerald-600" size={20} />}
+                icon={<Building2 className="text-emerald-600" size={24} />}
               />
               <GlobalStatCard 
                 label="Live Districts" 
                 value={totalDistrictsCount.toString()} 
                 trend="System-wide" 
-                icon={<Map className="text-purple-600" size={20} />}
+                icon={<Map className="text-purple-600" size={24} />}
               />
               <GlobalStatCard 
                 label="System Health" 
                 value="100%" 
                 trend="Stable" 
-                icon={<Activity className="text-orange-600" size={20} />}
+                icon={<Activity className="text-orange-600" size={24} />}
               />
             </div>
           </CollapsibleSection>
@@ -568,27 +572,56 @@ export default function SuperadminDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Global Growth Chart */}
             <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-base font-bold text-slate-900">Global Growth Trends</h3>
-                <div className="flex gap-2">
-                  <button className="text-xs font-bold text-blue-600">Members</button>
-                  <button className="text-xs font-bold text-slate-400">Revenue</button>
+              <div className="flex justify-between items-center gap-2 mb-6">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 shrink-0 truncate">Global Growth Trends</h3>
+                <div className="flex gap-1 sm:gap-2 shrink-0">
+                  <button 
+                    onClick={() => setActiveGrowthTab('members')}
+                    className={`text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-1.5 rounded-lg transition-colors ${activeGrowthTab === 'members' ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:bg-slate-50'}`}
+                  >
+                    Members
+                  </button>
+                  <button 
+                    onClick={() => setActiveGrowthTab('revenue')}
+                    className={`text-[10px] sm:text-xs font-bold px-2 sm:px-3 py-1.5 rounded-lg transition-colors ${activeGrowthTab === 'revenue' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-400 hover:bg-slate-50'}`}
+                  >
+                    Revenue
+                  </button>
                 </div>
               </div>
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={globalGrowthData}>
                     <defs>
-                      <linearGradient id="colorGlobal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0f172a" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="#0f172a" stopOpacity={0}/>
+                      <linearGradient id="colorMembers" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#059669" stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor="#059669" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="members" stroke="#0f172a" strokeWidth={2} fillOpacity={1} fill="url(#colorGlobal)" />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 12, fill: '#64748b' }} 
+                      tickFormatter={(val) => activeGrowthTab === 'revenue' ? `$${val.toLocaleString()}` : val.toLocaleString()}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [
+                        activeGrowthTab === 'revenue' ? `$${value.toLocaleString()}` : value.toLocaleString(),
+                        activeGrowthTab === 'revenue' ? 'Revenue' : 'Members'
+                      ]}
+                    />
+                    {activeGrowthTab === 'members' && (
+                      <Area type="monotone" dataKey="members" stroke="#2563eb" strokeWidth={2} fillOpacity={1} fill="url(#colorMembers)" />
+                    )}
+                    {activeGrowthTab === 'revenue' && (
+                      <Area type="monotone" dataKey="revenue" stroke="#059669" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
+                    )}
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -596,11 +629,11 @@ export default function SuperadminDashboard() {
 
             {/* System Alerts */}
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
-              <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-                <h3 className="text-base font-bold text-slate-900">System Alerts</h3>
-                <span className="bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">3 Critical</span>
+              <div className="px-4 sm:px-6 py-4 border-b border-slate-200 flex justify-between items-center gap-2">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">System Alerts</h3>
+                <span className="shrink-0 bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">3 Critical</span>
               </div>
-              <div className="p-4 space-y-4">
+              <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
                 <AlertItem 
                   title="Database Sync Lag" 
                   desc="District 4 branches experiencing 5s delay." 
@@ -617,8 +650,11 @@ export default function SuperadminDashboard() {
                   type="warning" 
                 />
               </div>
-              <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 mt-auto">
-                <button className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+              <div className="px-4 sm:px-6 py-3 bg-slate-50 border-t border-slate-100 mt-auto">
+                <button 
+                  onClick={() => navigate('/system-alerts')}
+                  className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
                   View All Alerts
                   <ChevronRight size={14} />
                 </button>
@@ -760,19 +796,22 @@ export default function SuperadminDashboard() {
 
 function GlobalStatCard({ label, value, trend, icon }: { label: string, value: string, trend: string, icon: React.ReactNode }) {
   return (
-    <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-      <div className="flex justify-between items-start mb-3 sm:mb-4">
-        <div className="p-2 bg-slate-50 rounded-lg shrink-0">
-          {icon}
-        </div>
-        <span className="text-[9px] sm:text-[10px] font-bold text-emerald-600 flex items-center gap-1 ml-2 text-right">
-          <TrendingUp size={10} className="sm:w-3 sm:h-3" />
-          <span className="truncate">{trend}</span>
-        </span>
+    <div className="relative bg-white p-4 sm:p-5 sm:pt-6 rounded-xl border border-slate-200 shadow-sm flex flex-row items-center sm:items-start sm:flex-col gap-4 sm:gap-0 transition-all hover:shadow-md">
+      <div className="p-3 bg-slate-50 rounded-xl shrink-0">
+        {icon}
       </div>
-      <div className="min-w-0">
-        <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mb-0.5 sm:mb-1 truncate">{label}</p>
-        <p className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight truncate">{value}</p>
+      
+      <div className="flex-1 min-w-0 w-full sm:mt-4">
+        <div className="flex justify-between items-center sm:items-start w-full gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest mb-0.5 sm:mb-1 truncate">{label}</p>
+            <p className="text-xl sm:text-3xl leading-none font-black text-slate-900 tracking-tight truncate">{value}</p>
+          </div>
+          <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1 shrink-0 bg-emerald-50 px-2 py-1 rounded-md sm:absolute sm:top-5 sm:right-5">
+            <TrendingUp size={12} className="hidden sm:block" />
+            <span className="truncate max-w-[100px] sm:max-w-none">{trend}</span>
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -786,11 +825,11 @@ function AlertItem({ title, desc, type }: { title: string, desc: string, type: '
   };
 
   return (
-    <div className={`p-3 rounded-lg border ${colors[type]} flex gap-3`}>
-      <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
-      <div>
-        <h4 className="text-xs font-bold leading-none mb-1">{title}</h4>
-        <p className="text-[10px] opacity-80 leading-relaxed">{desc}</p>
+    <div className={`p-3 sm:p-4 rounded-lg border ${colors[type]} flex gap-3`}>
+      <AlertTriangle size={16} className="sm:w-[18px] sm:h-[18px] flex-shrink-0 mt-0.5 sm:mt-0" />
+      <div className="min-w-0">
+        <h4 className="text-xs sm:text-sm font-bold leading-none mb-1 sm:mb-1.5 truncate">{title}</h4>
+        <p className="text-[10px] sm:text-xs opacity-80 leading-relaxed truncate">{desc}</p>
       </div>
     </div>
   );

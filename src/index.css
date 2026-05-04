@@ -14,6 +14,14 @@
   --font-serif: "Playfair Display", serif;
 }
 
+@utility no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+  &::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+  }
+}
+
 @utility bg-pattern {
   background-color: #008be2;
   background-image: radial-gradient(circle at center, #ffffff 1px, transparent 1px);
