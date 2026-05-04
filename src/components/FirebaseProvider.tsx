@@ -108,9 +108,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let unsubscribeMembers: (() => void) | null = null;
+    let unsubscribeProfile: (() => void) | null = null;
+
     if (user) {
       const userRef = doc(db, 'users', user.uid);
-      const unsubscribeProfile = onSnapshot(userRef, async (snapshot) => {
+      unsubscribeProfile = onSnapshot(userRef, async (snapshot) => {
         if (snapshot.exists()) {
           const profileData = snapshot.data() as UserProfile;
           setProfile(profileData);
@@ -119,6 +122,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
             console.log("Profile loaded from local cache.");
           }
           
+          // Cleanup previous member subscription if any
+          if (unsubscribeMembers) {
+            unsubscribeMembers();
+            unsubscribeMembers = null;
+          }
+
           // Fetch member profile if available
           if (profileData.email) {
             const membersQuery = query(
@@ -127,7 +136,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
               limit(1)
             );
             
-            const unsubscribeMembers = onSnapshot(membersQuery, (mSnap) => {
+            unsubscribeMembers = onSnapshot(membersQuery, (mSnap) => {
               if (!mSnap.empty) {
                 setMemberProfile({ id: mSnap.docs[0].id, ...mSnap.docs[0].data() });
               } else {
@@ -143,10 +152,6 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
               }
               setLoading(false);
             });
-
-            return () => {
-              unsubscribeMembers();
-            };
           } else {
             setLoading(false);
           }
@@ -167,9 +172,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         }
         handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
       });
-
-      return () => unsubscribeProfile();
     }
+
+    return () => {
+      if (unsubscribeProfile) unsubscribeProfile();
+      if (unsubscribeMembers) unsubscribeMembers();
+    };
   }, [user]);
 
   const attemptProvisioning = async (authUser: User, retryCount = 0) => {

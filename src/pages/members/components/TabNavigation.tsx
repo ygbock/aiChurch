@@ -23,7 +23,7 @@ export const TabNavigation = ({ activeTab, onTabChange, counts }: TabNavigationP
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-1 w-full max-w-full justify-start">
+    <div className="flex flex-nowrap overflow-x-auto no-scrollbar items-center gap-1 w-full max-w-full justify-start">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         const Icon = tab.icon;

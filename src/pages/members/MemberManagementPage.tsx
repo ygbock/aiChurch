@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Send, ArrowDownToLine, Sparkles, Loader2 } from 'lucide-react';
@@ -11,6 +11,7 @@ import { MemberStats } from './components/MemberStats';
 import { TabNavigation } from './components/TabNavigation';
 import { MemberToolbar } from './components/MemberToolbar';
 import { MemberTable } from './components/MemberTable';
+import { SuperAdminAddMemberModal } from './components/SuperAdminAddMemberModal';
 import { Button } from '@/components/ui/button';
 import { MemberData } from '@/types/membership';
 import { useFirebase } from '@/components/FirebaseProvider';
@@ -20,39 +21,102 @@ export default function MemberManagementPage() {
   const { profile } = useFirebase();
   const { members, loading } = useMembers();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [showSuperAdminModal, setShowSuperAdminModal] = useState(false);
   const { searchQuery, setSearchQuery, activeTab, setActiveTab, filteredMembers, filters, setFilters } = useMemberFilters(members, profile?.role || 'member');
+  
+  // To display names instead of IDs
+  const [districtMaps, setDistrictMaps] = useState<Record<string, string>>({});
+  const [branchMaps, setBranchMaps] = useState<Record<string, string>>({});
+  const [branchOptions, setBranchOptions] = useState<Record<string, {id: string, name: string}[]>>({});
 
-  const counts = useMemo(() => {
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        if (profile?.role === 'superadmin') {
+          const dSnap = await getDocs(collection(db, 'districts'));
+          const dMap: Record<string, string> = {};
+          dSnap.docs.forEach(d => { dMap[d.id] = d.data().name || 'Unnamed District' });
+          setDistrictMaps(dMap);
+          
+          // Fetch all branches
+          const bMap: Record<string, string> = {};
+          const bOpts: Record<string, {id: string, name: string}[]> = {};
+          await Promise.all(dSnap.docs.map(async (dDoc) => {
+            const bSnap = await getDocs(collection(db, 'districts', dDoc.id, 'branches'));
+            bOpts[dDoc.id] = [];
+            bSnap.docs.forEach(b => {
+              const bname = b.data().name || 'Unnamed Branch';
+              bMap[b.id] = bname;
+              bOpts[dDoc.id].push({ id: b.id, name: bname });
+            });
+          }));
+          setBranchMaps(bMap);
+          setBranchOptions(bOpts);
+        } else if (profile?.role === 'district' && profile.districtId) {
+          // Fetch branches just for this district
+          const bMap: Record<string, string> = {};
+          const bSnap = await getDocs(collection(db, 'districts', profile.districtId, 'branches'));
+          bSnap.docs.forEach(b => {
+            bMap[b.id] = b.data().name || 'Unnamed Branch';
+          });
+          setBranchMaps(bMap);
+        }
+      } catch (err: any) {
+        console.error("Failed to load locations", err);
+        toast.error(`Failed to load locations: ${err.message}`);
+      }
+    };
+    if (profile?.role === 'superadmin' || profile?.role === 'district') {
+      fetchLocations();
+    }
+  }, [profile]);
+
+  const locationFilteredMembers = useMemo(() => {
     let baseMembers = members;
-    
-    // For superadmin, the tabs serve as sub-filters for the district/branch selection
-    if (profile?.role === 'superadmin') {
+    if (profile?.role === 'superadmin' || profile?.role === 'district') {
       if (filters.district !== 'All') {
         baseMembers = baseMembers.filter(m => m.districtId === filters.district);
       }
       if (filters.branch !== 'All') {
         baseMembers = baseMembers.filter(m => m.branchId === filters.branch);
       }
-      
-      const activeMembers = baseMembers.filter(m => m.level !== 'Visitor' && m.level !== 'Convert');
+    }
+    return baseMembers;
+  }, [members, profile, filters.district, filters.branch]);
+
+  const counts = useMemo(() => {
+    let baseMembers = locationFilteredMembers;
+    
+    // For superadmin and district leaders, the tabs serve as sub-filters for the member list
+    if (profile?.role === 'superadmin' || profile?.role === 'district') {
+      const activeMembers = baseMembers.filter(m => m.level !== 'Visitor' && m.membershipLevel !== 'visitor' && m.level !== 'Convert' && m.membershipLevel !== 'convert');
       return {
         'All Member': activeMembers.length,
         Member: activeMembers.length,
-        Visitor: baseMembers.filter(m => m.level === 'Visitor').length,
-        Convert: baseMembers.filter(m => m.level === 'Convert').length,
-        Leader: activeMembers.filter(m => m.baptizedSubLevel?.toLowerCase() === 'leader').length,
-        Worker: activeMembers.filter(m => m.baptizedSubLevel?.toLowerCase() === 'worker').length,
-        Disciple: activeMembers.filter(m => m.baptizedSubLevel?.toLowerCase() === 'disciple').length,
+        Visitor: baseMembers.filter(m => m.level === 'Visitor' || m.membershipLevel === 'visitor').length,
+        Convert: baseMembers.filter(m => m.level === 'Convert' || m.membershipLevel === 'convert').length,
+        Leader: activeMembers.filter(m => {
+          const ml = m.baptizedSubLevel?.toLowerCase() || m.level?.toLowerCase();
+          return ['leader', 'admin', 'district', 'superadmin'].includes(ml || '');
+        }).length,
+        Worker: activeMembers.filter(m => {
+          const ml = m.baptizedSubLevel?.toLowerCase() || m.level?.toLowerCase();
+          return ml === 'worker';
+        }).length,
+        Disciple: activeMembers.filter(m => {
+          const ml = m.baptizedSubLevel?.toLowerCase() || m.level?.toLowerCase() || 'disciple';
+          return ml === 'disciple' || !['leader', 'admin', 'district', 'superadmin', 'worker'].includes(ml);
+        }).length,
       };
     }
     
     return {
       'All Member': baseMembers.length,
-      Member: baseMembers.filter(m => m.level !== 'Visitor' && m.level !== 'Convert').length,
-      Visitor: baseMembers.filter(m => m.level === 'Visitor').length,
-      Convert: baseMembers.filter(m => m.level === 'Convert').length,
+      Member: baseMembers.filter(m => m.level !== 'Visitor' && m.membershipLevel !== 'visitor' && m.level !== 'Convert' && m.membershipLevel !== 'convert').length,
+      Visitor: baseMembers.filter(m => m.level === 'Visitor' || m.membershipLevel === 'visitor').length,
+      Convert: baseMembers.filter(m => m.level === 'Convert' || m.membershipLevel === 'convert').length,
     };
-  }, [members, profile?.role, filters.district, filters.branch]);
+  }, [locationFilteredMembers, profile?.role]);
 
   const uniqueDistricts = useMemo(() => Array.from(new Set(members.map(m => m.districtId).filter(Boolean))), [members]);
   const uniqueBranches = useMemo(() => {
@@ -133,7 +197,7 @@ export default function MemberManagementPage() {
       </div>
 
       {/* Stats Cards */}
-      <MemberStats members={members} />
+      <MemberStats members={locationFilteredMembers} />
 
       {/* Main Content Area */}
       <div className="flex flex-col gap-6">
@@ -146,36 +210,46 @@ export default function MemberManagementPage() {
             onViewModeChange={setViewMode}
             filters={filters}
             onFilterChange={setFilters}
-            showGlobalFilters={profile?.role === 'superadmin'}
+            showGlobalFilters={profile?.role === 'superadmin' || profile?.role === 'district'}
           >
-            {profile?.role === 'superadmin' ? (
+            {profile?.role === 'superadmin' || profile?.role === 'district' ? (
               <div className="flex flex-row flex-nowrap items-center gap-3 sm:gap-4 px-1 sm:px-4 w-full overflow-x-auto no-scrollbar">
-                <div className="flex flex-col shrink-0 min-w-[120px]">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-px">District</label>
-                  <select 
-                    className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer w-full"
-                    value={filters.district}
-                    onChange={(e) => setFilters({...filters, district: e.target.value, branch: 'All'})}
-                  >
-                    <option value="All">All Districts</option>
-                    {uniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div className="h-8 w-px bg-slate-200 shrink-0"></div>
+                {profile?.role === 'superadmin' && (
+                  <>
+                    <div className="flex flex-col shrink-0 min-w-[120px]">
+                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-px">District</label>
+                      <select 
+                        className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer w-full"
+                        value={filters.district}
+                        onChange={(e) => setFilters({...filters, district: e.target.value, branch: 'All'})}
+                      >
+                        <option value="All">All Districts</option>
+                        {Object.entries(districtMaps).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                      </select>
+                    </div>
+                    <div className="h-8 w-px bg-slate-200 shrink-0"></div>
+                  </>
+                )}
                 <div className="flex flex-col shrink-0 min-w-[120px]">
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-px">Branch</label>
                   <select 
-                    className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer w-full"
+                    className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer w-full disabled:opacity-40"
                     value={filters.branch}
                     onChange={(e) => setFilters({...filters, branch: e.target.value})}
+                    disabled={profile?.role === 'superadmin' && filters.district === 'All'}
                   >
                     <option value="All">All Branches</option>
-                    {uniqueBranches.map(b => <option key={b} value={b}>{b}</option>)}
+                    {profile?.role === 'superadmin' && filters.district !== 'All' ? 
+                      branchOptions[filters.district]?.map(b => <option key={b.id} value={b.id}>{b.name}</option>) :
+                     profile?.role === 'district' ?
+                      uniqueBranches.map(b => <option key={b} value={b}>{branchMaps[b] || b}</option>) :
+                      null
+                    }
                   </select>
                 </div>
                 <div className="h-8 w-px bg-slate-200 shrink-0"></div>
                 <div className="flex flex-col shrink-0 min-w-[140px]">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-px">Role</label>
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-px">Level</label>
                   <select 
                     className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer w-full"
                     value={activeTab}
@@ -215,6 +289,33 @@ export default function MemberManagementPage() {
           />
         </motion.div>
       </div>
+
+      {profile?.role === 'superadmin' && (
+        <>
+          <button 
+            onClick={() => setShowSuperAdminModal(true)}
+            className="fixed bottom-8 right-8 h-14 w-14 bg-slate-900 text-white rounded-full shadow-2xl shadow-slate-900/20 flex items-center justify-center hover:scale-105 transition-all z-40 hidden sm:flex"
+          >
+            <Plus size={24} />
+          </button>
+          
+          {/* Mobile FAB */}
+          <button 
+            onClick={() => setShowSuperAdminModal(true)}
+            className="fixed bottom-20 right-6 h-12 w-12 bg-slate-900 text-white rounded-full shadow-2xl shadow-slate-900/20 flex items-center justify-center hover:scale-105 transition-all z-40 sm:hidden"
+          >
+            <Plus size={20} />
+          </button>
+
+          <SuperAdminAddMemberModal 
+            isOpen={showSuperAdminModal}
+            onClose={() => setShowSuperAdminModal(false)}
+            onSuccess={() => {
+              // Note: the useMembers hook listens to snap changes so it will auto-update.
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

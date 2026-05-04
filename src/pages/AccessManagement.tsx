@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
-import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, where } from 'firebase/firestore';
 
 export default function AccessManagement() {
   const { profile } = useFirebase();
@@ -111,22 +111,49 @@ export default function AccessManagement() {
     try {
       setSaving(true);
       const emailLower = newEmail.toLowerCase().trim();
+      const grantedRole = newRole;
       
       let payload: any = {
         email: emailLower,
-        role: newRole,
+        role: grantedRole,
         grantedAt: new Date().toISOString(),
         grantedBy: profile?.uid
       };
 
-      if (newRole === 'admin' || newRole === 'member') {
-        payload.districtId = profile?.role === 'district' ? profile.districtId : newDistrictId;
+      const finalDistrictId = profile?.role === 'district' ? profile.districtId : newDistrictId;
+      const finalBranchId = profile?.role === 'admin' ? profile.branchId : newBranchId;
+
+      if (grantedRole === 'admin' || grantedRole === 'member') {
+        payload.districtId = finalDistrictId;
       }
-      if (newRole === 'member' || newRole === 'admin') {
-        payload.branchId = profile?.role === 'admin' ? profile.branchId : newBranchId;
+      if (grantedRole === 'member' || grantedRole === 'admin') {
+        payload.branchId = finalBranchId;
       }
 
       await setDoc(doc(db, 'accessControl', emailLower), payload);
+
+      // Opportunistically create a member record so they appear in People Management immediately
+      if (finalDistrictId && finalBranchId) {
+        const { query, collectionGroup, getDocs, serverTimestamp, collection } = await import('firebase/firestore');
+        const mQuery = query(collectionGroup(db, 'members'), where('email', '==', emailLower));
+        const mSnap = await getDocs(mQuery);
+        
+        if (mSnap.empty) {
+          const memberRef = doc(collection(db, 'districts', finalDistrictId, 'branches', finalBranchId, 'members'));
+          await setDoc(memberRef, {
+            email: emailLower,
+            fullName: emailLower.split('@')[0], // placeholder name
+            role: grantedRole,
+            level: 'Worker',
+            districtId: finalDistrictId,
+            branchId: finalBranchId,
+            status: 'Active',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+        }
+      }
+
       setShowModal(false);
       setNewEmail('');
       setSaving(false);

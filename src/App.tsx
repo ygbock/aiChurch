@@ -33,6 +33,8 @@ import AdminRegistration from './pages/AdminRegistration';
 import ProgramDashboard from './pages/ProgramDashboard';
 import Directory from './pages/Directory';
 import Messages from './pages/Messages';
+import BaptismManagement from './pages/BaptismManagement';
+import BaptismInterviewPanel from './pages/BaptismInterviewPanel';
 import { FirebaseProvider } from './components/FirebaseProvider';
 import { Toaster } from 'sonner';
 
@@ -74,6 +76,8 @@ export default function App() {
             <Route path="calendar" element={<Calendar />} />
             <Route path="streaming" element={<LiveStreaming />} />
             <Route path="bible-school" element={<BibleSchool />} />
+            <Route path="baptism" element={<BaptismManagement />} />
+            <Route path="baptism/interviews" element={<BaptismInterviewPanel />} />
             <Route path="communication" element={<CommunicationHub />} />
             <Route path="cms" element={<CMS />} />
             <Route path="volunteers" element={<Volunteers />} />

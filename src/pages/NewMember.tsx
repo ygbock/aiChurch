@@ -116,34 +116,34 @@ const childSchema = z.object({
 
 const memberSchema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters'),
-  photoUrl: z.string().default(''),
-  dateOfBirth: z.string().min(1, 'Date of birth is required'),
-  gender: z.enum(['male', 'female']),
-  maritalStatus: z.enum(['single', 'married', 'widowed', 'divorced']),
-  spouseName: z.string(),
-  numberOfChildren: z.number().min(0),
-  children: z.array(childSchema),
-  email: z.string(),
-  phone: z.string().min(7, 'Phone number must be at least 7 characters'),
-  community: z.string().min(1, 'Community is required'),
-  area: z.string().min(1, 'Area is required'),
-  street: z.string().min(1, 'Street is required'),
-  publicLandmark: z.string(),
+  photoUrl: z.string().optional(),
+  dateOfBirth: z.string().optional(),
+  gender: z.enum(['male', 'female']).optional(),
+  maritalStatus: z.enum(['single', 'married', 'widowed', 'divorced']).optional(),
+  spouseName: z.string().optional(),
+  numberOfChildren: z.number().min(0).optional(),
+  children: z.array(childSchema).optional(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  community: z.string().optional(),
+  area: z.string().optional(),
+  street: z.string().optional(),
+  publicLandmark: z.string().optional(),
   branchId: z.string().min(1, 'Branch is required'),
-  membershipLevel: z.enum(['baptized', 'convert', 'visitor']),
+  membershipLevel: z.enum(['baptized', 'convert', 'visitor']).optional(),
   baptizedSubLevel: z.enum(['leader', 'worker', 'disciple']).optional(),
   leaderRole: z.enum(['pastor', 'assistant_pastor', 'department_head', 'ministry_head']).optional(),
-  baptismDate: z.string(),
-  joinDate: z.string().min(1, 'Join date is required'),
-  baptismOfficiator: z.string(),
-  spiritualMentor: z.string(),
-  assignedDepartment: z.string(),
-  status: z.enum(['active', 'inactive', 'suspended', 'transferred']),
-  prayerNeeds: z.string(),
-  pastoralNotes: z.string(),
-  createAccount: z.boolean(),
-  username: z.string(),
-  password: z.string(),
+  baptismDate: z.string().optional(),
+  joinDate: z.string().optional(),
+  baptismOfficiator: z.string().optional(),
+  spiritualMentor: z.string().optional(),
+  assignedDepartment: z.string().optional(),
+  status: z.enum(['active', 'inactive', 'suspended', 'transferred']).optional(),
+  prayerNeeds: z.string().optional(),
+  pastoralNotes: z.string().optional(),
+  createAccount: z.boolean().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
 });
 
 export default function NewMember() {
@@ -363,7 +363,7 @@ export default function NewMember() {
     }
   }, [watchedBranchId, profile?.districtId, districtIdParam]);
 
-  const resolveMinistries = (dob: string, gender: string): string[] => {
+  const resolveMinistries = (dob: string | undefined, gender: string | undefined): string[] => {
     if (!dob) return [];
     
     const birthDate = new Date(dob);
@@ -374,7 +374,7 @@ export default function NewMember() {
       age--;
     }
     
-    const g = gender.toLowerCase();
+    const g = (gender || '').toLowerCase();
     
     if (age < 13) {
       return ['children'];
@@ -394,9 +394,19 @@ export default function NewMember() {
 
       const calculatedMinistries = resolveMinistries(data.dateOfBirth, data.gender as string);
 
+      let calculatedLevel = 'Disciple';
+      if (data.membershipLevel === 'visitor') calculatedLevel = 'Visitor';
+      else if (data.membershipLevel === 'convert') calculatedLevel = 'Convert';
+      else if (data.baptizedSubLevel === 'worker') calculatedLevel = 'Worker';
+      else if (data.baptizedSubLevel === 'leader') calculatedLevel = 'Leader';
+
+      const capitalizedStatus = data.status ? data.status.charAt(0).toUpperCase() + data.status.slice(1) : 'Active';
+
       const memberData = {
         ...data,
         districtId,
+        level: calculatedLevel,
+        status: capitalizedStatus,
         ministries: calculatedMinistries,
         updatedAt: serverTimestamp(),
       };

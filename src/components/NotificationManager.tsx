@@ -85,6 +85,9 @@ export default function NotificationManager() {
   useEffect(() => {
     if (!user || profile?.notificationPrefs?.reminders === false) return;
 
+    let unsubscribeAppts: (() => void) | null = null;
+    let notifiedApptsLocal = new Set<string>();
+
     const checkApptReminders = () => {
       const now = new Date();
       
@@ -95,7 +98,11 @@ export default function NotificationManager() {
         where('date', '==', format(now, 'yyyy-MM-dd'))
       );
 
-      onSnapshot(q, (snapshot) => {
+      if (unsubscribeAppts) {
+        unsubscribeAppts();
+      }
+
+      unsubscribeAppts = onSnapshot(q, (snapshot) => {
         snapshot.docs.forEach(doc => {
           const appt = doc.data();
           const [hours, minutes] = appt.time.split(':').map(Number);
@@ -104,8 +111,9 @@ export default function NotificationManager() {
           const diffInMinutes = (apptTime.getTime() - now.getTime()) / (1000 * 60);
           
           // Notify if appointment is in exactly 30 minutes (or within a 1 min window)
-          if (diffInMinutes > 29 && diffInMinutes <= 31 && !notifiedAppts.current.has(doc.id)) {
+          if (diffInMinutes > 29 && diffInMinutes <= 31 && !notifiedAppts.current.has(doc.id) && !notifiedApptsLocal.has(doc.id)) {
             notifiedAppts.current.add(doc.id);
+            notifiedApptsLocal.add(doc.id);
             const title = "Session Starting Soon!";
             const body = `Your session "${appt.title}" starts in 30 minutes with ${appt.staffName || 'Staff'}.`;
 
@@ -127,8 +135,11 @@ export default function NotificationManager() {
     const interval = setInterval(checkApptReminders, 60000); // Check every minute
     checkApptReminders(); // Initial check
 
-    return () => clearInterval(interval);
-  }, [user]);
+    return () => {
+      clearInterval(interval);
+      if (unsubscribeAppts) unsubscribeAppts();
+    };
+  }, [user, profile?.notificationPrefs?.reminders]);
 
   // Real-time Chat Notifications
   useEffect(() => {

@@ -307,6 +307,23 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["senderId", "text", "createdAt"]
+    },
+    "BaptismProgram": {
+      "title": "Baptism Program",
+      "description": "A program for baptism.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "targetDate": { "type": "string" },
+        "baptismDate": { "type": "string" },
+        "baptismOfficiator": { "type": "string" },
+        "baptismLocation": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Completed", "Rescheduled"] },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "targetDate", "status"]
     }
   },
   "firestore": {
@@ -369,6 +386,10 @@
     "/calendar_events/{eventId}": {
       "schema": "CalendarEvent",
       "description": "Collection of global calendar events."
+    },
+    "/baptismPrograms/{programId}": {
+      "schema": "BaptismProgram",
+      "description": "Collection of baptism programs."
     }
   }
 }

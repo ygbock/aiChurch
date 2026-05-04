@@ -22,9 +22,10 @@ export interface MemberData {
   branch?: string;
   
   // Membership Details
-  level: MemberLevel;
-  baptizedSubLevel?: 'leader' | 'worker' | 'disciple';
-  status: MemberStatus;
+  level: MemberLevel | string;
+  membershipLevel?: string;
+  baptizedSubLevel?: 'leader' | 'worker' | 'disciple' | string;
+  status: MemberStatus | string;
   baptismStatus: BaptismStatus;
   isBaptised: boolean;
   joinDate: string;

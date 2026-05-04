@@ -85,7 +85,7 @@ export const MemberToolbar = ({
           <Button 
             variant="outline" 
             onClick={onBulkUpdate}
-            className="h-11 w-11 p-0 rounded-xl flex items-center justify-center border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shrink-0"
+            className="hidden sm:flex h-11 w-11 p-0 rounded-xl items-center justify-center border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shrink-0"
             title="Export Members"
           >
             <ArrowDownToLine size={18} />
@@ -94,8 +94,8 @@ export const MemberToolbar = ({
       </div>
 
       {/* Bottom Row: Search Input */}
-      <div className="w-full shrink-0 border-t border-slate-100 pt-3">
-        <div className="relative min-w-0 w-full">
+      <div className="w-full shrink-0 border-t border-slate-100 pt-3 flex gap-2">
+        <div className="relative min-w-0 w-full flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
             placeholder="Search members..." 
@@ -104,6 +104,14 @@ export const MemberToolbar = ({
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
+        <Button 
+          variant="outline" 
+          onClick={onBulkUpdate}
+          className="flex sm:hidden h-11 w-11 p-0 rounded-xl items-center justify-center border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shrink-0 bg-slate-50"
+          title="Export Members"
+        >
+          <ArrowDownToLine size={18} />
+        </Button>
       </div>
     </div>
   );

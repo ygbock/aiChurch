@@ -90,7 +90,7 @@ service cloud.firestore {
       return data.keys().hasAll(['fullName', 'branchId', 'level', 'status']) &&
              data.fullName is string && data.fullName.size() <= 100 &&
              data.branchId is string &&
-             data.level in ['Convert', 'Disciple', 'Worker', 'Leader'] &&
+             data.level in ['Visitor', 'Convert', 'Disciple', 'Worker', 'Leader'] &&
              data.status in ['Active', 'Pending', 'Inactive'];
     }
 
@@ -158,6 +158,16 @@ service cloud.firestore {
                  (data.recurrence.until is string || data.recurrence.until == null)
                )
              ));
+    }
+
+    function isValidBaptismProgram(data) {
+      return data.keys().hasAll(['title', 'targetDate', 'status']) &&
+             data.title is string && data.title.size() <= 200 &&
+             data.targetDate is string &&
+             data.status in ['Pending', 'Approved', 'Completed', 'Rescheduled'] &&
+             (!('baptismDate' in data) || data.baptismDate is string) &&
+             (!('baptismOfficiator' in data) || data.baptismOfficiator is string) &&
+             (!('baptismLocation' in data) || data.baptismLocation is string);
     }
 
     function isValidReminder(data) {
@@ -334,6 +344,13 @@ service cloud.firestore {
 
     match /{path=**}/queueEntries/{entryId} {
       allow read, list: if isBranchAdmin('any', 'any');
+    }
+
+    match /baptismPrograms/{programId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSuperAdmin() && isValidBaptismProgram(incoming());
+      allow update: if isSuperAdmin() && isValidBaptismProgram(incoming());
+      allow delete: if isSuperAdmin();
     }
   }
 }

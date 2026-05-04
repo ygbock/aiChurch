@@ -8,24 +8,36 @@ interface MemberStatsProps {
 }
 
 export const MemberStats = ({ members }: MemberStatsProps) => {
+  const activeMembers = members.filter(m => {
+    const isVisitor = m.level === 'Visitor' || m.membershipLevel === 'visitor';
+    const isConvert = m.level === 'Convert' || m.membershipLevel === 'convert';
+    return !isVisitor && !isConvert;
+  });
+
   const stats = [
     {
       label: 'Total Membership',
-      value: members.filter(m => m.level === 'Member').length,
+      value: activeMembers.length,
       icon: Users,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
     },
     {
-      label: 'First Timers',
-      value: members.filter(m => m.level === 'Visitor').length,
+      label: 'Workers',
+      value: activeMembers.filter(m => {
+        const ml = m.baptizedSubLevel?.toLowerCase() || m.level?.toLowerCase();
+        return ml === 'leader' || ml === 'worker';
+      }).length,
       icon: UserPlus,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50',
     },
     {
-      label: 'New Converts',
-      value: members.filter(m => m.level === 'Convert').length,
+      label: 'Disciples',
+      value: activeMembers.filter(m => {
+        const ml = m.baptizedSubLevel?.toLowerCase() || m.level?.toLowerCase() || 'disciple';
+        return ml === 'disciple' || !['leader', 'worker'].includes(ml);
+      }).length,
       icon: Flame,
       color: 'text-orange-600',
       bg: 'bg-orange-50',

@@ -85,9 +85,9 @@ export const MemberTable = ({
   const MemberCard = ({ member }: { member: MemberData }) => (
     <div 
       onClick={() => onView(member)}
-      className="bg-white p-5 rounded-2xl border border-slate-100 flex flex-col gap-4 relative group hover:shadow-xl hover:translate-y-[-2px] transition-all cursor-pointer"
+      className="bg-white p-3 sm:p-5 rounded-2xl border border-slate-100 flex flex-col gap-3 sm:gap-4 relative group hover:shadow-xl hover:translate-y-[-2px] transition-all cursor-pointer"
     >
-      <div className="absolute top-3 right-3" onClick={(e) => e.stopPropagation()}>
+      <div className="absolute top-2 right-2 sm:top-3 sm:right-3" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger className="h-8 w-8 p-0 hover:bg-slate-100 rounded-full flex items-center justify-center border-none shadow-none">
             <MoreHorizontal className="h-4 w-4 text-slate-400" />
@@ -111,40 +111,42 @@ export const MemberTable = ({
       </div>
 
       <div className="flex flex-col items-center text-center">
-        <Avatar className="h-20 w-20 border-4 border-slate-50 shadow-sm mb-4">
+        <Avatar className="h-14 w-14 sm:h-20 sm:w-20 border-2 sm:border-4 border-slate-50 shadow-sm mb-2 sm:mb-4">
           <AvatarImage src={member.photoUrl} alt={member.fullName} />
-          <AvatarFallback className="bg-slate-100 text-slate-400 font-black text-xl">{member.fullName?.charAt(0)}</AvatarFallback>
+          <AvatarFallback className="bg-slate-100 text-slate-400 font-black text-lg sm:text-xl">{member.fullName?.charAt(0)}</AvatarFallback>
         </Avatar>
-        <div className="space-y-1">
-          <h4 className="text-base font-black text-slate-900 uppercase tracking-tight line-clamp-1">{member.fullName}</h4>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-            {activeTab === 'Member' ? member.level || 'Member' : activeTab === 'Visitor' ? 'First Timer' : 'Convert'}
+        <div className="space-y-1 w-full px-1">
+          <h4 className="text-[13px] sm:text-base font-black text-slate-900 uppercase tracking-tight truncate">{member.fullName}</h4>
+          <p className="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase tracking-widest truncate">
+            {member.level === 'Visitor' || member.membershipLevel === 'visitor' ? 'First Timer' : 
+             member.level === 'Convert' || member.membershipLevel === 'convert' ? 'Convert' : 
+             member.baptizedSubLevel || member.level || 'Member'}
           </p>
         </div>
       </div>
 
-      <div className="space-y-3 pt-2">
-        <div className="flex flex-col gap-2">
+      <div className="space-y-2 sm:space-y-3 pt-1 sm:pt-2">
+        <div className="flex flex-col gap-1.5 sm:gap-2">
           {activeTab === 'Member' && (
-            <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-50 py-2 rounded-xl">
-              <Calendar size={12} className="text-slate-400" />
-              Joined {safeFormat(member.joinDate, "MMM yyyy")}
+            <div className="flex items-center justify-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-700 bg-slate-50 py-1.5 sm:py-2 rounded-xl truncate px-1">
+              <Calendar size={12} className="text-slate-400 shrink-0" />
+              <span className="truncate">Joined {safeFormat(member.joinDate, "MMM yy")}</span>
             </div>
           )}
           {activeTab === 'Convert' && (
-            <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-50 py-2 rounded-xl">
-              <Flame size={12} />
-              {safeFormat(member.conversionDate, "do MMM yyyy")}
+            <div className="flex items-center justify-center gap-1.5 text-[10px] sm:text-xs font-bold text-orange-600 bg-orange-50 py-1.5 sm:py-2 rounded-xl truncate px-1">
+              <Flame size={12} className="shrink-0" />
+              <span className="truncate">{safeFormat(member.conversionDate, "dd MMM yy")}</span>
             </div>
           )}
           {activeTab === 'Visitor' && (
-            <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-50 py-2 rounded-xl">
-              <Calendar size={12} className="text-slate-400" />
-              {safeFormat(member.visitDate || member.firstVisit, "do MMM yyyy")}
+            <div className="flex items-center justify-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-700 bg-slate-50 py-1.5 sm:py-2 rounded-xl truncate px-1">
+              <Calendar size={12} className="text-slate-400 shrink-0" />
+              <span className="truncate">{safeFormat(member.visitDate || member.firstVisit, "dd MMM yy")}</span>
             </div>
           )}
           
-          <div className="flex flex-wrap gap-2 justify-center">
+          <div className="flex flex-wrap gap-1 sm:gap-2 justify-center">
             <StatusBadge variant={member.status === 'Active' ? 'success' : 'warning'}>
               {member.status}
             </StatusBadge>
@@ -161,7 +163,7 @@ export const MemberTable = ({
       viewMode === 'list' && "md:bg-white md:rounded-2xl md:border md:border-slate-200 md:shadow-sm"
     )}>
       {viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 p-0">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6 p-0">
           {members.map((member) => (
             <MemberCard key={member.id} member={member} />
           ))}
@@ -169,7 +171,7 @@ export const MemberTable = ({
       ) : (
         <>
           {/* Mobile grid view (always grid on mobile) */}
-          <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-4 p-0">
+          <div className="md:hidden grid grid-cols-2 sm:grid-cols-2 gap-3 sm:gap-4 p-0">
             {members.map((member) => (
               <MemberCard key={member.id} member={member} />
             ))}
@@ -213,7 +215,11 @@ export const MemberTable = ({
               </TableCell>
 
               <TableCell className="py-4">
-                <StatusBadge variant="info">{member.baptizedSubLevel || member.level}</StatusBadge>
+                <StatusBadge variant="info">
+                  {member.level === 'Visitor' || member.membershipLevel === 'visitor' ? 'First Timer' : 
+                   member.level === 'Convert' || member.membershipLevel === 'convert' ? 'Convert' : 
+                   member.baptizedSubLevel || member.level || 'Member'}
+                </StatusBadge>
               </TableCell>
 
               <TableCell className="py-4">
