@@ -169,8 +169,8 @@ function BaptismAnalytics({ data, profile }: { data: any[]; profile: any }) {
   }, [data, districtNames, branchNames]);
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="space-y-6 w-full min-w-0 overflow-hidden">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full min-w-0">
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
           <p className="text-xs uppercase font-bold text-slate-500 mb-2">
             Total Baptised Flow
@@ -189,8 +189,8 @@ function BaptismAnalytics({ data, profile }: { data: any[]; profile: any }) {
           </p>
         </div>
 
-        <div className="md:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
-          <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+        <div className="md:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px] min-w-0">
+          <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <h3 className="font-bold text-slate-800 text-sm">
               {activeChart === "year" && "Yearly Trend"}
               {activeChart === "age" && "Age Demographics"}
@@ -201,7 +201,7 @@ function BaptismAnalytics({ data, profile }: { data: any[]; profile: any }) {
             <select
               value={activeChart}
               onChange={(e) => setActiveChart(e.target.value as any)}
-              className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all bg-white text-slate-700 border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
+              className="w-full sm:w-auto px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-all bg-white text-slate-700 border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
             >
               <option value="year">Yearly Trend</option>
               <option value="age">Age Demographics</option>
@@ -216,7 +216,7 @@ function BaptismAnalytics({ data, profile }: { data: any[]; profile: any }) {
             </select>
           </div>
 
-          <div className="p-6 flex-1 flex flex-col justify-center">
+          <div className="p-6 flex-1 flex flex-col justify-center min-w-0 w-full overflow-hidden">
             {activeChart === "year" && (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={stats.yearData}>
@@ -416,6 +416,9 @@ export default function BaptismManagement() {
   const [activeTab, setActiveTab] = useState<"workflow" | "analytics">(
     "workflow",
   );
+  const [activePipelineStage, setActivePipelineStage] = useState<
+    "foundation" | "district" | "hq" | "baptised"
+  >("foundation");
   const [analyticsData, setAnalyticsData] = useState<any[]>([]);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
@@ -659,7 +662,7 @@ export default function BaptismManagement() {
   );
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 sm:px-6 w-full">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight uppercase">
@@ -670,7 +673,7 @@ export default function BaptismManagement() {
           </p>
         </div>
 
-        <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner min-w-[240px]">
+        <div className="flex w-full sm:w-auto bg-slate-100 p-1 rounded-xl shadow-inner min-w-[240px]">
           <button
             onClick={() => setActiveTab("workflow")}
             className={`flex-1 py-1.5 px-3 rounded-lg text-sm font-bold uppercase tracking-wider transition-all ${
@@ -979,240 +982,337 @@ export default function BaptismManagement() {
                       </p>
                     </div>
                   ) : (
-                    <div className="flex flex-row xl:grid xl:grid-cols-4 gap-6 h-full overflow-x-auto snap-x no-scrollbar pb-4 p-2">
-                      {/* Phase 1: Foundation Class */}
-                      <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-200/60 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] flex flex-col shrink-0 w-[85vw] sm:w-[320px] xl:w-auto snap-center relative">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-slate-300 rounded-t-2xl"></div>
-                        <div className="mb-5 flex items-center justify-between border-b border-slate-200/60 pb-3 mt-1">
-                          <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                            <span className="flex items-center justify-center w-6 h-6 rounded bg-white border border-slate-200 text-slate-600 text-xs shadow-sm">
-                              1
-                            </span>
-                            Foundation
-                          </h4>
-                          <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md text-xs font-bold">
-                            {foundationClass.length}
-                          </span>
-                        </div>
-                        <div className="space-y-3 overflow-y-auto flex-1 min-h-[200px]">
-                          {foundationClass.map((c) => (
-                            <div
-                              key={c.id}
-                              className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 transition-all group relative"
+                    <div className="flex flex-col gap-6 h-full pb-4 items-start w-full">
+                      {/* Pipeline Stages Tabs */}
+                      <div className="w-full shrink-0 flex flex-row gap-2 overflow-x-auto no-scrollbar pb-2 snap-x">
+                        {[
+                          {
+                            id: "foundation",
+                            label: "Foundation Class",
+                            count: foundationClass.length,
+                            color: "slate",
+                          },
+                          {
+                            id: "district",
+                            label: "District Review",
+                            count: districtReview.length,
+                            color: "blue",
+                          },
+                          {
+                            id: "hq",
+                            label: "HQ Final Review",
+                            count: hqReview.length,
+                            color: "purple",
+                          },
+                          {
+                            id: "baptised",
+                            label: "Baptised",
+                            count: approved.length,
+                            color: "emerald",
+                          },
+                        ].map((stage, idx) => {
+                          const isActive = activePipelineStage === stage.id;
+                          return (
+                            <button
+                              key={stage.id}
+                              onClick={() =>
+                                setActivePipelineStage(stage.id as any)
+                              }
+                              className={`flex-shrink-0 w-[calc(85vw/2)] sm:w-[calc(50%-0.25rem)] md:w-[calc(33.333%-0.33rem)] lg:w-[calc(25%-0.38rem)] flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 rounded-xl transition-all snap-center gap-2 sm:gap-0 ${
+                                isActive
+                                  ? stage.color === "slate"
+                                    ? "bg-slate-800 text-white shadow-md shadow-slate-500/20"
+                                    : stage.color === "blue"
+                                      ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                                      : stage.color === "purple"
+                                        ? "bg-purple-600 text-white shadow-md shadow-purple-500/20"
+                                        : "bg-emerald-600 text-white shadow-md shadow-emerald-500/20"
+                                  : stage.color === "slate"
+                                    ? "bg-white border border-slate-200 text-slate-600 hover:border-slate-400 hover:bg-slate-50 shadow-sm"
+                                    : stage.color === "blue"
+                                      ? "bg-white border border-slate-200 text-slate-600 hover:border-blue-400 hover:bg-blue-50 shadow-sm"
+                                      : stage.color === "purple"
+                                        ? "bg-white border border-slate-200 text-slate-600 hover:border-purple-400 hover:bg-purple-50 shadow-sm"
+                                        : "bg-white border border-slate-200 text-slate-600 hover:border-emerald-400 hover:bg-emerald-50 shadow-sm"
+                              }`}
                             >
-                              <div className="flex items-start justify-between gap-2 mb-3">
-                                <div>
-                                  <p className="font-bold text-sm text-slate-900 leading-tight">
-                                    {c.fullName}
-                                  </p>
-                                  <p className="text-[11px] text-slate-500 font-medium mt-1">
-                                    Branch:{" "}
-                                    <span className="text-slate-700 font-semibold">
-                                      {c.branch || c.branchId}
-                                    </span>
-                                  </p>
-                                </div>
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                <span
+                                  className={`flex items-center justify-center w-6 h-6 rounded-md text-xs font-bold ${
+                                    isActive
+                                      ? "bg-white/20 text-white"
+                                      : stage.color === "slate"
+                                        ? "bg-slate-100 text-slate-600"
+                                        : stage.color === "blue"
+                                          ? "bg-blue-100 text-blue-600"
+                                          : stage.color === "purple"
+                                            ? "bg-purple-100 text-purple-600"
+                                            : "bg-emerald-100 text-emerald-600"
+                                  }`}
+                                >
+                                  {idx + 1}
+                                </span>
+                                <span className="font-bold text-sm tracking-tight">
+                                  {stage.label}
+                                </span>
                               </div>
-                              {(profile?.role === "admin" ||
-                                profile?.role === "member") &&
-                                selectedProgram.status !== "Completed" && (
-                                  <div className="mt-3 pt-3 border-t border-slate-100">
-                                    <button
-                                      onClick={() =>
-                                        handleStatusUpdate(
-                                          c.refPath,
-                                          "Submitted to District",
-                                        )
-                                      }
-                                      className="w-full py-2 bg-slate-50 border border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-bold rounded-lg transition-all"
-                                    >
-                                      Submit to District
-                                    </button>
-                                  </div>
-                                )}
-                            </div>
-                          ))}
-                          {foundationClass.length === 0 && (
-                            <div className="flex items-center justify-center h-24 border-2 border-dashed border-slate-200 rounded-xl text-xs text-slate-400 font-medium">
-                              No candidates
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Phase 2: District Interview */}
-                      <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-200/60 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] flex flex-col shrink-0 w-[85vw] sm:w-[320px] xl:w-auto snap-center relative">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-blue-400 rounded-t-2xl"></div>
-                        <div className="mb-5 border-b border-slate-200/60 pb-3 mt-1">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                              <span className="flex items-center justify-center w-6 h-6 rounded bg-white border border-blue-200 text-blue-600 text-xs shadow-sm">
-                                2
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-xs font-bold ${
+                                  isActive
+                                    ? "bg-white/20 text-white"
+                                    : "bg-slate-100 text-slate-500"
+                                }`}
+                              >
+                                {stage.count}
                               </span>
-                              District Review
-                            </h4>
-                            <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-xs font-bold">
-                              {districtReview.length}
-                            </span>
-                          </div>
-
-                          {(profile?.role === "superadmin" ||
-                            profile?.role === "district") && (
-                            <Link
-                              to="/baptism/interviews"
-                              className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm"
-                            >
-                              <ClipboardList size={14} />
-                              Open Interview Portal
-                            </Link>
-                          )}
-                        </div>
-                        <div className="space-y-3 overflow-y-auto flex-1 min-h-[200px]">
-                          {districtReview.map((c) => (
-                            <div
-                              key={c.id}
-                              className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all group relative"
-                            >
-                              <div className="flex items-start justify-between gap-2 mb-3">
-                                <div>
-                                  <p className="font-bold text-sm text-slate-900 leading-tight">
-                                    {c.fullName}
-                                  </p>
-                                  <p className="text-[11px] text-slate-500 font-medium mt-1">
-                                    Branch:{" "}
-                                    <span className="text-slate-700 font-semibold">
-                                      {c.branch || c.branchId}
-                                    </span>
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          {districtReview.length === 0 && (
-                            <div className="flex items-center justify-center h-24 border-2 border-dashed border-slate-200 rounded-xl text-xs text-slate-400 font-medium">
-                              No candidates
-                            </div>
-                          )}
-                        </div>
+                            </button>
+                          );
+                        })}
                       </div>
 
-                      {/* Phase 3: Final HQ Review */}
-                      <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-200/60 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] flex flex-col shrink-0 w-[85vw] sm:w-[320px] xl:w-auto snap-center relative">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-purple-400 rounded-t-2xl"></div>
-                        <div className="mb-5 border-b border-slate-200/60 pb-3 mt-1">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                              <span className="flex items-center justify-center w-6 h-6 rounded bg-white border border-purple-200 text-purple-600 text-xs shadow-sm">
-                                3
-                              </span>
-                              HQ Final Review
-                            </h4>
-                            <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md text-xs font-bold">
-                              {hqReview.length}
-                            </span>
-                          </div>
-
-                          {profile?.role === "superadmin" && (
-                            <Link
-                              to="/baptism/interviews"
-                              className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm"
-                            >
-                              <ClipboardList size={14} />
-                              Open HQ Interview Portal
-                            </Link>
-                          )}
-                        </div>
-                        <div className="space-y-3 overflow-y-auto flex-1 min-h-[200px]">
-                          {hqReview.map((c) => (
-                            <div
-                              key={c.id}
-                              className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-purple-300 transition-all group relative"
-                            >
-                              <div className="flex items-start justify-between gap-2 mb-3">
-                                <div>
-                                  <p className="font-bold text-sm text-slate-900 leading-tight">
-                                    {c.fullName}
-                                  </p>
-                                  <p className="text-[11px] text-slate-500 font-medium mt-1">
-                                    Dist:{" "}
-                                    <span className="text-slate-700 font-semibold">
-                                      {districtNames[c.districtId] ||
-                                        c.districtId}
-                                    </span>
-                                  </p>
-                                </div>
+                      {/* Active Stage Content Area */}
+                      <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col w-full h-full min-h-[500px]">
+                        {activePipelineStage === "foundation" && (
+                          <div className="flex flex-col h-full">
+                            <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl flex items-center justify-between">
+                              <div>
+                                <h4 className="font-black text-lg text-slate-800 tracking-tight">
+                                  Foundation Class
+                                </h4>
+                                <p className="text-xs text-slate-500 font-medium">
+                                  Candidates currently undergoing foundation
+                                  teachings.
+                                </p>
                               </div>
-                              {profile?.role === "superadmin" &&
-                                selectedProgram.status !== "Completed" && (
-                                  <div className="mt-3 pt-3 border-t border-slate-100">
-                                    <button
-                                      onClick={() =>
-                                        handleStatusUpdate(
-                                          c.refPath,
-                                          "Approved",
-                                        )
-                                      }
-                                      className="w-full py-2 bg-slate-50 border border-slate-200 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 text-slate-600 text-xs font-bold rounded-lg transition-all"
-                                    >
-                                      Approve & Baptize
-                                    </button>
+                            </div>
+                            <div className="p-4 space-y-3 overflow-y-auto flex-1">
+                              {foundationClass.map((c) => (
+                                <div
+                                  key={c.id}
+                                  className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex items-center justify-between"
+                                >
+                                  <div>
+                                    <p className="font-bold text-sm text-slate-900 leading-tight">
+                                      {c.fullName}
+                                    </p>
+                                    <p className="text-xs text-slate-500 font-medium mt-1">
+                                      Branch:{" "}
+                                      <span className="text-slate-700 font-semibold">
+                                        {c.branch || c.branchId}
+                                      </span>
+                                    </p>
                                   </div>
-                                )}
+                                  {(profile?.role === "admin" ||
+                                    profile?.role === "member") &&
+                                    selectedProgram.status !== "Completed" && (
+                                      <button
+                                        onClick={() =>
+                                          handleStatusUpdate(
+                                            c.refPath,
+                                            "Submitted to District",
+                                          )
+                                        }
+                                        className="px-4 py-2 bg-slate-50 border border-slate-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 text-slate-600 text-xs font-bold rounded-lg transition-all"
+                                      >
+                                        Submit to District
+                                      </button>
+                                    )}
+                                </div>
+                              ))}
+                              {foundationClass.length === 0 && (
+                                <div className="flex items-center justify-center h-32 border-2 border-dashed border-slate-200 rounded-xl text-sm text-slate-400 font-medium">
+                                  No candidates in foundation class.
+                                </div>
+                              )}
                             </div>
-                          ))}
-                          {hqReview.length === 0 && (
-                            <div className="flex items-center justify-center h-24 border-2 border-dashed border-slate-200 rounded-xl text-xs text-slate-400 font-medium">
-                              No candidates
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                          </div>
+                        )}
 
-                      {/* Phase 4: Enrolled & Baptised */}
-                      <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-200/60 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] flex flex-col shrink-0 w-[85vw] sm:w-[320px] xl:w-auto snap-center relative">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-emerald-400 rounded-t-2xl"></div>
-                        <div className="mb-5 flex items-center justify-between border-b border-slate-200/60 pb-3 mt-1">
-                          <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
-                            <span className="flex items-center justify-center w-6 h-6 rounded bg-white border border-emerald-200 text-emerald-600 text-xs shadow-sm">
-                              4
-                            </span>
-                            Baptised
-                          </h4>
-                          <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md text-xs font-bold">
-                            {approved.length}
-                          </span>
-                        </div>
-                        <div className="space-y-3 overflow-y-auto flex-1 min-h-[200px]">
-                          {approved.map((c) => (
-                            <div
-                              key={c.id}
-                              className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group"
-                            >
-                              <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                              <div className="relative z-10 flex items-center justify-between">
-                                <div>
-                                  <p className="font-bold text-sm text-slate-900">
-                                    {c.fullName}
-                                  </p>
-                                  <div className="flex items-center gap-1 mt-1">
+                        {activePipelineStage === "district" && (
+                          <div className="flex flex-col h-full">
+                            <div className="p-4 border-b border-slate-100 bg-blue-50/30 rounded-t-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                              <div>
+                                <h4 className="font-black text-lg text-slate-800 tracking-tight">
+                                  District Review
+                                </h4>
+                                <p className="text-xs text-slate-500 font-medium">
+                                  Candidates pending panel interview at the
+                                  district level.
+                                </p>
+                              </div>
+                              {(profile?.role === "superadmin" ||
+                                profile?.role === "district") && (
+                                <Link
+                                  to="/baptism/interviews"
+                                  className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm whitespace-nowrap"
+                                >
+                                  <ClipboardList size={14} />
+                                  Open Interview Portal
+                                </Link>
+                              )}
+                            </div>
+                            <div className="p-4 space-y-3 overflow-y-auto flex-1">
+                              {districtReview.map((c) => (
+                                <div
+                                  key={c.id}
+                                  className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex items-center justify-between"
+                                >
+                                  <div>
+                                    <p className="font-bold text-sm text-slate-900 leading-tight">
+                                      {c.fullName}
+                                    </p>
+                                    <div className="flex items-center gap-3 mt-1">
+                                      <p className="text-xs text-slate-500 font-medium">
+                                        Branch:{" "}
+                                        <span className="text-slate-700 font-semibold">
+                                          {c.branch || c.branchId}
+                                        </span>
+                                      </p>
+                                      {c.interviewStation && (
+                                        <p className="text-xs text-slate-500 font-medium">
+                                          Station:{" "}
+                                          <span className="text-blue-600 font-semibold">
+                                            {c.interviewStation}
+                                          </span>
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              {districtReview.length === 0 && (
+                                <div className="flex items-center justify-center h-32 border-2 border-dashed border-slate-200 rounded-xl text-sm text-slate-400 font-medium">
+                                  No candidates pending district review.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {activePipelineStage === "hq" && (
+                          <div className="flex flex-col h-full">
+                            <div className="p-4 border-b border-slate-100 bg-purple-50/30 rounded-t-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                              <div>
+                                <h4 className="font-black text-lg text-slate-800 tracking-tight">
+                                  HQ Final Review
+                                </h4>
+                                <p className="text-xs text-slate-500 font-medium">
+                                  Candidates pending final approval from HQ.
+                                </p>
+                              </div>
+                              {profile?.role === "superadmin" && (
+                                <Link
+                                  to="/baptism/interviews"
+                                  className="py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm whitespace-nowrap"
+                                >
+                                  <ClipboardList size={14} />
+                                  Open HQ Interview Portal
+                                </Link>
+                              )}
+                            </div>
+                            <div className="p-4 space-y-3 overflow-y-auto flex-1">
+                              {hqReview.map((c) => (
+                                <div
+                                  key={c.id}
+                                  className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-purple-300 transition-all flex items-center justify-between"
+                                >
+                                  <div>
+                                    <p className="font-bold text-sm text-slate-900 leading-tight">
+                                      {c.fullName}
+                                    </p>
+                                    <div className="flex items-center gap-3 mt-1">
+                                      <p className="text-xs text-slate-500 font-medium">
+                                        Dist:{" "}
+                                        <span className="text-slate-700 font-semibold">
+                                          {districtNames[c.districtId] ||
+                                            c.districtId}
+                                        </span>
+                                      </p>
+                                      {c.interviewStation && (
+                                        <p className="text-xs text-slate-500 font-medium">
+                                          Station:{" "}
+                                          <span className="text-purple-600 font-semibold">
+                                            {c.interviewStation}
+                                          </span>
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {profile?.role === "superadmin" &&
+                                    selectedProgram.status !== "Completed" && (
+                                      <button
+                                        onClick={() =>
+                                          handleStatusUpdate(
+                                            c.refPath,
+                                            "Approved",
+                                          )
+                                        }
+                                        className="px-4 py-2 bg-slate-50 border border-slate-200 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 text-slate-600 text-xs font-bold rounded-lg transition-all whitespace-nowrap"
+                                      >
+                                        Approve & Baptize
+                                      </button>
+                                    )}
+                                </div>
+                              ))}
+                              {hqReview.length === 0 && (
+                                <div className="flex items-center justify-center h-32 border-2 border-dashed border-slate-200 rounded-xl text-sm text-slate-400 font-medium">
+                                  No candidates pending HQ final review.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {activePipelineStage === "baptised" && (
+                          <div className="flex flex-col h-full">
+                            <div className="p-4 border-b border-slate-100 bg-emerald-50/30 rounded-t-2xl flex items-center justify-between">
+                              <div>
+                                <h4 className="font-black text-lg text-slate-800 tracking-tight">
+                                  Baptised Disciples
+                                </h4>
+                                <p className="text-xs text-slate-500 font-medium">
+                                  Candidates successfully baptised and
+                                  integrated as disciples.
+                                </p>
+                              </div>
+                            </div>
+                            <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+                              {approved.map((c) => (
+                                <div
+                                  key={c.id}
+                                  className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group flex items-center justify-between"
+                                >
+                                  <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                                  <div className="relative z-10">
+                                    <p className="font-bold text-sm text-slate-900">
+                                      {c.fullName}
+                                    </p>
+                                    <p className="text-xs text-slate-500 font-medium mt-1">
+                                      Branch:{" "}
+                                      <span className="text-slate-700 font-semibold">
+                                        {c.branch || c.branchId}
+                                      </span>
+                                    </p>
+                                  </div>
+                                  <div className="relative z-10 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg border border-emerald-100">
                                     <CheckCircle2
-                                      size={12}
+                                      size={14}
                                       className="text-emerald-500"
                                     />
-                                    <p className="text-[10px] text-emerald-600 uppercase tracking-wider font-bold">
+                                    <p className="text-xs text-emerald-700 uppercase tracking-wider font-bold">
                                       Disciple Mode
                                     </p>
                                   </div>
                                 </div>
-                              </div>
+                              ))}
+                              {approved.length === 0 && (
+                                <div className="flex items-center justify-center h-32 border-2 border-dashed border-slate-200 rounded-xl text-sm text-slate-400 font-medium">
+                                  No candidates have been baptised yet.
+                                </div>
+                              )}
                             </div>
-                          ))}
-                          {approved.length === 0 && (
-                            <div className="flex items-center justify-center h-24 border-2 border-dashed border-slate-200 rounded-xl text-xs text-slate-400 font-medium">
-                              No candidates
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
