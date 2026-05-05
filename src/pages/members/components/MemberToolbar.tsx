@@ -1,13 +1,14 @@
 import React from 'react';
-import { Search, Plus, Send, ArrowDownToLine, LayoutGrid, List } from 'lucide-react';
+import { Search, Plus, Send, ArrowDownToLine, LayoutGrid, List, FileText, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
 interface MemberToolbarProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
-  onBulkUpdate: () => void;
+  onExport: (type: 'csv' | 'pdf') => void;
   viewMode: 'grid' | 'list';
   onViewModeChange: (mode: 'grid' | 'list') => void;
   filters: any;
@@ -21,7 +22,7 @@ interface MemberToolbarProps {
 export const MemberToolbar = ({ 
   searchQuery, 
   onSearchChange, 
-  onBulkUpdate,
+  onExport,
   viewMode,
   onViewModeChange,
   filters,
@@ -34,7 +35,7 @@ export const MemberToolbar = ({
       {/* Top Row: Filters & Actions */}
       <div className="flex flex-row items-center justify-between gap-2 sm:gap-4 w-full">
         {/* Filter Options Area - horizontal scrolling if needed */}
-        <div className="flex-1 flex items-center min-w-0 overflow-x-auto no-scrollbar pb-1">
+        <div className="flex-1 flex items-center gap-3 min-w-0 overflow-x-auto no-scrollbar pb-1">
           {children}
           
            {/* Filter Level Dropdown - only show if not superadmin since superadmin uses tabs for levels */}
@@ -52,6 +53,20 @@ export const MemberToolbar = ({
                </select>
              </div>
            )}
+
+           <DropdownMenu>
+             <DropdownMenuTrigger className="hidden sm:flex h-11 w-11 p-0 rounded-xl items-center justify-center border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors shrink-0 outline-none cursor-pointer" title="Export Members">
+               <ArrowDownToLine size={18} />
+             </DropdownMenuTrigger>
+             <DropdownMenuContent align="end" className="w-40 rounded-xl border-slate-200">
+               <DropdownMenuItem onClick={() => onExport('csv')} className="cursor-pointer font-bold text-xs py-2.5">
+                 <Download className="mr-2 h-4 w-4 text-slate-400" /> Export as CSV
+               </DropdownMenuItem>
+               <DropdownMenuItem onClick={() => onExport('pdf')} className="cursor-pointer font-bold text-xs py-2.5">
+                 <FileText className="mr-2 h-4 w-4 text-slate-400" /> Export as PDF
+               </DropdownMenuItem>
+             </DropdownMenuContent>
+           </DropdownMenu>
         </div>
 
         {/* Right side actions */}
@@ -81,15 +96,6 @@ export const MemberToolbar = ({
               <LayoutGrid size={18} />
             </Button>
           </div>
-
-          <Button 
-            variant="outline" 
-            onClick={onBulkUpdate}
-            className="hidden sm:flex h-11 w-11 p-0 rounded-xl items-center justify-center border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shrink-0"
-            title="Export Members"
-          >
-            <ArrowDownToLine size={18} />
-          </Button>
         </div>
       </div>
 
@@ -104,14 +110,19 @@ export const MemberToolbar = ({
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
-        <Button 
-          variant="outline" 
-          onClick={onBulkUpdate}
-          className="flex sm:hidden h-11 w-11 p-0 rounded-xl items-center justify-center border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shrink-0 bg-slate-50"
-          title="Export Members"
-        >
-          <ArrowDownToLine size={18} />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex sm:hidden h-11 w-11 p-0 rounded-xl items-center justify-center border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shrink-0 bg-slate-50 outline-none cursor-pointer" title="Export Members">
+            <ArrowDownToLine size={18} />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40 rounded-xl border-slate-200">
+            <DropdownMenuItem onClick={() => onExport('csv')} className="cursor-pointer font-bold text-xs py-2.5">
+              <Download className="mr-2 h-4 w-4 text-slate-400" /> Export as CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onExport('pdf')} className="cursor-pointer font-bold text-xs py-2.5">
+              <FileText className="mr-2 h-4 w-4 text-slate-400" /> Export as PDF
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

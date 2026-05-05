@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Send, ArrowDownToLine, Sparkles, Loader2, X, Download, Trash, Users } from 'lucide-react';
+import { Plus, Send, ArrowDownToLine, Sparkles, Loader2, X, Download, Trash, Users, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { deleteDoc, doc, collectionGroup, getDocs, addDoc, collection, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { useMembers } from './hooks/useMembers';
 import { useMemberFilters } from './hooks/useMemberFilters';
 import { MemberStats } from './components/MemberStats';
@@ -180,11 +182,50 @@ export default function MemberManagementPage() {
     }
   };
 
-  const handleBulkExport = () => {
-    const selectedMembersData = members.filter(m => selectedIds.includes(m.id));
+  const handleBulkExportPDF = (exportIds: string[]) => {
+    const doc = new jsPDF();
+    const exportMembers = members.filter(m => exportIds.includes(m.id));
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(15, 23, 42); 
+    doc.text("Members Directory", 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139); 
+    doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 30);
+    
+    const tableData = exportMembers.map(m => [
+      m.fullName, 
+      m.email || '-', 
+      m.phone || '-', 
+      m.level || '-', 
+      m.status || '-', 
+      districtMaps[m.districtId!] || m.districtId || '-', 
+      branchMaps[m.branchId!] || m.branchId || '-'
+    ]);
+
+    autoTable(doc, {
+      startY: 40,
+      head: [["Name", "Email", "Phone", "Role", "Status", "District", "Branch"]],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [15, 23, 42], textColor: 255 },
+      styles: { fontSize: 8 },
+    });
+
+    doc.save(`members_export_${new Date().getTime()}.pdf`);
+    toast.success(`${exportIds.length} members exported to PDF.`);
+    if (selectedIds.length > 0) {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleBulkExportCSV = (exportIds: string[]) => {
+    const exportMembers = members.filter(m => exportIds.includes(m.id));
     const csvContent = [
       ["Name", "Email", "Phone", "Role", "Status", "District", "Branch", "Joined Date"],
-      ...selectedMembersData.map(m => [
+      ...exportMembers.map(m => [
         m.fullName, 
         m.email || '', 
         m.phone || '', 
@@ -205,8 +246,10 @@ export default function MemberManagementPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success(`${selectedIds.length} members exported successfully.`);
-    setSelectedIds([]);
+    toast.success(`${exportIds.length} members exported to CSV.`);
+    if (selectedIds.length > 0) {
+      setSelectedIds([]);
+    }
   };
 
   const handleBulkDelete = async () => {
@@ -280,23 +323,13 @@ export default function MemberManagementPage() {
           <MemberToolbar 
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            onBulkUpdate={() => {
+            onExport={(type: 'csv' | 'pdf') => {
                const exportIds = selectedCount > 0 ? selectedIds : filteredMembers.map(m => m.id);
-               // Quick export of whatever is filtered if no selection
-               const csvContent = [
-                 ["Name", "Email", "Phone", "Role", "Status"],
-                 ...members.filter(m => exportIds.includes(m.id)).map(m => [m.fullName, m.email||'', m.phone||'', m.level||'', m.status||''])
-               ].map(e => e.join(",")).join("\n");
-               const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-               const link = document.createElement("a");
-               const url = URL.createObjectURL(blob);
-               link.setAttribute("href", url);
-               link.setAttribute("download", `members_export_${new Date().getTime()}.csv`);
-               link.style.visibility = 'hidden';
-               document.body.appendChild(link);
-               link.click();
-               document.body.removeChild(link);
-               toast.success(`${exportIds.length} members exported.`);
+               if (type === 'pdf') {
+                 handleBulkExportPDF(exportIds);
+               } else {
+                 handleBulkExportCSV(exportIds);
+               }
             }}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
@@ -305,13 +338,13 @@ export default function MemberManagementPage() {
             showGlobalFilters={profile?.role === 'superadmin' || profile?.role === 'district'}
           >
             {profile?.role === 'superadmin' || profile?.role === 'district' ? (
-              <div className="flex flex-row flex-nowrap items-center gap-3 sm:gap-4 px-1 sm:px-4 w-full overflow-x-auto no-scrollbar">
+              <div className="flex flex-row flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-4 px-1 sm:px-4 w-full">
                 {profile?.role === 'superadmin' && (
                   <>
-                    <div className="flex flex-col shrink-0 min-w-[120px]">
+                    <div className="flex flex-col shrink-0 min-w-[100px] sm:min-w-[120px] flex-1 sm:flex-none">
                       <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-px">District</label>
                       <select 
-                        className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer w-full"
+                        className="bg-transparent text-xs sm:text-sm font-bold text-slate-700 outline-none cursor-pointer w-full"
                         value={filters.district}
                         onChange={(e) => setFilters({...filters, district: e.target.value, branch: 'All'})}
                       >
@@ -319,13 +352,13 @@ export default function MemberManagementPage() {
                         {Object.entries(districtMaps).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                       </select>
                     </div>
-                    <div className="h-8 w-px bg-slate-200 shrink-0"></div>
+                    <div className="hidden sm:block h-8 w-px bg-slate-200 shrink-0"></div>
                   </>
                 )}
-                <div className="flex flex-col shrink-0 min-w-[120px]">
+                <div className="flex flex-col shrink-0 min-w-[100px] sm:min-w-[120px] flex-1 sm:flex-none">
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-px">Branch</label>
                   <select 
-                    className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer w-full disabled:opacity-40"
+                    className="bg-transparent text-xs sm:text-sm font-bold text-slate-700 outline-none cursor-pointer w-full disabled:opacity-40"
                     value={filters.branch}
                     onChange={(e) => setFilters({...filters, branch: e.target.value})}
                     disabled={profile?.role === 'superadmin' && filters.district === 'All'}
@@ -339,11 +372,11 @@ export default function MemberManagementPage() {
                     }
                   </select>
                 </div>
-                <div className="h-8 w-px bg-slate-200 shrink-0"></div>
-                <div className="flex flex-col shrink-0 min-w-[140px]">
+                <div className="hidden sm:block h-8 w-px bg-slate-200 shrink-0"></div>
+                <div className="flex flex-col shrink-0 min-w-[100px] sm:min-w-[140px] flex-1 sm:flex-none">
                   <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-px">Level</label>
                   <select 
-                    className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer w-full"
+                    className="bg-transparent text-xs sm:text-sm font-bold text-slate-700 outline-none cursor-pointer w-full"
                     value={activeTab}
                     onChange={(e) => setActiveTab(e.target.value)}
                   >
@@ -432,12 +465,21 @@ export default function MemberManagementPage() {
             
             <div className="flex items-center gap-2">
               <Button 
-                onClick={handleBulkExport}
+                onClick={() => handleBulkExportCSV(selectedIds)}
                 variant="ghost" 
                 className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2"
               >
                 <Download size={16} />
-                <span className="hidden sm:inline">Export CSV</span>
+                <span className="hidden sm:inline">CSV</span>
+              </Button>
+              
+              <Button 
+                onClick={() => handleBulkExportPDF(selectedIds)}
+                variant="ghost" 
+                className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2"
+              >
+                <FileText size={16} />
+                <span className="hidden sm:inline">PDF</span>
               </Button>
               
               {profile?.role === 'superadmin' && (
