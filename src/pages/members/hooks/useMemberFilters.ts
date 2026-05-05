@@ -17,7 +17,7 @@ export function useMemberFilters(members: MemberData[], role: string = 'member')
   });
 
   const filteredMembers = useMemo(() => {
-    return members.filter(member => {
+    const filtered = members.filter(member => {
       
       const isVisitor = member.level === 'Visitor' || member.membershipLevel === 'visitor';
       const isConvert = member.level === 'Convert' || member.membershipLevel === 'convert';

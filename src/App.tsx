@@ -28,6 +28,7 @@ import SuperadminDashboard from './pages/SuperadminDashboard';
 import SystemAlerts from './pages/SystemAlerts';
 import MemberPortal from './pages/MemberPortal';
 import MemberProfile from './pages/MemberProfile';
+import KioskCheckIn from './pages/KioskCheckIn';
 import DistrictDashboard from './pages/DistrictDashboard';
 import AdminDistricts from './pages/AdminDistricts';
 import DepartmentMemberProfile from './pages/DepartmentMemberProfile';
@@ -54,6 +55,7 @@ export default function App() {
       <BrowserRouter>
         <Toaster position="top-right" richColors />
         <Routes>
+          <Route path="/kiosk" element={<KioskCheckIn />} />
           <Route path="/register" element={<AdminRegistration />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />

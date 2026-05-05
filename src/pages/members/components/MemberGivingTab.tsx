@@ -87,7 +87,7 @@ export const MemberGivingTab: React.FC<MemberGivingTabProps> = ({ member }) => {
         date: new Date(date).toISOString(),
         note,
         memberId: member.id,
-        recordedBy: profile?.id || 'system',
+        recordedBy: profile?.uid || 'system',
         timestamp: serverTimestamp()
       });
       

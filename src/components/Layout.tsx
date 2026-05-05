@@ -36,6 +36,7 @@ import {
   CalendarDays,
   Droplets,
   ClipboardList,
+  QrCode,
 } from "lucide-react";
 import { APP_MODULES, Role } from "../constants/modules";
 import { useFirebase } from "./FirebaseProvider";
@@ -343,6 +344,14 @@ export default function Layout() {
                   icon={<Flame size={18} />}
                   label="Live Events"
                   active={location.pathname === "/events"}
+                  isCollapsed={isCollapsed}
+                  onClick={() => setIsSidebarOpen(false)}
+                />
+                <NavItem
+                  to="/kiosk"
+                  icon={<QrCode size={18} />}
+                  label="Kiosk Mode"
+                  active={location.pathname === "/kiosk"}
                   isCollapsed={isCollapsed}
                   onClick={() => setIsSidebarOpen(false)}
                 />

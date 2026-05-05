@@ -95,8 +95,7 @@ service cloud.firestore {
     }
 
     function isValidAttendance(data) {
-      return data.keys().hasAll(['timestamp', 'recordedBy']) &&
-             data.keys().size() == 2 &&
+      return data.keys().hasAll(['timestamp', 'recordedBy', 'date', 'service', 'method', 'status']) &&
              data.timestamp == request.time &&
              data.recordedBy == request.auth.uid;
     }
@@ -231,6 +230,11 @@ service cloud.firestore {
           allow create: if isBranchAdmin(districtId, branchId) && isVerified() && isValidMember(incoming());
           allow update: if isBranchAdmin(districtId, branchId) && isVerified() && isValidMember(incoming());
           allow delete: if isBranchAdmin(districtId, branchId) && isVerified();
+
+          match /attendance/{attendanceId} {
+            allow read, list: if isBranchAdmin(districtId, branchId) || (isSignedIn() && request.auth.uid == memberId) || isSuperAdmin() || isDistrictLeader(districtId);
+            allow write: if (isBranchAdmin(districtId, branchId) || isSuperAdmin() || isDistrictLeader(districtId)) && isVerified() && isValidAttendance(incoming());
+          }
         }
 
         match /transactions/{transactionId} {

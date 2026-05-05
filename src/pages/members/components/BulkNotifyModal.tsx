@@ -62,7 +62,7 @@ export const BulkNotifyModal: React.FC<BulkNotifyModalProps> = ({ isOpen, onClos
            subject: channel === 'email' ? subject : null,
            message,
            timestamp: new Date().toISOString(),
-           performedBy: profile?.id || 'system'
+           performedBy: profile?.uid || 'system'
          });
          
          if (count % 450 === 0) {

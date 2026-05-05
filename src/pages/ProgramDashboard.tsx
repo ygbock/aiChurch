@@ -1879,12 +1879,11 @@ function BarcodeScanner({ onScan, onBack, scannedResult }: { onScan: (code: stri
 
 // --- MODULE: ATTENDANCE ---
 function AttendanceModule() {
+  const navigate = useNavigate();
   const { profile } = useFirebase();
   const { programId } = useParams();
   const [sessionInfo, setSessionInfo] = useState('General Session');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isKioskMode, setIsKioskMode] = useState(false);
-  const [useCamera, setUseCamera] = useState(false);
   const [kioskCode, setKioskCode] = useState('');
   const [scannedResult, setScannedResult] = useState('');
 
@@ -1927,11 +1926,25 @@ function AttendanceModule() {
   const toggleStatus = async (id: string, currentStatus: string) => {
     if (!profile?.districtId || !profile?.branchId || !programId) return;
     const ref = doc(db, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/attendance`, id);
+    const memberAttendanceRef = doc(db, `districts/${profile.districtId}/branches/${profile.branchId}/members/${id}/attendance`, programId);
+    
     try {
         if (currentStatus === 'pending') {
-            await setDoc(ref, { timestamp: serverTimestamp(), recordedBy: profile.uid });
+            const payload = { 
+                timestamp: serverTimestamp(), 
+                recordedBy: profile.uid,
+                date: new Date().toISOString().split('T')[0],
+                service: sessionInfo || "Event Transfer",
+                method: "Manual ID/Scanner",
+                status: "Present"
+            };
+            
+            // Dual write for event logic and individual member telemetry
+            await setDoc(ref, payload);
+            await setDoc(memberAttendanceRef, payload);
         } else {
             await deleteDoc(ref);
+            await deleteDoc(memberAttendanceRef);
         }
     } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, ref.path);
@@ -1970,64 +1983,6 @@ function AttendanceModule() {
     { label: "Main Service", percent: 82, count: 370, color: "bg-emerald-500" }
   ];
 
-  if (isKioskMode) {
-    return (
-       <div className="absolute inset-0 z-50 bg-slate-900 flex items-center justify-center p-4">
-          <button 
-            onClick={() => { setIsKioskMode(false); setUseCamera(false); setScannedResult(''); }}
-            className="absolute top-8 right-8 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all font-bold text-xl"
-          >
-            <X size={24} />
-          </button>
-          <div className="bg-slate-800 p-8 sm:p-12 rounded-[2rem] max-w-lg w-full text-center relative overflow-hidden flex flex-col items-center">
-             <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
-             
-             {!useCamera ? (
-               <>
-                 <Scan size={80} className="mx-auto text-blue-500 mb-8 opacity-80" />
-                 <h2 className="text-2xl sm:text-3xl font-black text-white font-display uppercase tracking-widest mb-2">Check-in Scanner</h2>
-                 <p className="text-slate-400 mb-8 font-medium text-xs sm:text-sm">Scan QR code or barcode to record attendance instantly.</p>
-                 
-                 <form onSubmit={handleKioskSubmit} className="relative z-10 w-full mb-6">
-                    <input 
-                      type="text" 
-                      autoFocus 
-                      value={kioskCode} 
-                      onChange={e => setKioskCode(e.target.value)} 
-                      placeholder="Waiting for scanner input..." 
-                      className="w-full bg-slate-900/50 border-2 border-slate-700 rounded-2xl px-4 sm:px-6 py-4 sm:py-5 text-lg sm:text-xl font-black text-white text-center focus:outline-none focus:border-blue-500 focus:bg-slate-900 transition-all placeholder:text-slate-600 tracking-widest"
-                    />
-                    <button type="submit" className="hidden">Submit</button>
-                 </form>
-                 <p className="text-[9px] sm:text-[10px] uppercase font-black tracking-widest text-slate-500 mb-6">Keyboard wedge simulated</p>
-
-                 <div className="relative z-10 w-full flex flex-col gap-4">
-                   <div className="flex items-center gap-4 w-full">
-                     <div className="h-px bg-slate-700 flex-1"></div>
-                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">OR</span>
-                     <div className="h-px bg-slate-700 flex-1"></div>
-                   </div>
-                   <button 
-                     onClick={() => { setUseCamera(true); setScannedResult(''); }}
-                     className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg flex justify-center items-center gap-2"
-                   >
-                     Use Device Camera
-                   </button>
-                 </div>
-               </>
-             ) : (
-               <BarcodeScanner 
-                 onScan={(code) => processScannedCode(code)} 
-                 onBack={() => { setUseCamera(false); setScannedResult(''); }} 
-                 scannedResult={scannedResult} 
-               />
-             )}
-             
-          </div>
-       </div>
-    );
-  }
-
   return (
     <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 min-h-[600px] h-full">
       {/* Left Sidebar: Scan & Status */}
@@ -2047,7 +2002,7 @@ function AttendanceModule() {
             </div>
             
             <button 
-              onClick={() => setIsKioskMode(true)}
+              onClick={() => navigate(`/kiosk?programId=${programId}&programName=${encodeURIComponent(sessionInfo)}`)}
               className="mt-4 w-full py-3 sm:py-4 bg-white text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-50 active:scale-[0.98] transition-all shadow-lg flex justify-center items-center gap-2"
             >
               Launch Kiosk Mode

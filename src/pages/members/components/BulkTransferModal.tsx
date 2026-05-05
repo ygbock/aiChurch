@@ -121,7 +121,7 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
              toBranchName: toBranchName,
              reason: transferReason,
              newCapacity: newCapacity || member.level,
-             requestedBy: profile?.id,
+             requestedBy: profile?.uid || 'system',
              status: 'pending',
              createdAt: new Date().toISOString()
            });
@@ -149,7 +149,7 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
                toBranch: targetBranchId,
                reason: transferReason,
                newCapacity: newCapacity || member.level,
-               transferredBy: profile?.id || 'system'
+               transferredBy: profile?.uid || 'system'
              }
            ]
         };

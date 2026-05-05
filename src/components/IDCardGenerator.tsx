@@ -7,6 +7,7 @@ interface IDCardGeneratorProps {
   isOpen: boolean;
   onClose: () => void;
   member: {
+    id: string;
     fullName: string;
     photoUrl?: string;
     level: string;
@@ -287,7 +288,7 @@ function Card({ orientation, side, member, themeColor, colors, accentColors }: a
             <div className="flex flex-col items-center">
               <div className="bg-white p-3 rounded-2xl shadow-xl mb-4 relative overflow-hidden">
                 <QRCodeSVG
-                  value={`https://faithconnect.app/verify/${member.fullName?.replace(/\s+/g, '-').toLowerCase()}`}
+                  value={member.id}
                   size={orientation === 'landscape' ? 90 : 80}
                   level="H"
                   includeMargin={false}

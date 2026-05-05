@@ -56,6 +56,7 @@ export interface MemberData {
   tags?: string[];
   
   path?: string; // Firestore path
+  transferHistory?: any[];
   createdAt: any;
   updatedAt: any;
 }

@@ -34,24 +34,9 @@ import { doc, getDoc, collection, query, where, getDocs, limit, orderBy, collect
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { TagEditorModal } from './members/components/TagEditorModal';
 import { MemberGivingTab } from './members/components/MemberGivingTab';
+import { MemberAttendanceTab } from './members/components/MemberAttendanceTab';
 import IDCardGenerator from '../components/IDCardGenerator';
-
-interface MemberData {
-  id: string;
-  fullName: string;
-  email: string;
-  phone: string;
-  address?: string;
-  createdAt?: any;
-  level: string;
-  status: string;
-  baptismStatus?: string;
-  isBaptised?: boolean;
-  branchId?: string;
-  districtId?: string;
-  photoUrl?: string;
-  tags?: string[];
-}
+import { MemberData } from '../types/membership';
 
 export default function MemberProfile() {
   const { memberId } = useParams();
@@ -218,6 +203,7 @@ export default function MemberProfile() {
           isOpen={isIDCardModalOpen}
           onClose={() => setIsIDCardModalOpen(false)}
           member={{
+             id: member.id,
              fullName: member.fullName,
              photoUrl: member.photoUrl,
              level: member.level
@@ -264,7 +250,7 @@ export default function MemberProfile() {
                   {member.status || "active"}
                 </span>
                 <span className="px-5 py-1 border border-blue-200 text-blue-700 rounded-full text-xs font-bold uppercase tracking-wide">
-                   {member.level === 'Pastor' ? 'PASTOR' : member.baptismStatus === 'Approved' ? `Baptized - ${member.level}` : member.level}
+                   {member.level === 'Pastor' ? 'PASTOR' : member.baptismStatus === 'Baptised' ? `Baptized - ${member.level}` : member.level}
                 </span>
 
                 {member.tags?.map((tag, i) => (
@@ -460,6 +446,8 @@ export default function MemberProfile() {
                     </div>
                  ))}
                </div>
+            ) : activeTab === 'attendance' ? (
+              <MemberAttendanceTab member={member} />
             ) : activeTab === 'giving' ? (
               <MemberGivingTab member={member} />
             ) : (
