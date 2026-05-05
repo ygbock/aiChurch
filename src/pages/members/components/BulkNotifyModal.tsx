@@ -5,6 +5,9 @@ import { Mail, MessageSquare, Send, Users, AlertCircle, Loader2 } from 'lucide-r
 import { MemberData } from '@/types/membership';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { writeBatch, collection, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useFirebase } from '@/components/FirebaseProvider';
 
 interface BulkNotifyModalProps {
   isOpen: boolean;
@@ -18,6 +21,7 @@ export const BulkNotifyModal: React.FC<BulkNotifyModalProps> = ({ isOpen, onClos
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const { profile } = useFirebase();
 
   // Filter members based on selected channel
   const eligibleMembers = selectedMembers.filter(m => {
@@ -45,10 +49,32 @@ export const BulkNotifyModal: React.FC<BulkNotifyModalProps> = ({ isOpen, onClos
     setIsSending(true);
     
     try {
-      // Simulate API call to notification service (e.g. SendGrid / Twilio)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const batch = writeBatch(db);
+      let count = 0;
       
-      toast.success(`Successfully sent ${channel.toUpperCase()} to ${eligibleMembers.length} members.`);
+      for (const member of eligibleMembers) {
+         if (!member.districtId || !member.branchId) continue;
+         count++;
+         const activityRef = doc(collection(db, `districts/${member.districtId}/branches/${member.branchId}/members/${member.id}/activities`));
+         batch.set(activityRef, {
+           type: 'communication',
+           channel,
+           subject: channel === 'email' ? subject : null,
+           message,
+           timestamp: new Date().toISOString(),
+           performedBy: profile?.id || 'system'
+         });
+         
+         if (count % 450 === 0) {
+            await batch.commit();
+         }
+      }
+      
+      if (count % 450 !== 0) {
+         await batch.commit();
+      }
+      
+      toast.success(`Successfully sent ${channel.toUpperCase()} to ${count} members.`);
       setSubject('');
       setMessage('');
       if (onSuccess) onSuccess();

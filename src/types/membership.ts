@@ -53,6 +53,7 @@ export interface MemberData {
   notes?: string;
 
   ministries?: string[];
+  tags?: string[];
   
   path?: string; // Firestore path
   createdAt: any;

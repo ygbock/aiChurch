@@ -327,7 +327,12 @@ service cloud.firestore {
     // Collection Group Helpers for safety
     match /{path=**}/members/{memberId} {
       allow read: if isSignedIn() && (request.auth.uid == memberId || isBranchAdmin('any', 'any'));
-      allow list: if isSuperAdmin() || isDistrictLeader('any') || isBranchAdmin('any', 'any');
+      allow list: if isSuperAdmin() || isDistrictLeader('any') || isBranchAdmin('any', 'any') || (isSignedIn() && (resource.data.uid == request.auth.uid || resource.data.memberId == request.auth.uid || resource.data.id == request.auth.uid));
+    }
+
+    match /{path=**}/activities/{activityId} {
+      allow read, list: if isSignedIn();
+      allow write: if isSuperAdmin() || isBranchAdmin('any', 'any');
     }
     
     match /{path=**}/branches/{branchId} {

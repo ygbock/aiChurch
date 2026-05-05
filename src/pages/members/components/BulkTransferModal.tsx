@@ -8,7 +8,6 @@ import { db } from '@/lib/firebase';
 import { useFirebase } from '@/components/FirebaseProvider';
 import { MemberData } from '@/types/membership';
 import { cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface BulkTransferModalProps {
   isOpen: boolean;
@@ -26,6 +25,8 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
   const { profile } = useFirebase();
   const [targetDistrictId, setTargetDistrictId] = useState('');
   const [targetBranchId, setTargetBranchId] = useState('');
+  const [transferReason, setTransferReason] = useState('');
+  const [newCapacity, setNewCapacity] = useState('');
   
   const [districts, setDistricts] = useState<{id: string, name: string}[]>([]);
   const [branches, setBranches] = useState<{id: string, name: string}[]>([]);
@@ -93,10 +94,38 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
       const batch = writeBatch(db);
       
       let transferCount = 0;
+      let needsApprovalCount = 0;
+      
+      const toBranchObj = branches.find(b => b.id === targetBranchId);
+      const toBranchName = toBranchObj ? toBranchObj.name : 'Unknown';
 
       for (const member of selectedMembers) {
         // Skip if they are already in the target branch
         if (member.branchId === targetBranchId && member.districtId === targetDistrictId) {
+           continue;
+        }
+
+        const isLeaderTransfer = ['District Overseer', 'Branch Pastor', 'Assistant Pastor', 'Department Head', 'Leader'].includes(member.level) || 
+                                 ['District Overseer', 'Branch Pastor', 'Assistant Pastor', 'Department Head', 'Leader'].includes(newCapacity);
+
+        if (profile?.role !== 'superadmin' && isLeaderTransfer) {
+           const transferRef = doc(collection(db, 'transfers'));
+           batch.set(transferRef, {
+             memberId: member.id,
+             memberName: member.fullName,
+             fromDistrictId: member.districtId || 'unassigned',
+             fromBranchId: member.branchId || 'unassigned',
+             fromBranchName: member.branch || 'Unknown',
+             toDistrictId: targetDistrictId,
+             toBranchId: targetBranchId,
+             toBranchName: toBranchName,
+             reason: transferReason,
+             newCapacity: newCapacity || member.level,
+             requestedBy: profile?.id,
+             status: 'pending',
+             createdAt: new Date().toISOString()
+           });
+           needsApprovalCount++;
            continue;
         }
 
@@ -109,7 +138,20 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
            ...member,
            districtId: targetDistrictId,
            branchId: targetBranchId,
-           // Keep a record of transfer history? (Optional, maybe skip for now) // updatedDate is likely there
+           ...(newCapacity ? { level: newCapacity } : {}),
+           transferHistory: [
+             ...(member.transferHistory || []),
+             {
+               date: new Date().toISOString(),
+               fromDistrict: member.districtId,
+               fromBranch: member.branchId,
+               toDistrict: targetDistrictId,
+               toBranch: targetBranchId,
+               reason: transferReason,
+               newCapacity: newCapacity || member.level,
+               transferredBy: profile?.id || 'system'
+             }
+           ]
         };
 
         // If the query returns 'path' field we shouldn't save back the old path
@@ -121,9 +163,14 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
         transferCount++;
       }
 
-      if (transferCount > 0) {
+      if (transferCount > 0 || needsApprovalCount > 0) {
          await batch.commit();
-         toast.success(`Successfully transferred ${transferCount} members.`);
+         if (transferCount > 0) {
+           toast.success(`Successfully transferred ${transferCount} members.`);
+         }
+         if (needsApprovalCount > 0) {
+           toast.success(`${needsApprovalCount} leader transfers sent to HQ for approval.`);
+         }
          onSuccess();
       } else {
          toast.info("No members needed transferring (they are already in the target branch).");
@@ -153,32 +200,72 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
         <div className="space-y-4">
            {profile?.role === 'superadmin' && (
              <div className="space-y-2">
-               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Destination District</label>
-               <Select onValueChange={handleDistrictChange} value={targetDistrictId}>
-                 <SelectTrigger className="w-full bg-slate-50 border-slate-200 h-11 rounded-xl focus:ring-blue-500">
-                   <SelectValue placeholder="Select District" />
-                 </SelectTrigger>
-                 <SelectContent>
-                   {districts.map(d => (
-                     <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                   ))}
-                 </SelectContent>
-               </Select>
-             </div>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Destination District</label>
+              <select 
+                onChange={(e) => handleDistrictChange(e.target.value)} 
+                value={targetDistrictId}
+                className="w-full bg-slate-50 border border-slate-200 h-11 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="" disabled>Select District</option>
+                {districts.map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
            )}
 
            <div className="space-y-2">
              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Destination Branch</label>
-             <Select onValueChange={setTargetBranchId} value={targetBranchId} disabled={!targetDistrictId || isLoadingLocations}>
-               <SelectTrigger className="w-full bg-slate-50 border-slate-200 h-11 rounded-xl focus:ring-blue-500">
-                 <SelectValue placeholder={!targetDistrictId ? "Select district first" : isLoadingLocations ? "Loading..." : "Select Branch"} />
-               </SelectTrigger>
-               <SelectContent>
-                 {branches.map(b => (
-                   <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                 ))}
-               </SelectContent>
-             </Select>
+             <select 
+               onChange={(e) => setTargetBranchId(e.target.value)} 
+               value={targetBranchId} 
+               disabled={!targetDistrictId || isLoadingLocations}
+               className="w-full bg-slate-50 border border-slate-200 h-11 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+             >
+                <option value="" disabled>
+                  {!targetDistrictId ? "Select district first" : isLoadingLocations ? "Loading..." : "Select Branch"}
+                </option>
+                {branches.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+             </select>
+           </div>
+
+           <div className="space-y-2">
+             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Reason for Transfer</label>
+             <select 
+               onChange={(e) => setTransferReason(e.target.value)} 
+               value={transferReason}
+               className="w-full bg-slate-50 border border-slate-200 h-11 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+             >
+               <option value="" disabled>Select Reason</option>
+               {profile?.role === 'superadmin' && (
+                 <option value="Official HQ Transfer">Official HQ Transfer</option>
+               )}
+               <option value="Relocation">Relocation</option>
+               <option value="Change of Service">Change of Service / Role</option>
+               <option value="Personal Request">Personal Request</option>
+               <option value="Other">Other</option>
+             </select>
+           </div>
+
+           <div className="space-y-2">
+             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">New Capacity / Role</label>
+             <select 
+               onChange={(e) => setNewCapacity(e.target.value)} 
+               value={newCapacity}
+               className="w-full bg-slate-50 border border-slate-200 h-11 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+             >
+               <option value="">Keep Current Capacity</option>
+               <option value="District Overseer">District Overseer</option>
+               <option value="Branch Pastor">Branch Pastor</option>
+               <option value="Assistant Pastor">Assistant Pastor</option>
+               <option value="Department Head">Department Head</option>
+               <option value="Leader">Leader</option>
+               <option value="Worker">Worker</option>
+               <option value="Member">Member</option>
+             </select>
+             <p className="text-xs text-slate-500">Leaving this empty will preserve their current role/level.</p>
            </div>
         </div>
 

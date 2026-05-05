@@ -109,8 +109,8 @@ export default function Volunteers() {
               </div>
             </div>
             <div className="grid grid-cols-7 gap-2">
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
-                <div key={day} className="text-center text-[10px] font-bold text-slate-400 uppercase mb-2">{day}</div>
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                <div key={`${day}-${i}`} className="text-center text-[10px] font-bold text-slate-400 uppercase mb-2">{day}</div>
               ))}
               {Array.from({ length: 31 }, (_, i) => (
                 <div key={i} className={`aspect-square rounded-lg border border-slate-100 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer ${i === 14 ? 'bg-blue-600 text-white' : 'hover:bg-slate-50 text-slate-600'}`}>

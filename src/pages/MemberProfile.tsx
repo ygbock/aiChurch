@@ -26,10 +26,14 @@ import {
   Star,
   Activity,
   Award,
-  Edit
+  Edit,
+  Plus,
+  Flame
 } from 'lucide-react';
 import { doc, getDoc, collection, query, where, getDocs, limit, orderBy, collectionGroup } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { TagEditorModal } from './members/components/TagEditorModal';
+import { MemberGivingTab } from './members/components/MemberGivingTab';
 import IDCardGenerator from '../components/IDCardGenerator';
 
 interface MemberData {
@@ -46,6 +50,7 @@ interface MemberData {
   branchId?: string;
   districtId?: string;
   photoUrl?: string;
+  tags?: string[];
 }
 
 export default function MemberProfile() {
@@ -54,8 +59,21 @@ export default function MemberProfile() {
   const navigate = useNavigate();
   const [member, setMember] = useState<MemberData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('attendance');
+  const [activeTab, setActiveTab] = useState('timeline');
   const [isIDCardModalOpen, setIsIDCardModalOpen] = useState(false);
+  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
+  const [activities, setActivities] = useState<any[]>([]);
+
+  const safeFormat = (dateStr: any, formatStr: string) => {
+    if (!dateStr) return 'N/A';
+    try {
+      const date = dateStr.toDate ? dateStr.toDate() : new Date(dateStr);
+      if (isNaN(date.getTime())) return 'N/A';
+      return format(date, formatStr);
+    } catch (e) {
+      return 'N/A';
+    }
+  };
 
   useEffect(() => {
     const fetchMember = async () => {
@@ -67,31 +85,43 @@ export default function MemberProfile() {
         const d = searchParams.get('districtId');
         const b = searchParams.get('branchId');
 
+        let foundMember = null;
         if (d && b) {
           const docRef = doc(db, 'districts', d, 'branches', b, 'members', memberId);
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
-            setMember({ id: docSnap.id, ...docSnap.data() } as MemberData);
-            setLoading(false);
-            return;
+            foundMember = { id: docSnap.id, ...docSnap.data() } as MemberData;
           }
         }
 
-        const qByMemberId = query(collectionGroup(db, 'members'), where('memberId', '==', memberId));
-        const qByUid = query(collectionGroup(db, 'members'), where('uid', '==', memberId));
-        const qById = query(collectionGroup(db, 'members'), where('id', '==', memberId));
+        if (!foundMember) {
+          const qByMemberId = query(collectionGroup(db, 'members'), where('memberId', '==', memberId));
+          const qByUid = query(collectionGroup(db, 'members'), where('uid', '==', memberId));
+          const qById = query(collectionGroup(db, 'members'), where('id', '==', memberId));
 
-        const [snapMemberId, snapUid, snapId] = await Promise.all([
-          getDocs(qByMemberId),
-          getDocs(qByUid),
-          getDocs(qById)
-        ]);
+          const [snapMemberId, snapUid, snapId] = await Promise.all([
+            getDocs(qByMemberId),
+            getDocs(qByUid),
+            getDocs(qById)
+          ]);
+          
+          const snapshot = !snapMemberId.empty ? snapMemberId : (!snapUid.empty ? snapUid : snapId);
+
+          if (!snapshot.empty) {
+            const doc = snapshot.docs[0];
+            foundMember = { id: doc.id, ...doc.data() } as MemberData;
+          }
+        }
         
-        const snapshot = !snapMemberId.empty ? snapMemberId : (!snapUid.empty ? snapUid : snapId);
-
-        if (!snapshot.empty) {
-          const doc = snapshot.docs[0];
-          setMember({ id: doc.id, ...doc.data() } as MemberData);
+        if (foundMember) {
+           setMember(foundMember);
+           
+           if (foundMember.districtId && foundMember.branchId) {
+             const actsRef = collection(db, `districts/${foundMember.districtId}/branches/${foundMember.branchId}/members/${foundMember.id}/activities`);
+             const actsSnap = await getDocs(query(actsRef, orderBy('timestamp', 'desc')));
+             const actsData = actsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+             setActivities(actsData);
+           }
         }
       } catch (error) {
         handleFirestoreError(error, OperationType.GET, 'member profile');
@@ -157,27 +187,27 @@ export default function MemberProfile() {
           <span className="text-sm font-semibold">Back to Members</span>
         </button>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto">
           <button 
             onClick={() => navigate(`/members/edit/${memberId}?districtId=${searchParams.get('districtId')}&branchId=${searchParams.get('branchId')}`)}
-            className="flex items-center gap-2 px-4 sm:px-6 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold hover:bg-slate-50 transition-all shadow-sm flex-1 sm:flex-none justify-center"
+            className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 px-1 sm:px-6 py-2 sm:py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-[10px] sm:text-sm font-bold hover:bg-slate-50 transition-all shadow-sm justify-center"
           >
-            <Edit size={14} className="sm:w-4 sm:h-4" />
+            <Edit size={14} className="shrink-0 sm:w-4 sm:h-4" />
             <span className="whitespace-nowrap">Edit</span>
           </button>
-          <button className="flex items-center gap-2 px-4 sm:px-6 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold hover:bg-slate-50 transition-all shadow-sm flex-1 sm:flex-none justify-center">
-            <ArrowRightLeft size={14} className="sm:w-4 sm:h-4" />
-            <span className="whitespace-nowrap">Transfer</span>
+          <button className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 px-1 sm:px-6 py-2 sm:py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-[10px] sm:text-sm font-bold hover:bg-slate-50 transition-all shadow-sm justify-center">
+            <ArrowRightLeft size={14} className="shrink-0 sm:w-4 sm:h-4" />
+            <span className="whitespace-nowrap truncate">Transfer</span>
           </button>
-          <button className="flex items-center gap-2 px-4 sm:px-6 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold hover:bg-slate-50 transition-all shadow-sm flex-1 sm:flex-none justify-center">
-            <Download size={14} className="sm:w-4 sm:h-4" />
+          <button className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 px-1 sm:px-6 py-2 sm:py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-[10px] sm:text-sm font-bold hover:bg-slate-50 transition-all shadow-sm justify-center">
+            <Download size={14} className="shrink-0 sm:w-4 sm:h-4" />
             <span className="whitespace-nowrap">Export</span>
           </button>
           <button 
             onClick={() => setIsIDCardModalOpen(true)}
-            className="flex items-center gap-2 px-5 sm:px-6 py-2.5 bg-[#0052cc] text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-[#0047b3] transition-all shadow-md group w-full sm:w-auto justify-center"
+            className="col-span-3 sm:flex-none flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-2 bg-[#0052cc] text-white rounded-xl text-[11px] sm:text-sm font-bold hover:bg-[#0047b3] transition-all shadow-md group justify-center"
           >
-            <CreditCard size={14} className="sm:w-4 sm:h-4" />
+            <CreditCard size={14} className="shrink-0 sm:w-4 sm:h-4" />
             <span>Digital ID Card</span>
           </button>
         </div>
@@ -195,12 +225,23 @@ export default function MemberProfile() {
         />
       )}
 
+      {member && isTagModalOpen && (
+        <TagEditorModal
+          isOpen={isTagModalOpen}
+          onClose={() => setIsTagModalOpen(false)}
+          member={member}
+          onSuccess={(newTags) => {
+             setMember({ ...member, tags: newTags });
+          }}
+        />
+      )}
+
       {/* Main Profile Header Card */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-6 sm:p-12">
-        <div className="flex flex-col md:flex-row gap-6 sm:gap-8 items-center md:items-start tracking-tight">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-8 lg:p-12">
+        <div className="flex flex-col md:flex-row gap-5 sm:gap-8 items-center md:items-start tracking-tight">
           {/* Profile Image */}
           <div className="relative shrink-0">
-            <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden border border-slate-100">
+            <div className="w-24 h-24 sm:w-40 sm:h-40 rounded-full overflow-hidden border border-slate-100">
               {member.photoUrl ? (
                 <img src={member.photoUrl} alt={member.fullName} className="w-full h-full object-cover" />
               ) : (
@@ -214,10 +255,10 @@ export default function MemberProfile() {
       <div className="flex-1 space-y-4 sm:space-y-6 text-center md:text-left w-full">
             <div>
               <div className="flex flex-col md:flex-row md:items-baseline gap-2 sm:gap-3 justify-center md:justify-start mb-3 sm:mb-4">
-                <h1 className="text-3xl sm:text-5xl font-black text-[#001f3f] font-serif tracking-tight leading-none truncate">{member.fullName}</h1>
+                <h1 className="text-2xl sm:text-5xl font-black text-[#001f3f] font-serif tracking-tight leading-tight break-words">{member.fullName}</h1>
               </div>
               
-              {/* Badges */}
+              {/* Badges and Tags */}
               <div className="flex flex-wrap items-center gap-2 justify-center md:justify-start">
                 <span className="px-5 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-wide">
                   {member.status || "active"}
@@ -225,28 +266,42 @@ export default function MemberProfile() {
                 <span className="px-5 py-1 border border-blue-200 text-blue-700 rounded-full text-xs font-bold uppercase tracking-wide">
                    {member.level === 'Pastor' ? 'PASTOR' : member.baptismStatus === 'Approved' ? `Baptized - ${member.level}` : member.level}
                 </span>
+
+                {member.tags?.map((tag, i) => (
+                   <span key={i} className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold uppercase tracking-wide flex items-center gap-1">
+                      {tag}
+                   </span>
+                ))}
+                
+                <button 
+                  onClick={() => setIsTagModalOpen(true)}
+                  className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 transition-colors"
+                  title="Manage Tags"
+                >
+                  <Plus size={14} />
+                </button>
               </div>
             </div>
 
             {/* Contact & Location Details */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-12">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-12 mt-6">
               <div className="flex items-center gap-3 text-slate-600 justify-center md:justify-start">
                 <div className="text-blue-600 shrink-0"><Mail size={16} className="sm:w-[18px] sm:h-[18px]" /></div>
-                <span className="text-xs sm:text-sm font-medium tracking-wide truncate">{member.email}</span>
+                <span className="text-[11px] sm:text-sm font-medium tracking-wide break-words">{member.email}</span>
               </div>
               <div className="flex items-center gap-3 text-slate-600 justify-center md:justify-start">
                 <div className="text-blue-600 shrink-0"><Phone size={16} className="sm:w-[18px] sm:h-[18px]" /></div>
-                <span className="text-xs sm:text-sm font-medium tracking-wide">{member.phone}</span>
+                <span className="text-[11px] sm:text-sm font-medium tracking-wide">{member.phone}</span>
               </div>
               <div className="flex items-start gap-3 text-slate-600 justify-center md:justify-start">
                 <div className="text-blue-600 shrink-0 pt-0.5"><MapPin size={16} className="sm:w-[18px] sm:h-[18px]" /></div>
-                <span className="text-xs sm:text-sm font-medium tracking-wide leading-relaxed text-center md:text-left">
+                <span className="text-[11px] sm:text-sm font-medium tracking-wide leading-relaxed text-center md:text-left">
                   {member.address || "Caritas Road Upper Allentown, Freetown, Hackney, Allentown, Freetown"}
                 </span>
               </div>
               <div className="flex items-center gap-3 text-slate-600 justify-center md:justify-start">
                 <div className="text-blue-600 shrink-0"><Calendar size={16} className="sm:w-[18px] sm:h-[18px]" /></div>
-                <span className="text-xs sm:text-sm font-medium tracking-wide">Joined {member.createdAt ? (
+                <span className="text-[11px] sm:text-sm font-medium tracking-wide">Joined {member.createdAt ? (
                   member.createdAt.toDate ? format(member.createdAt.toDate(), 'MMM d, yyyy') : 
                   member.createdAt instanceof Date ? format(member.createdAt, 'MMM d, yyyy') :
                   typeof member.createdAt === 'string' ? format(new Date(member.createdAt), 'MMM d, yyyy') :
@@ -259,7 +314,7 @@ export default function MemberProfile() {
       </div>
 
       {/* Stats Cards Row */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
         <StatsCard 
           label="Attendance" 
           value="0" 
@@ -278,24 +333,25 @@ export default function MemberProfile() {
       </div>
 
       {/* Tabs Menu */}
-      <div className="bg-slate-100/80 rounded-2xl p-1.5 flex overflow-x-auto no-scrollbar gap-1">
-        {['Attendance', 'RSVPs', 'Giving', 'Transfers'].map((tab) => (
+      <div className="bg-slate-100/80 rounded-2xl p-1.5 flex overflow-x-auto no-scrollbar gap-1 snap-x shadow-inner">
+        {tabs.map((tab) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab.toLowerCase())}
-            className={`flex-1 py-3 px-6 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
-              activeTab === tab.toLowerCase() 
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`shrink-0 snap-center py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl text-[13px] sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+              activeTab === tab.id 
                 ? 'bg-white text-slate-900 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
             }`}
           >
-            {tab}
+            <tab.icon size={16} className={activeTab === tab.id ? 'text-blue-600 shrink-0' : 'shrink-0'} />
+            <span className="whitespace-nowrap">{tab.label}</span>
           </button>
         ))}
       </div>
 
       {/* Content Area */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-12 min-h-[400px]">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-4 sm:p-8 lg:p-12 min-h-[400px]">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -304,16 +360,113 @@ export default function MemberProfile() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="mb-12">
-              <span className="text-slate-400 text-xs font-bold uppercase tracking-[0.15em] block mb-2 px-1">Timeline</span>
-              <h2 className="text-4xl font-black text-[#001f3f] font-serif tracking-tight">
-                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} History
+            <div className="mb-8 sm:mb-12">
+              <span className="text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-[0.15em] block mb-2 px-1">Timeline</span>
+              <h2 className="text-2xl sm:text-4xl font-black text-[#001f3f] font-serif tracking-tight">
+                {tabs.find(t => t.id === activeTab)?.label || activeTab}
               </h2>
             </div>
             
-            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-               <p className="text-lg font-medium">No {activeTab} records</p>
-            </div>
+            {activeTab === 'timeline' ? (
+               <div className="space-y-6">
+                 {/* Member Joining Event */}
+                 {member.visitDate || member.firstVisit ? (
+                    <div className="flex gap-4">
+                       <div className="flex flex-col items-center">
+                          <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center shrink-0 z-10">
+                             <MapPin size={18} />
+                          </div>
+                          <div className="w-0.5 h-full bg-slate-100 my-1"></div>
+                       </div>
+                       <div className="pb-6">
+                          <p className="text-sm text-slate-500 font-bold mb-1">
+                             {safeFormat(member.visitDate || member.firstVisit, 'MMM d, yyyy')}
+                          </p>
+                          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 mt-2">
+                              <h4 className="font-bold text-slate-900">First Visit</h4>
+                              <p className="text-sm text-slate-600 mt-1">First checked in as a visitor</p>
+                          </div>
+                       </div>
+                    </div>
+                 ) : null}
+
+                 {member.conversionDate ? (
+                    <div className="flex gap-4">
+                       <div className="flex flex-col items-center">
+                          <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center shrink-0 z-10">
+                             <Flame size={18} />
+                          </div>
+                          <div className="w-0.5 h-full bg-slate-100 my-1"></div>
+                       </div>
+                       <div className="pb-6">
+                          <p className="text-sm text-slate-500 font-bold mb-1">
+                             {safeFormat(member.conversionDate, 'MMM d, yyyy')}
+                          </p>
+                          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 mt-2">
+                              <h4 className="font-bold text-slate-900">Conversion to Christ</h4>
+                              <p className="text-sm text-slate-600 mt-1">Surrendered life to Christ</p>
+                          </div>
+                       </div>
+                    </div>
+                 ) : null}
+
+                 <div className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                       <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center shrink-0 z-10">
+                          <User size={18} />
+                       </div>
+                       <div className="w-0.5 h-full bg-slate-100 my-1"></div>
+                    </div>
+                    <div className="pb-6">
+                       <p className="text-sm text-slate-500 font-bold mb-1">
+                          {safeFormat(member.joinDate || member.createdAt, 'MMM d, yyyy - h:mm a')}
+                       </p>
+                       <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 mt-2">
+                           <h4 className="font-bold text-slate-900">Member Registration</h4>
+                           <p className="text-sm text-slate-600 mt-1">Profile created in the system</p>
+                       </div>
+                    </div>
+                 </div>
+
+                 {activities.map((act, i) => (
+                    <div className="flex gap-4" key={act.id}>
+                       <div className="flex flex-col items-center">
+                          <div className={`w-10 h-10 flex items-center justify-center shrink-0 z-10 rounded-full
+                             ${act.type === 'communication' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-600'}`}>
+                             {act.type === 'communication' ? <Mail size={18} /> : <Activity size={18} />}
+                          </div>
+                          {i !== activities.length - 1 && (
+                             <div className="w-0.5 h-full bg-slate-100 my-1"></div>
+                          )}
+                       </div>
+                       <div className="pb-6 w-full">
+                          <p className="text-sm text-slate-500 font-bold mb-1">
+                             {format(new Date(act.timestamp), 'MMM d, yyyy - h:mm a')}
+                          </p>
+                          <div className="bg-white border border-slate-200 rounded-2xl p-4 mt-2 shadow-sm">
+                              {act.type === 'communication' ? (
+                                  <>
+                                     <h4 className="font-bold text-slate-900 flex items-center gap-2">
+                                        {act.channel === 'email' ? 'Email Sent' : 'SMS Sent'}
+                                     </h4>
+                                     {act.subject && <p className="text-sm font-bold text-slate-700 mt-2">Subject: {act.subject}</p>}
+                                     <p className="text-sm text-slate-600 mt-1">"{act.message}"</p>
+                                  </>
+                              ) : (
+                                  <h4 className="font-bold text-slate-900">Activity logged</h4>
+                              )}
+                          </div>
+                       </div>
+                    </div>
+                 ))}
+               </div>
+            ) : activeTab === 'giving' ? (
+              <MemberGivingTab member={member} />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                 <p className="text-lg font-medium">No {activeTab} records</p>
+              </div>
+            )}
           </motion.div>
         </AnimatePresence>
       </div>

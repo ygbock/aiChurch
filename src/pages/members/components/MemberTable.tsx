@@ -191,6 +191,12 @@ export const MemberTable = ({
               {member.status}
             </StatusBadge>
             <StatusBadge variant="info">{member.branch || 'Main Branch'}</StatusBadge>
+            
+            {member.tags && member.tags.length > 0 && (
+               <StatusBadge variant="default">
+                 +{member.tags.length} Tag{member.tags.length !== 1 && 's'}
+               </StatusBadge>
+            )}
           </div>
         </div>
       </div>
@@ -263,11 +269,27 @@ export const MemberTable = ({
               </TableCell>
               <TableCell className="py-4">
                 <div className="flex items-center gap-3">
-                  <Avatar className={cn("h-10 w-10 border", isSelected ? "border-blue-200" : "border-slate-200")}>
+                  <Avatar className={cn("h-10 w-10 border shrink-0", isSelected ? "border-blue-200" : "border-slate-200")}>
                     <AvatarImage src={member.photoUrl} alt={member.fullName} />
                     <AvatarFallback className="bg-slate-100 text-slate-500 font-bold">{member.fullName?.charAt(0)}</AvatarFallback>
                   </Avatar>
-                  <div className="text-sm font-bold text-slate-900 leading-none">{member.fullName}</div>
+                  <div>
+                    <div className="text-sm font-bold text-slate-900 leading-tight mb-1">{member.fullName}</div>
+                    {member.tags && member.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {member.tags.slice(0, 2).map((tag, i) => (
+                           <span key={i} className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[9px] font-bold uppercase tracking-wider border border-amber-100">
+                             {tag}
+                           </span>
+                        ))}
+                        {member.tags.length > 2 && (
+                           <span className="px-1.5 py-0.5 bg-slate-50 text-slate-500 rounded text-[9px] font-bold uppercase tracking-wider border border-slate-200">
+                             +{member.tags.length - 2}
+                           </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </TableCell>
               

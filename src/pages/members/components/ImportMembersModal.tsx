@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import Modal from '@/components/Modal';
 import { Button } from '@/components/ui/button';
-import { Upload, FileType, CheckCircle, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
+import { Upload, FileType, CheckCircle, AlertCircle, Loader2, ArrowRight, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import Papa from 'papaparse';
 import { writeBatch, collection, doc, serverTimestamp, getDocs } from 'firebase/firestore';
@@ -122,6 +122,21 @@ export const ImportMembersModal: React.FC<ImportMembersModalProps> = ({
     }
   };
 
+  const handleDownloadTemplate = () => {
+    const csvContent = "Name,Phone,Email,Gender,Level\nJohn Doe,+1234567890,john@example.com,Male,Member";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'members_import_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    
+    // Clean up
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleClose = () => {
     setFile(null);
     setParsedData([]);
@@ -133,14 +148,25 @@ export const ImportMembersModal: React.FC<ImportMembersModalProps> = ({
     <Modal isOpen={isOpen} onClose={handleClose} title="Import Members">
       {step === 1 ? (
         <div className="space-y-6">
-          <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-start gap-3">
-            <AlertCircle className="text-blue-500 shrink-0 mt-0.5" size={18} />
-            <div className="text-sm text-blue-900">
-              <p className="font-bold mb-1">CSV Format Requirements</p>
-              <p className="text-blue-700">
-                Your CSV file must include headers in the first row. The system will look for columns named: <strong>Name</strong>, <strong>Phone</strong>, <strong>Email</strong>, <strong>Level</strong>.
-              </p>
+          <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-blue-500 shrink-0 mt-0.5" size={18} />
+              <div className="text-sm text-blue-900">
+                <p className="font-bold mb-1">CSV Format Requirements</p>
+                <p className="text-blue-700">
+                  Your CSV file must include headers in the first row. The system will look for columns named: <strong>Name</strong>, <strong>Phone</strong>, <strong>Email</strong>, <strong>Gender</strong>, <strong>Level</strong>.
+                </p>
+              </div>
             </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleDownloadTemplate}
+              className="bg-white border-blue-200 text-blue-700 hover:bg-blue-50 shrink-0"
+            >
+              <Download size={14} className="mr-2" />
+              Download Template
+            </Button>
           </div>
 
           <div 
