@@ -17,6 +17,8 @@ import { VisualInsights } from './components/VisualInsights';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { SuperAdminAddMemberModal } from './components/SuperAdminAddMemberModal';
 import { BulkNotifyModal } from './components/BulkNotifyModal';
+import { BulkTransferModal } from './components/BulkTransferModal';
+import { ImportMembersModal } from './components/ImportMembersModal';
 import { Button } from '@/components/ui/button';
 import { MemberData } from '@/types/membership';
 import { useFirebase } from '@/components/FirebaseProvider';
@@ -28,6 +30,8 @@ export default function MemberManagementPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'insights'>('list');
   const [showSuperAdminModal, setShowSuperAdminModal] = useState(false);
   const [showNotifyModal, setShowNotifyModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
   const { searchQuery, setSearchQuery, activeTab, setActiveTab, filteredMembers, filters, setFilters, sortField, setSortField, sortOrder, setSortOrder } = useMemberFilters(members, profile?.role || 'member');
   
   // Selection state
@@ -352,7 +356,7 @@ export default function MemberManagementPage() {
             onSortFieldChange={setSortField}
             sortOrder={sortOrder}
             onSortOrderChange={setSortOrder}
-            onImport={() => toast.info('Import feature coming soon!')}
+            onImport={() => setShowImportModal(true)}
             onExport={(type: 'csv' | 'pdf') => {
                const exportIds = selectedCount > 0 ? selectedIds : filteredMembers.map(m => m.id);
                if (type === 'pdf') {
@@ -491,6 +495,23 @@ export default function MemberManagementPage() {
         />
       )}
 
+      {showImportModal && (
+        <ImportMembersModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => {}}
+        />
+      )}
+
+      {showTransferModal && (
+        <BulkTransferModal
+          isOpen={showTransferModal}
+          onClose={() => setShowTransferModal(false)}
+          selectedMembers={selectedIds.length > 0 ? members.filter(m => selectedIds.includes(m.id)) : filteredMembers}
+          onSuccess={() => setSelectedIds([])}
+        />
+      )}
+
       {/* Floating Bulk Actions Bar */}
       <AnimatePresence>
         {selectedCount > 0 && (
@@ -545,7 +566,7 @@ export default function MemberManagementPage() {
               
               {profile?.role === 'superadmin' && (
                 <Button 
-                  onClick={() => toast.info('Bulk transfer feature coming in v2')}
+                  onClick={() => setShowTransferModal(true)}
                   variant="ghost" 
                   className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2 shrink-0"
                 >
