@@ -71,6 +71,24 @@ export const MemberTable = ({
   onToggleSelect = () => {},
   onToggleSelectAll = () => {}
 }: MemberTableProps) => {
+  const [visibleCount, setVisibleCount] = React.useState(50);
+  const observerRef = React.useRef<IntersectionObserver | null>(null);
+  
+  React.useEffect(() => {
+    setVisibleCount(50);
+  }, [members]);
+
+  const loadMoreRef = React.useCallback((node: HTMLDivElement | null) => {
+    if (loading) return;
+    if (observerRef.current) observerRef.current.disconnect();
+    observerRef.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && visibleCount < members.length) {
+        setVisibleCount(prev => Math.min(prev + 50, members.length));
+      }
+    });
+    if (node) observerRef.current.observe(node);
+  }, [loading, visibleCount, members.length]);
+
   if (loading) {
     return <div className="p-20 text-center text-slate-400 font-medium">Loading data...</div>;
   }
@@ -78,6 +96,9 @@ export const MemberTable = ({
   if (members.length === 0) {
     return <div className="p-20 text-center text-slate-400 font-medium">No records found.</div>;
   }
+
+  const visibleMembers = members.slice(0, visibleCount);
+  const isAllSelected = selectedIds.length > 0 && selectedIds.length === members.length;
 
   const safeFormat = (dateStr: string | undefined | null, formatStr: string) => {
     if (!dateStr) return 'N/A';
@@ -89,8 +110,6 @@ export const MemberTable = ({
       return 'N/A';
     }
   };
-
-  const isAllSelected = selectedIds.length > 0 && selectedIds.length === members.length;
 
   const MemberCard = ({ member }: { member: MemberData }) => {
     const isSelected = selectedIds.includes(member.id);
@@ -186,7 +205,7 @@ export const MemberTable = ({
     )}>
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 md:gap-6 p-0">
-          {members.map((member) => (
+          {visibleMembers.map((member) => (
             <MemberCard key={member.id} member={member} />
           ))}
         </div>
@@ -194,7 +213,7 @@ export const MemberTable = ({
         <>
           {/* Mobile grid view (always grid on mobile) */}
           <div className="md:hidden grid grid-cols-2 sm:grid-cols-2 gap-3 sm:gap-4 p-0">
-            {members.map((member) => (
+            {visibleMembers.map((member) => (
               <MemberCard key={member.id} member={member} />
             ))}
           </div>
@@ -229,7 +248,7 @@ export const MemberTable = ({
                 </TableRow>
               </TableHeader>
         <TableBody>
-          {members.map((member) => {
+          {visibleMembers.map((member) => {
             const isSelected = selectedIds.includes(member.id);
             return (
             <TableRow 
@@ -307,6 +326,12 @@ export const MemberTable = ({
             </Table>
           </div>
         </>
+      )}
+
+      {visibleCount < members.length && (
+        <div ref={loadMoreRef} className="py-8 flex justify-center items-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
       )}
     </div>
   );

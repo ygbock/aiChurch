@@ -136,19 +136,19 @@ export const BulkNotifyModal: React.FC<BulkNotifyModalProps> = ({ isOpen, onClos
           </div>
         </div>
 
-        <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
+        <div className="pt-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row flex-wrap sm:flex-nowrap justify-end gap-3">
           <Button 
             variant="ghost" 
             onClick={onClose}
             disabled={isSending}
-            className="font-bold px-6 hover:bg-slate-100"
+            className="font-bold px-6 hover:bg-slate-100 w-full sm:w-auto"
           >
             Cancel
           </Button>
           <Button 
             onClick={handleSend}
             disabled={isSending || eligibleMembers.length === 0}
-            className="font-bold px-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center gap-2"
+            className="font-bold px-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center gap-2 w-full sm:w-auto"
           >
             {isSending ? (
               <>
