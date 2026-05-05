@@ -5,6 +5,8 @@ export function useMemberFilters(members: MemberData[], role: string = 'member')
   const isHighLevelAdmin = role === 'superadmin' || role === 'district';
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState(isHighLevelAdmin ? 'All Member' : 'Member');
+  const [sortField, setSortField] = useState<'name' | 'joinDate' | 'status'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [filters, setFilters] = useState({
     status: 'All',
     baptism: 'All',
@@ -84,13 +86,39 @@ export function useMemberFilters(members: MemberData[], role: string = 'member')
 
       return true;
     });
-  }, [members, activeTab, searchQuery, filters, isHighLevelAdmin]);
+
+    const sorted = filtered.sort((a, b) => {
+      let valA: string = '';
+      let valB: string = '';
+
+      if (sortField === 'name') {
+        valA = a.fullName?.toLowerCase() || '';
+        valB = b.fullName?.toLowerCase() || '';
+      } else if (sortField === 'joinDate') {
+        valA = a.joinDate || '';
+        valB = b.joinDate || '';
+      } else if (sortField === 'status') {
+        valA = a.status?.toLowerCase() || '';
+        valB = b.status?.toLowerCase() || '';
+      }
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }, [members, activeTab, searchQuery, filters, isHighLevelAdmin, sortField, sortOrder]);
 
   return {
     searchQuery,
     setSearchQuery,
     activeTab,
     setActiveTab,
+    sortField,
+    setSortField,
+    sortOrder,
+    setSortOrder,
     filters,
     setFilters,
     filteredMembers

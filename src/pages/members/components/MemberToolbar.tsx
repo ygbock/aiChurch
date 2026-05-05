@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus, Send, ArrowDownToLine, LayoutGrid, List, FileText, Download } from 'lucide-react';
+import { Search, ArrowDownToLine, ArrowUpToLine, LayoutGrid, List, FileText, Download, SortAsc, SortDesc } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -9,8 +9,13 @@ interface MemberToolbarProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   onExport: (type: 'csv' | 'pdf') => void;
+  onImport?: () => void;
   viewMode: 'grid' | 'list';
   onViewModeChange: (mode: 'grid' | 'list') => void;
+  sortField?: 'name' | 'joinDate' | 'status';
+  onSortFieldChange?: (val: 'name' | 'joinDate' | 'status') => void;
+  sortOrder?: 'asc' | 'desc';
+  onSortOrderChange?: (val: 'asc' | 'desc') => void;
   filters: any;
   onFilterChange: (filters: any) => void;
   showGlobalFilters?: boolean;
@@ -23,8 +28,13 @@ export const MemberToolbar = ({
   searchQuery, 
   onSearchChange, 
   onExport,
+  onImport,
   viewMode,
   onViewModeChange,
+  sortField = 'name',
+  onSortFieldChange,
+  sortOrder = 'asc',
+  onSortOrderChange,
   filters,
   onFilterChange,
   showGlobalFilters,
@@ -52,6 +62,44 @@ export const MemberToolbar = ({
                  <option value="Leader">Leader</option>
                </select>
              </div>
+           )}
+
+           {/* Sorting */}
+           {onSortFieldChange && (
+             <div className="hidden md:flex shrink-0 items-center bg-white border border-slate-200 rounded-xl overflow-hidden h-11">
+               <select
+                 className="h-full pl-3 pr-1 text-xs sm:text-sm font-bold text-slate-600 outline-none bg-transparent cursor-pointer"
+                 value={sortField}
+                 onChange={(e) => onSortFieldChange(e.target.value as any)}
+               >
+                 <option value="name">Sort: Name</option>
+                 <option value="joinDate">Sort: Date</option>
+                 <option value="status">Sort: Status</option>
+               </select>
+               <button 
+                 type="button"
+                 onMouseDown={(e) => { 
+                   e.preventDefault(); 
+                   e.stopPropagation();
+                   onSortOrderChange?.(sortOrder === 'asc' ? 'desc' : 'asc'); 
+                 }}
+                 className="h-full px-2 border-l border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors"
+               >
+                 {sortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
+               </button>
+             </div>
+           )}
+
+           {onImport && (
+             <Button
+               variant="outline"
+               onClick={onImport}
+               className="hidden sm:flex lg:px-3 h-11 w-11 lg:w-auto p-0 rounded-xl items-center justify-center border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors shrink-0 outline-none cursor-pointer lg:gap-2"
+               title="Import Members"
+             >
+               <ArrowUpToLine size={18} />
+               <span className="hidden lg:inline text-sm font-bold truncate">Import</span>
+             </Button>
            )}
 
            <DropdownMenu>

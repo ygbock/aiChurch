@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Send, ArrowDownToLine, Sparkles, Loader2, X, Download, Trash, Users, FileText } from 'lucide-react';
+import { Plus, Send, ArrowDownToLine, Sparkles, Loader2, X, Download, Trash, Users, FileText, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { deleteDoc, doc, collectionGroup, getDocs, addDoc, collection, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { deleteDoc, doc, collectionGroup, getDocs, addDoc, collection, serverTimestamp, writeBatch, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -13,6 +13,7 @@ import { MemberStats } from './components/MemberStats';
 import { TabNavigation } from './components/TabNavigation';
 import { MemberToolbar } from './components/MemberToolbar';
 import { MemberTable } from './components/MemberTable';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { SuperAdminAddMemberModal } from './components/SuperAdminAddMemberModal';
 import { Button } from '@/components/ui/button';
 import { MemberData } from '@/types/membership';
@@ -24,10 +25,11 @@ export default function MemberManagementPage() {
   const { members, loading } = useMembers();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [showSuperAdminModal, setShowSuperAdminModal] = useState(false);
-  const { searchQuery, setSearchQuery, activeTab, setActiveTab, filteredMembers, filters, setFilters } = useMemberFilters(members, profile?.role || 'member');
+  const { searchQuery, setSearchQuery, activeTab, setActiveTab, filteredMembers, filters, setFilters, sortField, setSortField, sortOrder, setSortOrder } = useMemberFilters(members, profile?.role || 'member');
   
   // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showStatusModal, setShowStatusModal] = useState(false);
 
   // To display names instead of IDs
   const [districtMaps, setDistrictMaps] = useState<Record<string, string>>({});
@@ -252,6 +254,26 @@ export default function MemberManagementPage() {
     }
   };
 
+  const handleBulkStatusUpdate = async (status: string) => {
+    if (!window.confirm(`Are you sure you want to change status to "${status}" for ${selectedIds.length} members?`)) return;
+    
+    const selectedMembersData = members.filter(m => selectedIds.includes(m.id));
+    try {
+      const batch = writeBatch(db);
+      selectedMembersData.forEach(m => {
+        if (m.path) {
+          batch.update(doc(db, m.path), { status, updatedAt: serverTimestamp() });
+        }
+      });
+      await batch.commit();
+      toast.success(`${selectedIds.length} members updated to ${status}.`);
+      setSelectedIds([]);
+    } catch (error: any) {
+      console.error("Bulk update failed:", error);
+      toast.error(`Bulk update failed: ${error.message}`);
+    }
+  };
+
   const handleBulkDelete = async () => {
     if (!window.confirm(`Are you sure you want to permanently delete ${selectedIds.length} members?`)) return;
     
@@ -323,6 +345,11 @@ export default function MemberManagementPage() {
           <MemberToolbar 
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            sortField={sortField}
+            onSortFieldChange={setSortField}
+            sortOrder={sortOrder}
+            onSortOrderChange={setSortOrder}
+            onImport={() => toast.info('Import feature coming soon!')}
             onExport={(type: 'csv' | 'pdf') => {
                const exportIds = selectedCount > 0 ? selectedIds : filteredMembers.map(m => m.id);
                if (type === 'pdf') {
@@ -452,22 +479,37 @@ export default function MemberManagementPage() {
             initial={{ opacity: 0, y: 50, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.95 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl shadow-slate-900/20 flex items-center gap-6 z-50 min-w-max border border-slate-700/50"
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-2 sm:px-5 py-2 sm:py-3 rounded-2xl shadow-2xl shadow-slate-900/20 flex items-center gap-2 sm:gap-6 z-50 w-[90vw] sm:w-auto max-w-full border border-slate-700/50"
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 shrink-0 pl-2 sm:pl-0">
               <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm font-bold">
                 {selectedCount}
               </div>
               <span className="text-sm font-bold hidden sm:inline">Selected</span>
             </div>
             
-            <div className="h-6 w-px bg-white/10 hidden sm:block"></div>
+            <div className="h-6 w-px bg-white/10 hidden sm:block shrink-0"></div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-1 px-1">
+              <DropdownMenu>
+                <DropdownMenuTrigger className="px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2 hover:bg-white/10 text-white transition-colors outline-none shrink-0 border border-transparent">
+                  <CheckCircle size={16} />
+                  <span className="hidden sm:inline">Status</span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-40 rounded-xl border-slate-700 bg-slate-800 text-white">
+                  <DropdownMenuItem onClick={() => handleBulkStatusUpdate('Active')} className="cursor-pointer font-bold text-xs py-2.5 hover:bg-slate-700">
+                    Set Active
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleBulkStatusUpdate('Inactive')} className="cursor-pointer font-bold text-xs py-2.5 hover:bg-slate-700 text-slate-400">
+                    Set Inactive
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Button 
                 onClick={() => handleBulkExportCSV(selectedIds)}
                 variant="ghost" 
-                className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2"
+                className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2 shrink-0"
               >
                 <Download size={16} />
                 <span className="hidden sm:inline">CSV</span>
@@ -476,7 +518,7 @@ export default function MemberManagementPage() {
               <Button 
                 onClick={() => handleBulkExportPDF(selectedIds)}
                 variant="ghost" 
-                className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2"
+                className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2 shrink-0"
               >
                 <FileText size={16} />
                 <span className="hidden sm:inline">PDF</span>
@@ -486,28 +528,28 @@ export default function MemberManagementPage() {
                 <Button 
                   onClick={() => toast.info('Bulk transfer feature coming in v2')}
                   variant="ghost" 
-                  className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2"
+                  className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2 shrink-0"
                 >
                   <Users size={16} />
-                  <span className="hidden sm:inline">Bulk Transfer</span>
+                  <span className="hidden sm:inline">Transfer</span>
                 </Button>
               )}
 
               <Button 
                 onClick={handleBulkDelete}
                 variant="ghost" 
-                className="hover:bg-red-500/20 text-red-300 hover:text-red-200 px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2 transition-colors"
+                className="hover:bg-red-500/20 text-red-300 hover:text-red-200 px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2 transition-colors shrink-0"
               >
                 <Trash size={16} />
                 <span className="hidden sm:inline">Delete</span>
               </Button>
             </div>
 
-            <div className="h-6 w-px bg-white/10 ml-2"></div>
+            <div className="h-6 w-px bg-white/10 ml-1 shrink-0"></div>
 
             <button 
               onClick={() => setSelectedIds([])}
-              className="p-2 ml-1 text-slate-400 hover:text-white rounded-xl transition-colors hover:bg-white/10"
+              className="p-2 ml-1 mr-1 sm:mr-0 text-slate-400 hover:text-white rounded-xl transition-colors hover:bg-white/10 shrink-0"
               title="Clear selection"
             >
               <X size={18} />
