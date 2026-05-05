@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Send, ArrowDownToLine, Sparkles, Loader2 } from 'lucide-react';
+import { Plus, Send, ArrowDownToLine, Sparkles, Loader2, X, Download, Trash, Users } from 'lucide-react';
 import { toast } from 'sonner';
-import { deleteDoc, doc, collectionGroup, getDocs, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { deleteDoc, doc, collectionGroup, getDocs, addDoc, collection, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useMembers } from './hooks/useMembers';
 import { useMemberFilters } from './hooks/useMemberFilters';
@@ -24,10 +24,18 @@ export default function MemberManagementPage() {
   const [showSuperAdminModal, setShowSuperAdminModal] = useState(false);
   const { searchQuery, setSearchQuery, activeTab, setActiveTab, filteredMembers, filters, setFilters } = useMemberFilters(members, profile?.role || 'member');
   
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   // To display names instead of IDs
   const [districtMaps, setDistrictMaps] = useState<Record<string, string>>({});
   const [branchMaps, setBranchMaps] = useState<Record<string, string>>({});
   const [branchOptions, setBranchOptions] = useState<Record<string, {id: string, name: string}[]>>({});
+
+  useEffect(() => {
+    // Clear selection when filters change
+    setSelectedIds([]);
+  }, [filters, activeTab, searchQuery]);
 
   useEffect(() => {
     const fetchLocations = async () => {
@@ -159,8 +167,72 @@ export default function MemberManagementPage() {
     }
   };
 
+  const handleToggleSelect = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(selectedId => selectedId !== id) : [...prev, id]);
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.length === filteredMembers.length && filteredMembers.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredMembers.map(m => m.id));
+    }
+  };
+
+  const handleBulkExport = () => {
+    const selectedMembersData = members.filter(m => selectedIds.includes(m.id));
+    const csvContent = [
+      ["Name", "Email", "Phone", "Role", "Status", "District", "Branch", "Joined Date"],
+      ...selectedMembersData.map(m => [
+        m.fullName, 
+        m.email || '', 
+        m.phone || '', 
+        m.level || '', 
+        m.status || '', 
+        districtMaps[m.districtId!] || m.districtId || '', 
+        branchMaps[m.branchId!] || m.branchId || '',
+        m.joinDate || ''
+      ])
+    ].map(e => e.join(",")).join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `members_export_${new Date().getTime()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success(`${selectedIds.length} members exported successfully.`);
+    setSelectedIds([]);
+  };
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Are you sure you want to permanently delete ${selectedIds.length} members?`)) return;
+    
+    const selectedMembersData = members.filter(m => selectedIds.includes(m.id));
+    try {
+      const batch = writeBatch(db);
+      selectedMembersData.forEach(m => {
+        if (m.path) {
+          batch.delete(doc(db, m.path));
+        }
+      });
+      await batch.commit();
+      toast.success(`${selectedIds.length} members deleted successfully.`);
+      setSelectedIds([]);
+    } catch (error: any) {
+      console.error("Bulk delete failed:", error);
+      toast.error(`Bulk delete failed: ${error.message}`);
+    }
+  };
+
+  const selectedCount = selectedIds.length;
+
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-12 relative min-h-[calc(100vh-100px)]">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
         <div>
@@ -177,13 +249,16 @@ export default function MemberManagementPage() {
         </div>
         
         <div className="flex flex-row md:flex-row items-center gap-3 w-full md:w-auto">
-          <Button 
-            variant="outline"
-            className="hidden sm:flex flex-1 md:flex-none rounded-xl px-5 font-bold border-slate-200 items-center justify-center gap-2 h-11"
-          >
-            <Send size={18} />
-            Bulk Notify
-          </Button>
+          {profile?.role !== 'superadmin' && (
+            <Button 
+              variant="outline"
+              onClick={() => toast.info('Notification dispatcher coming soon')}
+              className="hidden sm:flex flex-1 md:flex-none rounded-xl px-5 font-bold border-slate-200 items-center justify-center gap-2 h-11"
+            >
+              <Send size={18} />
+              Bulk Notify
+            </Button>
+          )}
           {profile?.role !== 'superadmin' && (
             <Button 
               onClick={handleAddClick}
@@ -205,7 +280,24 @@ export default function MemberManagementPage() {
           <MemberToolbar 
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            onBulkUpdate={() => toast.info("Bulk update coming soon")}
+            onBulkUpdate={() => {
+               const exportIds = selectedCount > 0 ? selectedIds : filteredMembers.map(m => m.id);
+               // Quick export of whatever is filtered if no selection
+               const csvContent = [
+                 ["Name", "Email", "Phone", "Role", "Status"],
+                 ...members.filter(m => exportIds.includes(m.id)).map(m => [m.fullName, m.email||'', m.phone||'', m.level||'', m.status||''])
+               ].map(e => e.join(",")).join("\n");
+               const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+               const link = document.createElement("a");
+               const url = URL.createObjectURL(blob);
+               link.setAttribute("href", url);
+               link.setAttribute("download", `members_export_${new Date().getTime()}.csv`);
+               link.style.visibility = 'hidden';
+               document.body.appendChild(link);
+               link.click();
+               document.body.removeChild(link);
+               toast.success(`${exportIds.length} members exported.`);
+            }}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             filters={filters}
@@ -286,6 +378,9 @@ export default function MemberManagementPage() {
             onEdit={handleEdit}
             onDelete={handleDelete}
             onView={handleView}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
+            onToggleSelectAll={handleToggleSelectAll}
           />
         </motion.div>
       </div>
@@ -302,7 +397,7 @@ export default function MemberManagementPage() {
           {/* Mobile FAB */}
           <button 
             onClick={() => setShowSuperAdminModal(true)}
-            className="fixed bottom-20 right-6 h-12 w-12 bg-slate-900 text-white rounded-full shadow-2xl shadow-slate-900/20 flex items-center justify-center hover:scale-105 transition-all z-40 sm:hidden"
+            className="fixed bottom-[80px] right-6 h-12 w-12 bg-slate-900 text-white rounded-full shadow-2xl shadow-slate-900/20 flex items-center justify-center hover:scale-105 transition-all z-40 sm:hidden"
           >
             <Plus size={20} />
           </button>
@@ -316,6 +411,68 @@ export default function MemberManagementPage() {
           />
         </>
       )}
+
+      {/* Floating Bulk Actions Bar */}
+      <AnimatePresence>
+        {selectedCount > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl shadow-slate-900/20 flex items-center gap-6 z-50 min-w-max border border-slate-700/50"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm font-bold">
+                {selectedCount}
+              </div>
+              <span className="text-sm font-bold hidden sm:inline">Selected</span>
+            </div>
+            
+            <div className="h-6 w-px bg-white/10 hidden sm:block"></div>
+            
+            <div className="flex items-center gap-2">
+              <Button 
+                onClick={handleBulkExport}
+                variant="ghost" 
+                className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2"
+              >
+                <Download size={16} />
+                <span className="hidden sm:inline">Export CSV</span>
+              </Button>
+              
+              {profile?.role === 'superadmin' && (
+                <Button 
+                  onClick={() => toast.info('Bulk transfer feature coming in v2')}
+                  variant="ghost" 
+                  className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2"
+                >
+                  <Users size={16} />
+                  <span className="hidden sm:inline">Bulk Transfer</span>
+                </Button>
+              )}
+
+              <Button 
+                onClick={handleBulkDelete}
+                variant="ghost" 
+                className="hover:bg-red-500/20 text-red-300 hover:text-red-200 px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2 transition-colors"
+              >
+                <Trash size={16} />
+                <span className="hidden sm:inline">Delete</span>
+              </Button>
+            </div>
+
+            <div className="h-6 w-px bg-white/10 ml-2"></div>
+
+            <button 
+              onClick={() => setSelectedIds([])}
+              className="p-2 ml-1 text-slate-400 hover:text-white rounded-xl transition-colors hover:bg-white/10"
+              title="Clear selection"
+            >
+              <X size={18} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

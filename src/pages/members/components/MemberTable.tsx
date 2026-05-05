@@ -6,7 +6,9 @@ import {
   Trash,
   Flame,
   Calendar,
-  UserCheck
+  UserCheck,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { 
@@ -37,6 +39,9 @@ interface MemberTableProps {
   onView: (member: MemberData) => void;
   activeTab: string;
   viewMode: 'grid' | 'list';
+  selectedIds?: string[];
+  onToggleSelect?: (id: string, e: React.MouseEvent) => void;
+  onToggleSelectAll?: () => void;
 }
 
 const StatusBadge = ({ children, variant = 'default' }: { children: React.ReactNode, variant?: string }) => {
@@ -61,7 +66,10 @@ export const MemberTable = ({
   onDelete, 
   onView,
   activeTab,
-  viewMode
+  viewMode,
+  selectedIds = [],
+  onToggleSelect = () => {},
+  onToggleSelectAll = () => {}
 }: MemberTableProps) => {
   if (loading) {
     return <div className="p-20 text-center text-slate-400 font-medium">Loading data...</div>;
@@ -82,26 +90,39 @@ export const MemberTable = ({
     }
   };
 
-  const MemberCard = ({ member }: { member: MemberData }) => (
+  const isAllSelected = selectedIds.length > 0 && selectedIds.length === members.length;
+
+  const MemberCard = ({ member }: { member: MemberData }) => {
+    const isSelected = selectedIds.includes(member.id);
+    
+    return (
     <div 
       onClick={() => onView(member)}
-      className="bg-white p-3 sm:p-5 rounded-2xl border border-slate-100 flex flex-col gap-3 sm:gap-4 relative group hover:shadow-xl hover:translate-y-[-2px] transition-all cursor-pointer"
+      className={cn(
+        "bg-white p-3 sm:p-5 rounded-2xl border flex flex-col gap-3 sm:gap-4 relative group hover:shadow-xl hover:translate-y-[-2px] transition-all cursor-pointer",
+        isSelected ? "border-blue-500 ring-1 ring-blue-500 bg-blue-50/10" : "border-slate-100"
+      )}
     >
-      <div className="absolute top-2 right-2 sm:top-3 sm:right-3" onClick={(e) => e.stopPropagation()}>
+      <div className="absolute top-2 left-2 z-10" onClick={(e) => { e.stopPropagation(); onToggleSelect(member.id, e); }}>
+        <button className="p-1 rounded hover:bg-slate-100 text-slate-400 transition-colors">
+          {isSelected ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} />}
+        </button>
+      </div>
+      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
-          <DropdownMenuTrigger className="h-8 w-8 p-0 hover:bg-slate-100 rounded-full flex items-center justify-center border-none shadow-none">
-            <MoreHorizontal className="h-4 w-4 text-slate-400" />
+          <DropdownMenuTrigger className="h-8 w-8 p-0 hover:bg-slate-100 rounded-full flex items-center justify-center border-none shadow-none text-slate-500">
+            <MoreHorizontal className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 rounded-xl border-slate-200 shadow-xl">
-            <DropdownMenuItem onClick={() => onView(member)} className="font-bold text-xs uppercase tracking-widest py-3">
+            <DropdownMenuItem onClick={() => onView(member)} className="font-bold text-xs uppercase tracking-widest py-3 cursor-pointer">
               <ExternalLink className="mr-2 h-4 w-4" /> View Profile
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(member)} className="font-bold text-xs uppercase tracking-widest py-3">
+            <DropdownMenuItem onClick={() => onEdit(member)} className="font-bold text-xs uppercase tracking-widest py-3 cursor-pointer">
               <Edit className="mr-2 h-4 w-4" /> Edit Record
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
-              className="text-red-600 font-bold text-xs uppercase tracking-widest py-3"
+              className="text-red-600 focus:text-red-600 focus:bg-red-50 font-bold text-xs uppercase tracking-widest py-3 cursor-pointer"
               onClick={() => onDelete(member)}
             >
               <Trash className="mr-2 h-4 w-4" /> Delete Record
@@ -110,8 +131,8 @@ export const MemberTable = ({
         </DropdownMenu>
       </div>
 
-      <div className="flex flex-col items-center text-center">
-        <Avatar className="h-14 w-14 sm:h-20 sm:w-20 border-2 sm:border-4 border-slate-50 shadow-sm mb-2 sm:mb-4">
+      <div className="flex flex-col items-center text-center mt-2">
+        <Avatar className={cn("h-14 w-14 sm:h-20 sm:w-20 border-2 sm:border-4 shadow-sm mb-2 sm:mb-4 transition-colors", isSelected ? "border-blue-100" : "border-slate-50")}>
           <AvatarImage src={member.photoUrl} alt={member.fullName} />
           <AvatarFallback className="bg-slate-100 text-slate-400 font-black text-lg sm:text-xl">{member.fullName?.charAt(0)}</AvatarFallback>
         </Avatar>
@@ -155,11 +176,12 @@ export const MemberTable = ({
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className={cn(
-      "overflow-hidden",
+      "overflow-hidden pb-[80px]",
       viewMode === 'list' && "md:bg-white md:rounded-2xl md:border md:border-slate-200 md:shadow-sm"
     )}>
       {viewMode === 'grid' ? (
@@ -181,8 +203,24 @@ export const MemberTable = ({
           <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader className="bg-slate-50/50">
-                <TableRow>
-                  <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 py-4 pl-6">Identity</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-12 pl-6">
+                    <button 
+                      onClick={onToggleSelectAll}
+                      className="p-1 rounded hover:bg-slate-200 text-slate-400 transition-colors flex items-center justify-center mt-1"
+                    >
+                      {isAllSelected ? (
+                        <CheckSquare size={18} className="text-blue-600" />
+                      ) : selectedIds.length > 0 ? (
+                        <div className="w-[18px] h-[18px] rounded-[3px] border border-blue-600 bg-blue-600 flex items-center justify-center">
+                          <div className="w-2.5 h-0.5 bg-white rounded-sm"></div>
+                        </div>
+                      ) : (
+                        <Square size={18} />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 py-4">Identity</TableHead>
                   <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 py-4">Contact</TableHead>
                   <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 py-4">Joined Date</TableHead>
                   <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 py-4">Level</TableHead>
@@ -191,11 +229,22 @@ export const MemberTable = ({
                 </TableRow>
               </TableHeader>
         <TableBody>
-          {members.map((member) => (
-            <TableRow key={member.id} className="hover:bg-slate-50 transition-colors group">
-              <TableCell className="py-4 pl-6">
+          {members.map((member) => {
+            const isSelected = selectedIds.includes(member.id);
+            return (
+            <TableRow 
+              key={member.id} 
+              className={cn("hover:bg-slate-50 transition-colors group cursor-pointer", isSelected && "bg-blue-50/30 hover:bg-blue-50/50")}
+              onClick={() => onView(member)}
+            >
+              <TableCell className="pl-6" onClick={(e) => { e.stopPropagation(); onToggleSelect(member.id, e); }}>
+                <button className="p-1 rounded text-slate-400 transition-colors hover:bg-slate-200 flex items-center justify-center">
+                  {isSelected ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} />}
+                </button>
+              </TableCell>
+              <TableCell className="py-4">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10 border border-slate-200">
+                  <Avatar className={cn("h-10 w-10 border", isSelected ? "border-blue-200" : "border-slate-200")}>
                     <AvatarImage src={member.photoUrl} alt={member.fullName} />
                     <AvatarFallback className="bg-slate-100 text-slate-500 font-bold">{member.fullName?.charAt(0)}</AvatarFallback>
                   </Avatar>
@@ -205,8 +254,8 @@ export const MemberTable = ({
               
               <TableCell className="py-4">
                 <div className="flex flex-col text-xs font-bold text-slate-700">
-                  <span className="text-slate-900">{member.email}</span>
-                  <span className="text-slate-500 mt-0.5">{member.phone}</span>
+                  <span className="text-slate-900">{member.email || '-'}</span>
+                  <span className="text-slate-500 mt-0.5">{member.phone || '-'}</span>
                 </div>
               </TableCell>
 
@@ -224,14 +273,14 @@ export const MemberTable = ({
 
               <TableCell className="py-4">
                 <StatusBadge variant={member.status === 'Active' ? 'success' : 'warning'}>
-                  {member.status}
+                  {member.status || 'Active'}
                 </StatusBadge>
               </TableCell>
 
-              <TableCell className="py-4 pr-6 text-right">
+              <TableCell className="py-4 pr-6 text-right" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
-                  <DropdownMenuTrigger className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg flex items-center justify-center border-none shadow-none">
-                    <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                  <DropdownMenuTrigger className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg inline-flex items-center justify-center border-none shadow-none text-slate-500 transition-colors">
+                    <MoreHorizontal className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48 rounded-xl border-slate-200 shadow-xl">
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-400">Actions</div>
@@ -252,7 +301,8 @@ export const MemberTable = ({
                 </DropdownMenu>
               </TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
             </Table>
           </div>
@@ -261,3 +311,4 @@ export const MemberTable = ({
     </div>
   );
 };
+
