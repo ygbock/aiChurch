@@ -23,7 +23,8 @@ import {
   Database,
   BookOpen,
   QrCode,
-  Download
+  Download,
+  Copy
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { format, isSameDay, parseISO, addYears } from 'date-fns';
@@ -43,6 +44,7 @@ interface EventData {
   type: string;
   targetMinistry?: string;
   registrationRequired?: boolean;
+  isOpenToPublic?: boolean;
   cost?: string;
   duration?: string;
   attendanceRequirement?: 'Optional' | 'Required' | 'Not Required';
@@ -265,6 +267,7 @@ export default function Events() {
     type: 'Service',
     targetMinistry: 'All',
     registrationRequired: false,
+    isOpenToPublic: false,
     cost: '',
     duration: '',
     attendanceRequirement: 'Not Required' as 'Optional' | 'Required' | 'Not Required',
@@ -332,6 +335,7 @@ export default function Events() {
         type: 'Service',
         targetMinistry: location.state.createEventForMinistry,
         registrationRequired: false,
+        isOpenToPublic: false,
         cost: '',
         duration: '',
         attendanceRequirement: 'Not Required',
@@ -360,6 +364,7 @@ export default function Events() {
       type: 'Service',
       targetMinistry: 'All',
       registrationRequired: false,
+      isOpenToPublic: false,
       cost: '',
       duration: '',
       attendanceRequirement: 'Not Required',
@@ -386,6 +391,7 @@ export default function Events() {
       type: event.type || 'Service',
       targetMinistry: event.targetMinistry || 'All',
       registrationRequired: event.registrationRequired || false,
+      isOpenToPublic: event.isOpenToPublic || false,
       cost: event.cost || '',
       duration: event.duration || '',
       attendanceRequirement: event.attendanceRequirement || 'Not Required',
@@ -415,6 +421,7 @@ export default function Events() {
       type: category.includes('Retreat') ? 'Conference' : 'Service',
       targetMinistry: 'All',
       registrationRequired: event.registration?.toLowerCase().includes('required'),
+      isOpenToPublic: event.isOpenToPublic || false,
       cost: event.cost,
       duration: event.duration,
       attendanceRequirement: event.attendance?.toLowerCase().includes('optional') ? 'Optional' : 
@@ -455,6 +462,7 @@ export default function Events() {
         type: eventForm.type,
         targetMinistry: eventForm.targetMinistry,
         registrationRequired: eventForm.registrationRequired,
+        isOpenToPublic: eventForm.isOpenToPublic,
         cost: eventForm.cost,
         duration: eventForm.duration,
         attendanceRequirement: eventForm.attendanceRequirement,
@@ -820,6 +828,20 @@ export default function Events() {
                     >
                        <Eye className="sm:w-4 sm:h-4 w-3 h-3" /> View
                     </button>
+                    {evt.isOpenToPublic && (
+                      <button 
+                        onClick={() => {
+                          const distId = profile?.districtId || 'default';
+                          const brId = profile?.branchId || 'default';
+                          navigator.clipboard.writeText(`${window.location.origin}/public/events/${distId}/${brId}/${evt.id}/register`);
+                          toast.success('Public link copied to clipboard');
+                        }}
+                        className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all shrink-0 rounded-xl border border-slate-200 bg-white"
+                        title="Copy Public Link"
+                      >
+                         <Copy className="sm:w-5 sm:h-5 w-4 h-4" />
+                      </button>
+                    )}
                     <button 
                       onClick={() => handleOpenEditModal(evt)}
                       className="w-7 h-7 sm:w-10 sm:h-10 flex items-center justify-center text-slate-400 hover:text-blue-600 transition-colors shrink-0 bg-white sm:bg-transparent rounded-lg sm:rounded-none border sm:border-transparent border-slate-200"
@@ -942,7 +964,7 @@ export default function Events() {
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                         <input 
                           type="checkbox" 
@@ -952,6 +974,16 @@ export default function Events() {
                           className="w-5 h-5 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500"
                         />
                         <label htmlFor="regReq" className="text-[10px] font-black text-slate-700 uppercase tracking-widest cursor-pointer">Registration Required</label>
+                    </div>
+                    <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                        <input 
+                          type="checkbox" 
+                          id="isOpenToPublic"
+                          checked={eventForm.isOpenToPublic}
+                          onChange={e => setEventForm({...eventForm, isOpenToPublic: e.target.checked})}
+                          className="w-5 h-5 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <label htmlFor="isOpenToPublic" className="text-[10px] font-black text-slate-700 uppercase tracking-widest cursor-pointer">Open to Public</label>
                     </div>
                     <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
                         <input 

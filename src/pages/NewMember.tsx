@@ -60,7 +60,7 @@ import {
 import { cn } from '../lib/utils';
 
 // Firebase
-import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where, doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 import { useRole } from '../components/Layout';
@@ -142,7 +142,6 @@ const memberSchema = z.object({
   prayerNeeds: z.string().optional(),
   pastoralNotes: z.string().optional(),
   createAccount: z.boolean().optional(),
-  username: z.string().optional(),
   password: z.string().optional(),
 });
 
@@ -270,7 +269,6 @@ export default function NewMember() {
       prayerNeeds: '',
       pastoralNotes: '',
       createAccount: false,
-      username: '',
       password: '',
     },
     mode: "onBlur",
@@ -414,11 +412,63 @@ export default function NewMember() {
       if (!memberId) {
         (memberData as any).createdAt = serverTimestamp();
         const path = `districts/${districtId}/branches/${data.branchId}/members`;
-        await addDoc(collection(db, path), memberData);
+        const newDocRef = await addDoc(collection(db, path), memberData);
+        if (data.createAccount && data.email && data.password) {
+           let userUid = newDocRef.id;
+           try {
+             const authHelpers = await import('../lib/auth-helpers');
+             userUid = await authHelpers.createSecondaryUser(data.email.toLowerCase().trim(), data.password);
+             
+             // Update the member doc with the real auth uid
+             await updateDoc(newDocRef, { uid: userUid });
+             
+             // Also create the users profile doc
+             await setDoc(doc(db, 'users', userUid), {
+                uid: userUid,
+                authCreated: true,
+                fullName: data.fullName,
+                email: data.email.toLowerCase().trim(),
+                role: 'member',
+                districtId: districtId,
+                branchId: data.branchId,
+                requirePasswordChange: true,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+             });
+             
+           } catch (err: any) {
+             console.error("Auth creation failed:", err);
+             toast.error(`Auth creation failed: ${err.message}`);
+           }
+
+           await setDoc(doc(db, 'accessControl', data.email.toLowerCase().trim()), {
+              email: data.email.toLowerCase().trim(),
+              role: 'member',
+              districtId: districtId,
+              branchId: data.branchId,
+              uid: userUid,
+              requirePasswordChange: true,
+              grantedAt: serverTimestamp(),
+              grantedBy: profile?.uid || 'system'
+           });
+        }
         toast.success('Member identity initialized successfully');
       } else {
         const docRef = doc(db, 'districts', districtId, 'branches', data.branchId, 'members', memberId);
         await updateDoc(docRef, memberData as any);
+        if (data.createAccount && data.email) {
+           // We only update access control info, creating auth accounts for existing members is complex since we don't have their temp password usually, but if it was supplied we could. For now let's just do accessControl.
+           await setDoc(doc(db, 'accessControl', data.email.toLowerCase().trim()), {
+              email: data.email.toLowerCase().trim(),
+              role: 'member',
+              districtId: districtId,
+              branchId: data.branchId,
+              uid: memberId,
+              requirePasswordChange: true,
+              grantedAt: serverTimestamp(),
+              grantedBy: profile?.uid || 'system'
+           }, { merge: true });
+        }
         toast.success('Member record updated successfully');
       }
       
@@ -1205,7 +1255,7 @@ export default function NewMember() {
                             </FormControl>
                             <div className="space-y-1">
                               <FormLabel className="text-2xl font-black uppercase tracking-tight cursor-pointer">Initialize Portal Access</FormLabel>
-                              <p className="text-sm text-slate-400 font-medium leading-none">Generate secure login parameters for the ecclesiastical portal.</p>
+                              <p className="text-sm text-slate-400 font-medium leading-none">Grant access to the ecclesiastical portal. Member will log in securely using Email and Password.</p>
                             </div>
                           </FormItem>
                         )}
@@ -1213,32 +1263,26 @@ export default function NewMember() {
 
                       {watchedCreateAccount && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 p-10 border border-slate-100 rounded-[3rem] animate-in fade-in slide-in-from-top-6 duration-500 bg-slate-50/50">
-                          <FormField
-                            control={form.control}
-                            name="username"
-                            render={({ field }) => (
-                              <FormItem className="space-y-4">
-                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                                  <User size={12} /> Username Matrix
-                                </FormLabel>
-                                <FormControl>
-                                  <Input type="email" placeholder="identity@registry.com" {...field} className="h-14 rounded-2xl border-slate-200 bg-white text-sm font-bold shadow-sm" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                          <div className="space-y-4">
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400">Login Email</FormLabel>
+                            <div className="h-14 rounded-2xl border border-slate-200 bg-white text-sm font-bold flex items-center px-4 text-slate-500 shadow-sm cursor-not-allowed">
+                               {form.watch('email') || 'Enter email in Personal Details'}
+                            </div>
+                            <p className="text-[10px] text-slate-500 font-medium">This is synced with their personal email address.</p>
+                          </div>
+                          
                           <FormField
                             control={form.control}
                             name="password"
                             render={({ field }) => (
                               <FormItem className="space-y-4">
                                 <FormLabel className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                                  <Lock size={12} /> Access Passphrase
+                                  <Lock size={12} /> Temporary Password
                                 </FormLabel>
                                 <FormControl>
-                                  <Input type="password" placeholder="System generated or manual" {...field} className="h-14 rounded-2xl border-slate-200 bg-white text-sm font-bold shadow-sm" />
+                                  <Input type="password" placeholder="e.g. changeme123" {...field} className="h-14 rounded-2xl border-slate-200 bg-white text-sm font-bold shadow-sm" required={watchedCreateAccount} />
                                 </FormControl>
+                                <p className="text-[10px] text-slate-500 font-medium">They will be forced to change this on their first login.</p>
                                 <FormMessage />
                               </FormItem>
                             )}

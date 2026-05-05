@@ -35,6 +35,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { TagEditorModal } from './members/components/TagEditorModal';
 import { MemberGivingTab } from './members/components/MemberGivingTab';
 import { MemberAttendanceTab } from './members/components/MemberAttendanceTab';
+import { MemberSignalTab } from './members/components/MemberSignalTab';
 import IDCardGenerator from '../components/IDCardGenerator';
 import { MemberData } from '../types/membership';
 
@@ -448,6 +449,8 @@ export default function MemberProfile() {
                </div>
             ) : activeTab === 'attendance' ? (
               <MemberAttendanceTab member={member} />
+            ) : activeTab === 'rsvps' ? (
+              <MemberSignalTab member={member} />
             ) : activeTab === 'giving' ? (
               <MemberGivingTab member={member} />
             ) : (

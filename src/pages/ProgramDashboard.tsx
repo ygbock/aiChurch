@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useZxing } from 'react-zxing';
 import { useRole } from '../components/Layout';
 import { useFirebase } from '../components/FirebaseProvider';
-import { collection, onSnapshot, query, setDoc, doc, serverTimestamp, getDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, query, setDoc, doc, serverTimestamp, getDoc, deleteDoc, getDocs, addDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
@@ -1445,8 +1445,9 @@ function AuditLogViewer({ logs }: { logs: AuditEntry[] }) {
 function RegistrationModule() {
   const { profile } = useFirebase();
   const { programId } = useParams();
-  const [view, setView] = useState<'Registrants' | 'FormDesigner'>('Registrants');
-  const [members, setMembers] = useState<any[]>([]);
+  const [view, setView] = useState<'Public' | 'Internal' | 'FormDesigner'>('Public');
+  const [publicRegistrants, setPublicRegistrants] = useState<any[]>([]);
+  const [internalRegistrants, setInternalRegistrants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1454,59 +1455,78 @@ function RegistrationModule() {
   const [newMember, setNewMember] = useState({ fullName: '', email: '', phone: '', gender: 'Male', status: 'Active', level: 'Convert' });
 
   useEffect(() => {
-    if (!profile?.districtId || !profile?.branchId) return;
+    if (!profile?.districtId || !profile?.branchId || !programId) return;
 
-    const membersRef = collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/members`);
-    const unsub = onSnapshot(membersRef, (snap) => {
-        setMembers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    // 1. Fetch Public Registrations
+    const registrationsRef = collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/registrations`);
+    const unsubPublic = onSnapshot(registrationsRef, (snap) => {
+        setPublicRegistrants(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, registrationsRef.path));
+
+    // 2. Fetch Internal RSVPs (attendance collection with status 'Attending' or 'Interested')
+    const attendanceRef = collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/attendance`);
+    const unsubInternal = onSnapshot(attendanceRef, (snap) => {
+        const attRecords = snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+        const rsvpRecords = attRecords.filter(r => r.status === 'Attending' || r.status === 'Interested');
+        setInternalRegistrants(rsvpRecords);
         setLoading(false);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, `districts/${profile.districtId}/branches/${profile.branchId}/members`));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, attendanceRef.path));
 
-    return () => unsub();
-  }, [profile?.districtId, profile?.branchId]);
+    return () => {
+        unsubPublic();
+        unsubInternal();
+    };
+  }, [profile?.districtId, profile?.branchId, programId]);
 
   const handleAddManual = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile?.districtId || !profile?.branchId || !newMember.fullName) return;
+    if (!profile?.districtId || !profile?.branchId || !newMember.fullName || !programId) return;
 
-    const membersRef = collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/members`);
+    // Add manual public registrant
+    const registrationsRef = collection(db, `districts/${profile.districtId}/branches/${profile.branchId}/events/${programId}/registrations`);
     try {
-        await setDoc(doc(membersRef), {
+        await addDoc(registrationsRef, {
             ...newMember,
-            branchId: profile.branchId,
+            type: 'manual',
+            paymentStatus: 'none',
             createdAt: serverTimestamp()
         });
         setIsAddManualModalOpen(false);
         setNewMember({ fullName: '', email: '', phone: '', gender: 'Male', status: 'Active', level: 'Convert' });
     } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, membersRef.path);
+        handleFirestoreError(err, OperationType.WRITE, registrationsRef.path);
     }
   };
 
-  const filteredMembers = members.filter(m => 
-    (m.fullName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+  const currentList = view === 'Public' ? publicRegistrants : internalRegistrants;
+
+  const filteredList = currentList.filter(m => 
+    (m.fullName?.toLowerCase() || m.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
     (m.email?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
   
   const exportRegistrants = () => {
-    let csvContent = 'ID,Name,Email,Type,Status,Paid\n';
-    filteredMembers.forEach(m => {
-        csvContent += `"${m.id}","${m.fullName || ''}","${m.email || ''}","Member","Verified","Yes"\n`;
+    let csvContent = 'ID,Name,Email,Type,Status,Payment\n';
+    filteredList.forEach(m => {
+        const name = m.fullName || m.name || '';
+        const type = view === 'Public' ? 'Public' : 'Member';
+        const pStatus = m.paymentStatus || 'N/A';
+        csvContent += `"${m.id}","${name}","${m.email || ''}","${type}","${m.status || 'Verified'}","${pStatus}"\n`;
     });
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', `registrants_${new Date().getTime()}.csv`);
+    link.setAttribute('download', `${view.toLowerCase()}_registrants_${new Date().getTime()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
   
   return (
-    <div className="space-y-8 flex flex-col h-full">
+    <div className="space-y-8 flex flex-col h-full items-stretch">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex gap-2 sm:gap-4 p-1 bg-slate-100 rounded-xl w-fit overflow-x-auto">
-          {['Registrants', 'FormDesigner'].map(v => (
+          {['Public', 'Internal', 'FormDesigner'].map(v => (
             <button
               key={v}
               onClick={() => setView(v as any)}
@@ -1514,52 +1534,68 @@ function RegistrationModule() {
                 view === v ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
               }`}
             >
-              {v === 'FormDesigner' ? 'Form Designer' : 'Registrant List'}
+              {v === 'FormDesigner' ? 'Form Designer' : `${v} RSVPs`}
             </button>
           ))}
         </div>
-        {view === 'Registrants' && (
+        {view !== 'FormDesigner' && (
           <div className="flex gap-2 sm:gap-4 items-center">
              <div className="relative flex-1 sm:w-64">
                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                <input 
                  type="text" 
-                 placeholder="Search registrants..." 
+                 placeholder={`Search ${view.toLowerCase()} RSVPs...`} 
                  value={searchQuery}
                  onChange={(e) => setSearchQuery(e.target.value)}
                  className="w-full pl-9 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                />
              </div>
-             <button 
-               onClick={() => setIsAddManualModalOpen(true)}
-               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-colors flex items-center gap-2 whitespace-nowrap"
-             >
-               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Manual</span>
-             </button>
+             {view === 'Public' && (
+               <button 
+                 onClick={() => setIsAddManualModalOpen(true)}
+                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-colors flex items-center gap-2 whitespace-nowrap"
+               >
+                 <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Manual</span>
+               </button>
+             )}
           </div>
         )}
       </div>
 
       <div className="flex-1">
-        {view === 'Registrants' ? (
+        {view !== 'FormDesigner' ? (
           <div className="space-y-6">
-            <CollapsibleSection title="Reporting Summaries" icon={<LayoutGrid size={20} />} className="!bg-slate-50/50">
+            <CollapsibleSection title={`${view} RSVP Summary`} icon={<LayoutGrid size={20} />} className="!bg-slate-50/50">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl">
-                  <p className="text-[9px] font-bold text-blue-500 uppercase tracking-widest mb-0.5">Total Registered</p>
-                  <p className="text-xl font-black text-blue-900">{filteredMembers.length}</p>
+                  <p className="text-[9px] font-bold text-blue-500 uppercase tracking-widest mb-0.5">Total RSVPs</p>
+                  <p className="text-xl font-black text-blue-900">{filteredList.length}</p>
                 </div>
-                <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
-                  <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mb-0.5">Paid Status</p>
-                  <p className="text-xl font-black text-emerald-900">{filteredMembers.length}</p>
-                </div>
-                <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
-                  <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-0.5">Pending Review</p>
-                  <p className="text-xl font-black text-amber-900">0</p>
-                </div>
+                {view === 'Public' ? (
+                  <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
+                    <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mb-0.5">Verified / Confirmed</p>
+                    <p className="text-xl font-black text-emerald-900">{filteredList.filter(r => r.paymentStatus === 'none' || r.paymentStatus === 'completed').length}</p>
+                  </div>
+                ) : (
+                  <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
+                    <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mb-0.5">Attending Status</p>
+                    <p className="text-xl font-black text-emerald-900">{filteredList.filter(r => r.status === 'Attending').length}</p>
+                  </div>
+                )}
+                {view === 'Public' ? (
+                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
+                    <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-0.5">Pending Payment</p>
+                    <p className="text-xl font-black text-amber-900">{filteredList.filter(r => r.paymentStatus === 'pending').length}</p>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
+                    <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-0.5">Interested</p>
+                    <p className="text-xl font-black text-amber-900">{filteredList.filter(r => r.status === 'Interested').length}</p>
+                  </div>
+                )}
                 <div className="bg-white border border-slate-100 p-4 rounded-2xl flex flex-col justify-center items-center text-center">
                    <button onClick={exportRegistrants} className="text-blue-600 font-bold flex items-center gap-2 hover:underline text-[10px] uppercase">
-                     <Download size={14} /> CSV
+                     <Download size={14} /> Export CSV
                    </button>
                 </div>
               </div>
@@ -1569,30 +1605,31 @@ function RegistrationModule() {
               <table className="w-full min-w-[600px] text-left border-collapse">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Registrant</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{view === 'Internal' ? 'Member Name' : 'Registrant'}</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Payment</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">RSVP Status</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Details</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr><td colSpan={5} className="text-center py-8 text-slate-400 text-xs">Loading...</td></tr>
-                  ) : filteredMembers.map(member => (
+                  ) : filteredList.map(item => (
                     <RegistrantRow 
-                        key={member.id}
-                        name={member.fullName || 'Unknown'} 
-                        email={member.email || 'No email'} 
-                        type="Member" 
-                        status="Verified" 
-                        paid={true} 
-                        onView={() => setSelectedMember(member)}
+                        key={item.id}
+                        name={item.fullName || item.name || 'Unknown'} 
+                        email={item.email || '-'} 
+                        type={view === 'Public' ? 'Public' : 'Member'} 
+                        status={item.paymentStatus || item.status || 'Verified'} 
+                        paid={view !== 'Public' || item.paymentStatus === 'completed' || item.paymentStatus === 'none'} 
+                        onView={() => setSelectedMember(item)}
                     />
                   ))}
-                  {filteredMembers.length === 0 && !loading && (
-                    <tr><td colSpan={5} className="text-center py-8 text-slate-400 text-xs">No registrants found.</td></tr>
+                  {filteredList.length === 0 && !loading && (
+                    <tr><td colSpan={5} className="text-center py-8 text-slate-400 text-xs">No RSVPs found in this category.</td></tr>
                   )}
+
                 </tbody>
               </table>
             </div>

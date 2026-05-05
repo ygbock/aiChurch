@@ -9,12 +9,15 @@ interface VisualInsightsProps {
 const COLORS = ['#3b82f6', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#64748b'];
 
 export const VisualInsights: React.FC<VisualInsightsProps> = ({ members }) => {
-  const { genderData, categoryData, growthData, statusData } = useMemo(() => {
+  const { genderData, categoryData, growthData, statusData, tagsData } = useMemo(() => {
     // Gender Distribution
     const genderMap: Record<string, number> = {};
     const categoryMap: Record<string, number> = {};
     const growthMap: Record<string, number> = {};
     const statusMap: Record<string, number> = {};
+    const tagsMap: Record<string, number> = {};
+
+    let totalTaggedMembers = 0;
 
     members.forEach(member => {
       // Gender
@@ -28,6 +31,14 @@ export const VisualInsights: React.FC<VisualInsightsProps> = ({ members }) => {
       // Status
       const status = member.status || 'Unknown';
       statusMap[status] = (statusMap[status] || 0) + 1;
+
+      // Tags
+      if (member.tags && member.tags.length > 0) {
+        totalTaggedMembers++;
+        member.tags.forEach(tag => {
+          tagsMap[tag] = (tagsMap[tag] || 0) + 1;
+        });
+      }
 
       // Growth over time (by month-year from joinDate or createdAt)
       let dateString = member.joinDate || member.conversionDate || member.visitDate || member.serviceDate;
@@ -49,6 +60,17 @@ export const VisualInsights: React.FC<VisualInsightsProps> = ({ members }) => {
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value);
 
+    // Format tags data, calculating percentage based on total tagged members (or total members?)
+    // Using total members for percentage lets you see what % of the church is in a tag.
+    const formattedTags = Object.entries(tagsMap)
+      .map(([name, value]) => ({ 
+        name, 
+        value, 
+        percentage: members.length > 0 ? Math.round((value / members.length) * 100) : 0 
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10); // Show top 10 tags
+
     // Sort growth data chronologically
     const sortedGrowth = Object.entries(growthMap)
       .map(([name, value]) => ({ name, value }))
@@ -58,6 +80,7 @@ export const VisualInsights: React.FC<VisualInsightsProps> = ({ members }) => {
       genderData: formatData(genderMap),
       categoryData: formatData(categoryMap),
       statusData: formatData(statusMap),
+      tagsData: formattedTags,
       growthData: sortedGrowth.slice(-12) // Last 12 months
     };
   }, [members]);
@@ -160,6 +183,55 @@ export const VisualInsights: React.FC<VisualInsightsProps> = ({ members }) => {
             </PieChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      {/* Tags Analytics */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+        <h3 className="text-lg font-bold text-slate-800 mb-6">Demographic Segmentations (Tags)</h3>
+        {tagsData.length > 0 ? (
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart layout="vertical" data={tagsData} margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
+                <XAxis type="number" hide />
+                <YAxis 
+                  dataKey="name" 
+                  type="category" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  width={100}
+                  tick={{ fontSize: 11, fill: '#64748b' }} 
+                />
+                <RechartsTooltip 
+                  cursor={{fill: '#f8fafc'}}
+                  content={({active, payload}) => {
+                    if (active && payload && payload.length) {
+                       const data = payload[0].payload;
+                      return (
+                        <div className="bg-slate-900 text-white p-3 rounded-xl shadow-xl text-sm border border-slate-700 z-[100]">
+                          <p className="text-slate-400 mb-1">{data.name}</p>
+                          <p className="font-bold text-lg">{data.value} Members</p>
+                          <p className="font-bold text-blue-400 text-xs">{data.percentage}% of total</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar 
+                  dataKey="value" 
+                  fill="#8b5cf6" 
+                  radius={[0, 6, 6, 0]} 
+                  barSize={20}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="h-[300px] flex items-center justify-center text-slate-500 font-medium">
+             No tags found.
+          </div>
+        )}
       </div>
 
       {/* Growth Trends */}

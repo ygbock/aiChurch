@@ -55,6 +55,7 @@ import {
 import { db, handleFirestoreError, OperationType } from "../lib/firebase";
 import NotificationManager from "./NotificationManager";
 import { format } from "date-fns";
+import ForcePasswordChange from '../pages/ForcePasswordChange';
 
 interface RoleContextType {
   role: Role;
@@ -203,6 +204,10 @@ export default function Layout() {
 
   if (!user) {
     return <Login />;
+  }
+
+  if (profile?.requirePasswordChange) {
+    return <ForcePasswordChange />;
   }
 
   return (

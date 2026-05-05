@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import DashboardDispatcher from './pages/DashboardDispatcher';
 import MemberManagementPage from './pages/members/MemberManagementPage';
+import PublicEventRegistration from './pages/PublicEventRegistration';
 import MembersDashboard from './pages/MembersDashboard';
 import NewMember from './pages/NewMember';
 import NewConvert from './pages/NewConvert';
@@ -57,6 +58,7 @@ export default function App() {
         <Routes>
           <Route path="/kiosk" element={<KioskCheckIn />} />
           <Route path="/register" element={<AdminRegistration />} />
+          <Route path="/public/events/:districtId/:branchId/:eventId/register" element={<PublicEventRegistration />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardDispatcher />} />

@@ -97,6 +97,7 @@ export default function MemberPortal() {
   };
 
   const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const growthSteps = React.useMemo(() => {
@@ -131,7 +132,29 @@ export default function MemberPortal() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Fetch upcoming events for this branch
+    let eventsUnsub = () => {};
+    if (profile.districtId && profile.branchId) {
+      const eventsRef = collection(db, 'districts', profile.districtId, 'branches', profile.branchId, 'events');
+      const eventsQ = query(eventsRef, orderBy('date', 'desc'), limit(5));
+      eventsUnsub = onSnapshot(eventsQ, (snapshot) => {
+        const evts = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        // filter future events locally as firebase query on arbitrary date field needs index
+        const futureEvts = evts.filter(e => {
+            if (!e.date) return false;
+            const eventDate = e.date.toDate ? e.date.toDate() : new Date(e.date);
+            return eventDate >= new Date(new Date().setHours(0,0,0,0));
+        });
+        setUpcomingEvents(futureEvts);
+      }, (error) => {
+          handleFirestoreError(error, OperationType.LIST, 'events');
+      });
+    }
+
+    return () => {
+      unsubscribe();
+      eventsUnsub();
+    };
   }, [profile]);
 
   const toggleStep = async (sessionId: string, stepId: string) => {
@@ -280,6 +303,62 @@ export default function MemberPortal() {
                   >
                     Schedule a Session
                   </button>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Upcoming Church Events Widget */}
+          <section>
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <Calendar size={18} className="text-blue-500" />
+                <h3 className="text-base font-bold text-slate-900">Upcoming Church Events</h3>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {loading ? (
+                <div className="bg-slate-50 rounded-2xl p-6 animate-pulse border border-slate-100 h-24"></div>
+              ) : upcomingEvents.length > 0 ? (
+                upcomingEvents.map((event) => (
+                  <div key={event.id} className="bg-white p-4 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm group">
+                    <div className="flex items-center gap-4 w-full sm:w-auto">
+                      <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-black flex-col border border-blue-100 shrink-0 shadow-sm">
+                        <span className="text-[10px] uppercase leading-none opacity-80">{event.date ? format(new Date(event.date.seconds ? event.date.toMillis() : event.date), 'MMM') : ''}</span>
+                        <span className="text-sm leading-tight">{event.date ? format(new Date(event.date.seconds ? event.date.toMillis() : event.date), 'dd') : ''}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-slate-900 text-sm truncate">{event.title || event.name}</h4>
+                        <div className="flex items-center gap-3 mt-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                          <span className="flex items-center gap-1.5"><Clock size={12} className="text-slate-400" /> {event.time || 'TBD'}</span>
+                          {event.location && <span className="flex items-center gap-1.5 truncate"><MapPin size={12} className="text-slate-400" /> {event.location}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    {event.registrationRequired ? (
+                       <button
+                         onClick={() => navigate(`/public/events/${profile?.districtId}/${profile?.branchId}/${event.id}/register`)}
+                         className="w-full sm:w-auto mt-2 sm:mt-0 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-colors active:scale-95"
+                       >
+                         Register {event.cost && event.cost !== 'Free' && event.cost !== '0' ? `(${event.cost})` : ''}
+                       </button>
+                    ) : (
+                       <div className="px-4 py-2 bg-slate-50 text-slate-500 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                         Open to All
+                       </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-[2rem] p-8 text-center flex flex-col items-center justify-center">
+                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-slate-300 mb-3 shadow-sm border border-slate-100">
+                    <Calendar size={20} />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-900 mb-1">No Upcoming Events</h4>
+                  <p className="text-xs text-slate-500 max-w-[200px] mx-auto leading-relaxed">
+                    There are no scheduled church events in your branch at this time.
+                  </p>
                 </div>
               )}
             </div>

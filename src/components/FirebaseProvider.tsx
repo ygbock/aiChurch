@@ -12,6 +12,7 @@ interface UserProfile {
   role: Role;
   districtId?: string;
   branchId?: string;
+  requirePasswordChange?: boolean;
   availability?: {
     enabled: boolean;
     days: string[];
@@ -222,6 +223,7 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         const role = (accessData?.role || 'superadmin') as Role;
         const districtId = accessData?.districtId || null;
         const branchId = accessData?.branchId || null;
+        const reqPwdChange = accessData?.requirePasswordChange || false;
 
         setProvisioningStatus('Finalizing your administrator profile...');
         const newProfile: UserProfile = {
@@ -230,7 +232,8 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
           email: emailLower,
           role: role,
           districtId: districtId,
-          branchId: branchId
+          branchId: branchId,
+          requirePasswordChange: reqPwdChange
         };
         // Use a retry block for profile creation as rules propagation can be slow
         let success = false;
