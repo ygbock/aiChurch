@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Search, ArrowDownToLine, ArrowUpToLine, LayoutGrid, List, FileText, Download, SortAsc, SortDesc, PieChart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +41,8 @@ export const MemberToolbar = ({
   showGlobalFilters,
   children
 }: MemberToolbarProps) => {
+  const [isViewModeExpanded, setIsViewModeExpanded] = useState(false);
+
   return (
     <div className="flex flex-col gap-4 bg-white p-3 rounded-2xl border border-slate-200 w-full">
       {/* Top Row: Filters & Actions */}
@@ -119,45 +122,106 @@ export const MemberToolbar = ({
 
         {/* Right side actions */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 justify-end">
-          {/* Hide grid/list on small devices */}
-          <div className="hidden sm:flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onViewModeChange('list')}
-              className={cn(
-                "h-9 w-9 p-0 rounded-lg transition-all",
-                viewMode === 'list' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400"
+          {/* View Mode controls with collapsing animation */}
+          <motion.div layout className="hidden sm:flex flex-row items-center bg-slate-100 p-1 rounded-xl overflow-hidden h-[44px]">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {(isViewModeExpanded || viewMode === 'list') && (
+                <motion.div
+                  layout
+                  key="list"
+                  initial={{ opacity: 0, width: 0, marginRight: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, width: 36, scale: 1, marginRight: isViewModeExpanded ? 4 : 0 }}
+                  exit={{ opacity: 0, width: 0, marginRight: 0, scale: 0.8 }}
+                  transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  style={{ overflow: 'hidden', flexShrink: 0 }}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (!isViewModeExpanded) {
+                        setIsViewModeExpanded(true);
+                      } else {
+                        onViewModeChange('list');
+                        setIsViewModeExpanded(false);
+                      }
+                    }}
+                    className={cn(
+                      "h-9 w-9 p-0 rounded-lg transition-all",
+                      viewMode === 'list' && !isViewModeExpanded ? "bg-white text-slate-900 shadow-sm" : viewMode === 'list' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700"
+                    )}
+                    title="List View"
+                  >
+                    <List size={18} />
+                  </Button>
+                </motion.div>
               )}
-              title="List View"
-            >
-              <List size={18} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onViewModeChange('grid')}
-              className={cn(
-                "h-9 w-9 p-0 rounded-lg transition-all",
-                viewMode === 'grid' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400"
+
+              {(isViewModeExpanded || viewMode === 'grid') && (
+                <motion.div
+                  layout
+                  key="grid"
+                  initial={{ opacity: 0, width: 0, marginRight: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, width: 36, scale: 1, marginRight: isViewModeExpanded ? 4 : 0 }}
+                  exit={{ opacity: 0, width: 0, marginRight: 0, scale: 0.8 }}
+                  transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  style={{ overflow: 'hidden', flexShrink: 0 }}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (!isViewModeExpanded) {
+                        setIsViewModeExpanded(true);
+                      } else {
+                        onViewModeChange('grid');
+                        setIsViewModeExpanded(false);
+                      }
+                    }}
+                    className={cn(
+                      "h-9 w-9 p-0 rounded-lg transition-all",
+                      viewMode === 'grid' && !isViewModeExpanded ? "bg-white text-slate-900 shadow-sm" : viewMode === 'grid' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400 hover:text-slate-700"
+                    )}
+                    title="Grid View"
+                  >
+                    <LayoutGrid size={18} />
+                  </Button>
+                </motion.div>
               )}
-              title="Grid View"
-            >
-              <LayoutGrid size={18} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onViewModeChange('insights')}
-              className={cn(
-                "h-9 w-9 p-0 rounded-lg transition-all",
-                viewMode === 'insights' ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700 hover:text-white" : "text-slate-400"
+
+              {(isViewModeExpanded || viewMode === 'insights') && (
+                <motion.div
+                  layout
+                  key="insights"
+                  initial={{ opacity: 0, width: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, width: 36, scale: 1 }}
+                  exit={{ opacity: 0, width: 0, scale: 0.8 }}
+                  transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                  style={{ overflow: 'hidden', flexShrink: 0 }}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (!isViewModeExpanded) {
+                        setIsViewModeExpanded(true);
+                      } else {
+                        onViewModeChange('insights');
+                        setIsViewModeExpanded(false);
+                      }
+                    }}
+                    className={cn(
+                      "h-9 w-9 p-0 rounded-lg transition-all",
+                      viewMode === 'insights' && !isViewModeExpanded ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700 hover:text-white" : viewMode === 'insights' ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700 hover:text-white" : "text-slate-400 hover:text-slate-700"
+                    )}
+                    title="Visual Insights"
+                  >
+                    <PieChart size={18} />
+                  </Button>
+                </motion.div>
               )}
-              title="Visual Insights"
-            >
-              <PieChart size={18} />
-            </Button>
-          </div>
+            </AnimatePresence>
+          </motion.div>
         </div>
       </div>
 

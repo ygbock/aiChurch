@@ -427,29 +427,32 @@ export default function MemberManagementPage() {
           </MemberToolbar>
         </div>
 
-        <motion.div
-          key={activeTab + viewMode}
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.2 }}
-        >
-          {viewMode === 'insights' ? (
-            <VisualInsights members={filteredMembers} />
-          ) : (
-            <MemberTable 
-              members={filteredMembers}
-              loading={loading}
-              activeTab={activeTab}
-              viewMode={viewMode as 'grid' | 'list'}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onView={handleView}
-              selectedIds={selectedIds}
-              onToggleSelect={handleToggleSelect}
-              onToggleSelectAll={handleToggleSelectAll}
-            />
-          )}
-        </motion.div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab + viewMode}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            {viewMode === 'insights' ? (
+              <VisualInsights members={filteredMembers} />
+            ) : (
+              <MemberTable 
+                members={filteredMembers}
+                loading={loading}
+                activeTab={activeTab}
+                viewMode={viewMode as 'grid' | 'list'}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onView={handleView}
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
+                onToggleSelectAll={handleToggleSelectAll}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {profile?.role === 'superadmin' && (
