@@ -13,8 +13,10 @@ import { MemberStats } from './components/MemberStats';
 import { TabNavigation } from './components/TabNavigation';
 import { MemberToolbar } from './components/MemberToolbar';
 import { MemberTable } from './components/MemberTable';
+import { VisualInsights } from './components/VisualInsights';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { SuperAdminAddMemberModal } from './components/SuperAdminAddMemberModal';
+import { BulkNotifyModal } from './components/BulkNotifyModal';
 import { Button } from '@/components/ui/button';
 import { MemberData } from '@/types/membership';
 import { useFirebase } from '@/components/FirebaseProvider';
@@ -23,8 +25,9 @@ export default function MemberManagementPage() {
   const navigate = useNavigate();
   const { profile } = useFirebase();
   const { members, loading } = useMembers();
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'insights'>('list');
   const [showSuperAdminModal, setShowSuperAdminModal] = useState(false);
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
   const { searchQuery, setSearchQuery, activeTab, setActiveTab, filteredMembers, filters, setFilters, sortField, setSortField, sortOrder, setSortOrder } = useMemberFilters(members, profile?.role || 'member');
   
   // Selection state
@@ -317,7 +320,7 @@ export default function MemberManagementPage() {
           {profile?.role !== 'superadmin' && (
             <Button 
               variant="outline"
-              onClick={() => toast.info('Notification dispatcher coming soon')}
+              onClick={() => setShowNotifyModal(true)}
               className="hidden sm:flex flex-1 md:flex-none rounded-xl px-5 font-bold border-slate-200 items-center justify-center gap-2 h-11"
             >
               <Send size={18} />
@@ -430,18 +433,22 @@ export default function MemberManagementPage() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.2 }}
         >
-          <MemberTable 
-            members={filteredMembers}
-            loading={loading}
-            activeTab={activeTab}
-            viewMode={viewMode}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onView={handleView}
-            selectedIds={selectedIds}
-            onToggleSelect={handleToggleSelect}
-            onToggleSelectAll={handleToggleSelectAll}
-          />
+          {viewMode === 'insights' ? (
+            <VisualInsights members={filteredMembers} />
+          ) : (
+            <MemberTable 
+              members={filteredMembers}
+              loading={loading}
+              activeTab={activeTab}
+              viewMode={viewMode as 'grid' | 'list'}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onView={handleView}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              onToggleSelectAll={handleToggleSelectAll}
+            />
+          )}
         </motion.div>
       </div>
 
@@ -470,6 +477,15 @@ export default function MemberManagementPage() {
             }}
           />
         </>
+      )}
+
+      {showNotifyModal && (
+        <BulkNotifyModal
+          isOpen={showNotifyModal}
+          onClose={() => setShowNotifyModal(false)}
+          selectedMembers={selectedIds.length > 0 ? members.filter(m => selectedIds.includes(m.id)) : filteredMembers}
+          onSuccess={() => setSelectedIds([])}
+        />
       )}
 
       {/* Floating Bulk Actions Bar */}
@@ -534,6 +550,15 @@ export default function MemberManagementPage() {
                   <span className="hidden sm:inline">Transfer</span>
                 </Button>
               )}
+
+              <Button 
+                onClick={() => setShowNotifyModal(true)}
+                variant="ghost" 
+                className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2 shrink-0"
+              >
+                <Send size={16} />
+                <span className="hidden sm:inline">Notify</span>
+              </Button>
 
               <Button 
                 onClick={handleBulkDelete}

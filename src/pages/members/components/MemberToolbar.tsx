@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, ArrowDownToLine, ArrowUpToLine, LayoutGrid, List, FileText, Download, SortAsc, SortDesc } from 'lucide-react';
+import { Search, ArrowDownToLine, ArrowUpToLine, LayoutGrid, List, FileText, Download, SortAsc, SortDesc, PieChart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -10,8 +10,8 @@ interface MemberToolbarProps {
   onSearchChange: (value: string) => void;
   onExport: (type: 'csv' | 'pdf') => void;
   onImport?: () => void;
-  viewMode: 'grid' | 'list';
-  onViewModeChange: (mode: 'grid' | 'list') => void;
+  viewMode: 'grid' | 'list' | 'insights';
+  onViewModeChange: (mode: 'grid' | 'list' | 'insights') => void;
   sortField?: 'name' | 'joinDate' | 'status';
   onSortFieldChange?: (val: 'name' | 'joinDate' | 'status') => void;
   sortOrder?: 'asc' | 'desc';
@@ -129,6 +129,7 @@ export const MemberToolbar = ({
                 "h-9 w-9 p-0 rounded-lg transition-all",
                 viewMode === 'list' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400"
               )}
+              title="List View"
             >
               <List size={18} />
             </Button>
@@ -140,8 +141,21 @@ export const MemberToolbar = ({
                 "h-9 w-9 p-0 rounded-lg transition-all",
                 viewMode === 'grid' ? "bg-white text-slate-900 shadow-sm" : "text-slate-400"
               )}
+              title="Grid View"
             >
               <LayoutGrid size={18} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onViewModeChange('insights')}
+              className={cn(
+                "h-9 w-9 p-0 rounded-lg transition-all",
+                viewMode === 'insights' ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700 hover:text-white" : "text-slate-400"
+              )}
+              title="Visual Insights"
+            >
+              <PieChart size={18} />
             </Button>
           </div>
         </div>
