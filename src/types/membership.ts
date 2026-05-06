@@ -26,6 +26,7 @@ export interface MemberData {
   districtId: string;
   branchId: string;
   branch?: string;
+  branchName?: string;
   
   // Membership Details
   level: MemberLevel | string;

@@ -307,11 +307,13 @@ export default function NewMember() {
             const formattedData = {
               ...form.getValues(), // Use defaults for any missing fields
               ...data,
+              branchId: branchIdParam || data.branchId || profile?.branchId || '',
               membershipLevel: membershipLevel || 'baptized',
               children: data.children || [],
               dateOfBirth: data.dateOfBirth || '',
               joinDate: data.joinDate || new Date().toISOString().split('T')[0],
               baptismDate: data.baptismDate || '',
+              assignedDepartment: data.assignedDepartment || data.departmentId || '_none',
             };
 
             form.reset(formattedData as any);
@@ -400,9 +402,23 @@ export default function NewMember() {
 
       const capitalizedStatus = data.status ? data.status.charAt(0).toUpperCase() + data.status.slice(1) : 'Active';
 
+      let departmentName = '';
+      if (data.assignedDepartment && data.assignedDepartment !== '_none') {
+        const found = departments.find(d => d.id === data.assignedDepartment);
+        if (found) departmentName = found.name;
+      }
+      
+      let branchName = '';
+      if (data.branchId) {
+        const found = branches.find(b => b.id === data.branchId);
+        if (found) branchName = found.name;
+      }
+
       const memberData = {
         ...data,
         districtId,
+        departmentName,
+        branchName,
         level: calculatedLevel,
         status: capitalizedStatus,
         ministries: calculatedMinistries,
@@ -473,9 +489,9 @@ export default function NewMember() {
       }
       
       setSaveSuccess(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error(memberId ? 'Failed to update member record' : 'Failed to create member record');
+      toast.error(memberId ? `Failed to update member record: ${error.message}` : `Failed to create member record: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -524,9 +540,12 @@ export default function NewMember() {
           <Button variant="outline" onClick={() => navigate(-1)} className="h-10 sm:h-12 w-full rounded-[2rem] border-slate-200 px-8 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 md:w-auto">
             <ChevronLeft className="mr-2" size={16} /> Back
           </Button>
-          <Button 
-            onClick={form.handleSubmit(onSubmit)} 
-            disabled={isSaving}
+            <Button 
+            onClick={form.handleSubmit(onSubmit, (errors) => {
+              console.error('Form errors:', errors);
+              toast.error('Validation failed. Please check the highlighted fields.');
+            })} 
+            disabled={isSaving || form.formState.isSubmitting}
             className="h-10 sm:h-12 w-full rounded-[2rem] bg-slate-900 px-10 text-[10px] font-black uppercase tracking-widest text-white shadow-xl transition-all gap-3 hover:bg-slate-800 active:scale-95 md:w-auto"
           >
             {isSaving ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
@@ -536,7 +555,10 @@ export default function NewMember() {
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 md:space-y-10">
+        <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+          console.error('Form errors:', errors);
+          toast.error('Validation failed. Please check the highlighted fields.');
+        })} className="space-y-6 md:space-y-10">
           {/* Mobile-only Progress Indicator & Desktop Tab Selector */}
           <div className="flex gap-1 overflow-x-auto rounded-[2rem] border border-slate-200 bg-white p-1.5 shadow-sm no-scrollbar">
             {[
@@ -603,13 +625,13 @@ export default function NewMember() {
                 >
                   <div className="flex flex-col lg:flex-row gap-8 lg:gap-16">
                     {/* Photo Acquisition Block */}
-                    <div className="lg:w-1/3 xl:w-1/4 space-y-6">
-                      <div className="space-y-4">
+                    <div className="lg:w-1/3 xl:w-1/4 flex flex-col items-center lg:items-start space-y-6">
+                      <div className="w-full space-y-4">
                         <div className="flex items-center gap-2">
                           <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Identification Matrix</Label>
                           <div className="h-px flex-1 bg-slate-100" />
                         </div>
-                        <div className="relative aspect-square rounded-[3rem] bg-slate-50 border-4 border-slate-100 overflow-hidden shadow-inner group flex items-center justify-center">
+                        <div className="relative w-48 sm:w-56 lg:w-full aspect-square mx-auto lg:mx-0 rounded-[2rem] lg:rounded-[3rem] bg-slate-50 border-4 border-slate-100 overflow-hidden shadow-inner group flex items-center justify-center">
                           {showCamera ? (
                             <div className="relative w-full h-full bg-black">
                               <video 
@@ -1079,7 +1101,7 @@ export default function NewMember() {
                                 <Select 
                                   onValueChange={field.onChange} 
                                   value={field.value}
-                                  disabled={!(role === 'superadmin' || role === 'district')}
+                                  disabled={!!memberId || !(role === 'superadmin' || role === 'district')}
                                 >
                                   <FormControl>
                                     <SelectTrigger className="h-14 rounded-2xl border-slate-200 bg-slate-50 focus:bg-white transition-all text-sm font-bold">
@@ -1093,7 +1115,11 @@ export default function NewMember() {
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
-                                {!(role === 'superadmin' || role === 'district') && (
+                                {!!memberId ? (
+                                  <p className="text-[9px] text-amber-600 font-bold uppercase tracking-widest mt-1">
+                                    Branch cannot be changed during member edit. Use Bulk Transfer instead.
+                                  </p>
+                                ) : !(role === 'superadmin' || role === 'district') && (
                                   <p className="text-[9px] text-amber-600 font-bold uppercase tracking-widest mt-1">
                                     Defaulted to your assigned branch
                                   </p>
@@ -1355,8 +1381,8 @@ export default function NewMember() {
             <Button type="button" variant="ghost" onClick={() => navigate(-1)} className="font-bold uppercase tracking-widest text-[10px] sm:text-xs">
               Abort Registration
             </Button>
-            <Button type="submit" disabled={isSaving} className="w-full sm:w-auto bg-slate-900 text-white px-8 sm:px-12 h-12 rounded-xl font-bold uppercase tracking-widest shadow-lg shadow-black/10 active:scale-95 disabled:opacity-50 text-[10px] sm:text-xs">
-              {isSaving ? <Loader2 className="animate-spin mr-2" size={18} /> : <CheckCircle2 className="mr-2" size={18} />}
+            <Button type="submit" disabled={isSaving || form.formState.isSubmitting} className="w-full sm:w-auto bg-slate-900 text-white px-8 sm:px-12 h-12 rounded-xl font-bold uppercase tracking-widest shadow-lg shadow-black/10 active:scale-95 disabled:opacity-50 text-[10px] sm:text-xs">
+              {isSaving || form.formState.isSubmitting ? <Loader2 className="animate-spin mr-2" size={18} /> : <CheckCircle2 className="mr-2" size={18} />}
               {memberId ? 'Update Record' : 'Initialize Identity'}
             </Button>
           </div>

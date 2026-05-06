@@ -79,9 +79,14 @@ export function MemberBioTab({ member }: { member: MemberData }) {
           <div className="mt-6">
              <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-widest mb-3">Active Ministries / Departments</h4>
              <div className="flex flex-wrap gap-2">
-               {(member.assignedDepartment || member.departmentName || member.departmentId) && member.assignedDepartment !== '_none' && (
+               {member.branchName && (
+                 <span className="px-4 py-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-sm font-bold flex items-center gap-2">
+                   <Building size={16} /> Branch: {member.branchName}
+                 </span>
+               )}
+               {(member.departmentName || (member.assignedDepartment && member.assignedDepartment !== '_none')) && (
                  <span className="px-4 py-2 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg text-sm font-bold flex items-center gap-2">
-                   <Target size={16} /> Department: {member.assignedDepartment || member.departmentName || member.departmentId}
+                   <Target size={16} /> Department: {member.departmentName || member.assignedDepartment}
                  </span>
                )}
                {member.ministries?.map((min, i) => (
