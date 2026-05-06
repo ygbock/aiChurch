@@ -195,15 +195,31 @@ service cloud.firestore {
     match /accessControl/{email} {
       allow get: if isSignedIn() && (getEmail() == email.lower() || isSuperAdmin() || isVerified());
       allow list: if isSuperAdmin() || (isSignedIn() && isVerified() && isDistrictLeader('any'));
-      allow write: if (isSuperAdmin() || getEmail() == email.lower()) && isVerified();
+      allow create, update: if isSuperAdmin() || getEmail() == email.lower() || (isSignedIn() && isVerified() && (
+        (isDistrictLeader(request.resource.data.districtId)) ||
+        (isBranchAdmin(request.resource.data.districtId, request.resource.data.branchId))
+      ));
+      allow delete: if isSuperAdmin() || (isSignedIn() && isVerified() && (
+        (isDistrictLeader(resource.data.districtId)) ||
+        (isBranchAdmin(resource.data.districtId, resource.data.branchId))
+      ));
     }
 
     match /users/{uid} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isSuperAdmin() || isDistrictLeader('any'));
-      allow create: if isSignedIn() && request.auth.uid == uid && isValidUser(incoming());
-      allow update: if isSignedIn() && request.auth.uid == uid && isVerified() && isValidUser(incoming()) && 
-                    incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'photoUrl', 'availability', 'notificationPrefs']);
-      allow delete: if isSuperAdmin();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (
+        request.auth.uid == uid || 
+        isSuperAdmin() || 
+        (isDistrictLeader(incoming().districtId)) ||
+        (isBranchAdmin(incoming().districtId, incoming().branchId))
+      ) && isValidUser(incoming());
+      allow update: if isSignedIn() && isVerified() && (
+        (request.auth.uid == uid && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'photoUrl', 'availability', 'notificationPrefs', 'requirePasswordChange'])) ||
+        isSuperAdmin() ||
+        (isDistrictLeader(resource.data.districtId)) ||
+        (isBranchAdmin(resource.data.districtId, resource.data.branchId))
+      ) && isValidUser(incoming());
+      allow delete: if isSuperAdmin() || isDistrictLeader(resource.data.districtId);
 
       match /reminders/{reminderId} {
         allow read, list, delete: if isSignedIn() && request.auth.uid == uid;

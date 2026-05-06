@@ -35,6 +35,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { TagEditorModal } from './members/components/TagEditorModal';
 import { MemberGivingTab } from './members/components/MemberGivingTab';
 import { MemberAttendanceTab } from './members/components/MemberAttendanceTab';
+import { MemberBioTab } from './members/components/MemberBioTab';
 import { MemberSignalTab } from './members/components/MemberSignalTab';
 import IDCardGenerator from '../components/IDCardGenerator';
 import { MemberData } from '../types/membership';
@@ -150,6 +151,7 @@ export default function MemberProfile() {
   }
 
   const tabs = [
+    { id: 'bio', label: 'Biography & Family', icon: User },
     { id: 'attendance', label: 'Attendance Telemetry', icon: Activity },
     { id: 'rsvps', label: 'Event Signal', icon: CalendarDays },
     { id: 'giving', label: 'Fiscal Contributions', icon: CircleDollarSign },
@@ -447,6 +449,8 @@ export default function MemberProfile() {
                     </div>
                  ))}
                </div>
+            ) : activeTab === 'bio' ? (
+              <MemberBioTab member={member} />
             ) : activeTab === 'attendance' ? (
               <MemberAttendanceTab member={member} />
             ) : activeTab === 'rsvps' ? (

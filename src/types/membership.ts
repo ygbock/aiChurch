@@ -8,13 +8,19 @@ export interface MemberData {
   email?: string;
   phone: string;
   address?: string;
-  gender: 'Male' | 'Female';
+  gender: 'male' | 'female' | 'Male' | 'Female' | string;
   dob?: string;
+  dateOfBirth?: string;
   maritalStatus?: string;
+  spouseName?: string;
+  numberOfChildren?: number;
+  children?: { fullName: string; dateOfBirth: string }[];
   occupation?: string;
   photoUrl?: string;
   community?: string;
   area?: string;
+  street?: string;
+  publicLandmark?: string;
   
   // Scoping
   districtId: string;
@@ -23,12 +29,17 @@ export interface MemberData {
   
   // Membership Details
   level: MemberLevel | string;
+  status: MemberStatus | string;
   membershipLevel?: string;
   baptizedSubLevel?: 'leader' | 'worker' | 'disciple' | string;
-  status: MemberStatus | string;
-  baptismStatus: BaptismStatus;
+  leaderRole?: 'pastor' | 'assistant_pastor' | 'department_head' | 'ministry_head' | string;
+  baptismDate?: string;
+  baptismStatus: BaptismStatus | string;
   isBaptised: boolean;
   joinDate: string;
+  assignedDepartment?: string;
+  departmentId?: string;
+  departmentName?: string;
   
   // Category
   category?: 'Adult' | 'Youth' | 'Child' | 'Senior';
@@ -44,8 +55,6 @@ export interface MemberData {
   invitedBy?: string;
   
   // Specific to First Timers
-  street?: string;
-  publicLandmark?: string;
   serviceDate?: string;
   firstVisit?: string;
   followUpStatus?: 'pending' | 'called' | 'visited' | 'completed';

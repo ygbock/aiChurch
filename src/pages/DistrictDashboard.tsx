@@ -121,6 +121,7 @@ interface MemberData {
   isBaptised: boolean;
   photoUrl?: string;
   createdAt?: string;
+  uid?: string;
 }
 
 export default function DistrictDashboard() {
@@ -158,15 +159,18 @@ export default function DistrictDashboard() {
   const [bulkRole, setBulkRole] = useState("Member");
   const [bulkStatus, setBulkStatus] = useState("Active");
 
-  // Leadership Provisioning State
-  const [provisionType, setProvisionType] = useState<"existing" | "new">(
-    "existing",
-  );
-  const [selectedMemberId, setSelectedMemberId] = useState("");
-  const [leaderRole, setLeaderRole] = useState("admin");
-  const [leaderBranchId, setLeaderBranchId] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteLink, setInviteLink] = useState("");
+  const [provisionType, setProvisionType] = useState<"existing" | "new">("existing");
+
+  // Leadership Form State
+  const [leaderForm, setLeaderForm] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    role: 'admin',
+    position: 'Branch Pastor',
+    branchId: '',
+    selectedMemberId: ''
+  });
 
   // Form states
   const [branchForm, setBranchForm] = useState({
@@ -306,8 +310,12 @@ export default function DistrictDashboard() {
     );
 
     // Listen to district leadership
-    const leadersRef = collection(db, "accessControl");
-    const qLeaders = query(leadersRef, where("districtId", "==", districtId));
+    const leadersRef = collection(db, "users");
+    const qLeaders = query(
+      leadersRef, 
+      where("districtId", "==", districtId),
+      where("role", "in", ["district", "admin", "branch_admin"])
+    );
     const unsubscribeLeaders = onSnapshot(
       qLeaders,
       (snapshot) => {
@@ -318,7 +326,7 @@ export default function DistrictDashboard() {
         setLeaders(results);
       },
       (error) => {
-        handleFirestoreError(error, OperationType.LIST, "accessControl");
+        handleFirestoreError(error, OperationType.LIST, "users");
       },
     );
 
@@ -468,87 +476,106 @@ export default function DistrictDashboard() {
     }
   };
 
-  const handleAssignLeadership = async (e: React.FormEvent) => {
+  const handleCreateLeader = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!districtId) return;
 
     setSaving(true);
     try {
-      if (provisionType === "existing") {
-        const member = members.find((m) => m.id === selectedMemberId);
-        if (!member || !member.email) {
-          alert(
-            "Selected member does not have an email address. Please update their profile first.",
-          );
-          setSaving(false);
-          return;
-        }
-
-        const emailLower = member.email.toLowerCase().trim();
-        const payload = {
-          email: emailLower,
-          role: leaderRole,
-          districtId: districtId,
-          branchId: leaderBranchId || member.branchId,
-          grantedAt: serverTimestamp(),
-          grantedBy: profile?.uid || "system",
-          status: "active",
-        };
-
-        await setDoc(doc(db, "accessControl", emailLower), payload);
-        setIsLeadershipModalOpen(false);
-      } else {
-        // Invite New User
-        const invitePayload = {
-          role: leaderRole,
-          districtId: districtId,
-          branchId: leaderBranchId,
-          requestedBy: profile?.uid || "system",
-          createdAt: serverTimestamp(),
-          status: "pending",
-          email: inviteEmail.toLowerCase().trim() || null,
-        };
-
-        const docRef = await addDoc(collection(db, "invites"), invitePayload);
-
-        // PRE-AUTHORIZE: If email provided, create access record immediately
-        if (inviteEmail) {
-          const emailLower = inviteEmail.toLowerCase().trim();
-          await setDoc(doc(db, "accessControl", emailLower), {
-            email: emailLower,
-            role: leaderRole,
-            districtId: districtId,
-            branchId: leaderBranchId || null,
-            grantedAt: serverTimestamp(),
-            grantedBy: profile?.uid || "system",
-            inviteId: docRef.id,
-            status: "pre-authorized",
+      const emailLower = leaderForm.email.toLowerCase().trim();
+      const authHelpers = await import('../lib/auth-helpers');
+      const { setDoc, addDoc, updateDoc, doc, collection, serverTimestamp } = await import('firebase/firestore');
+      
+      let finalUid = '';
+      
+      if (provisionType === 'existing') {
+        const member = members.find(m => m.id === leaderForm.selectedMemberId);
+        if (!member) throw new Error("Please select a member");
+        
+        if (member.uid) {
+          finalUid = member.uid;
+        } else {
+          if (!leaderForm.password) throw new Error("A temporary password is required to create portal access for this member.");
+          finalUid = await authHelpers.createSecondaryUser(emailLower, leaderForm.password);
+          
+          await updateDoc(doc(db, `districts/${districtId}/branches/${member.branchId || leaderForm.branchId}/members`, member.id), {
+            uid: finalUid,
+            email: emailLower
           });
         }
-
-        const link = `${window.location.origin}/register?invite=${docRef.id}`;
-        setInviteLink(link);
+      } else {
+        if (!leaderForm.password) throw new Error("Password is required.");
+        finalUid = await authHelpers.createSecondaryUser(emailLower, leaderForm.password);
+        
+        if (leaderForm.branchId) {
+          const path = `districts/${districtId}/branches/${leaderForm.branchId}/members`;
+          await addDoc(collection(db, path), {
+            fullName: leaderForm.fullName,
+            email: emailLower,
+            status: 'Active',
+            visibility: 'Public',
+            uid: finalUid,
+            createdAt: serverTimestamp()
+          });
+        }
       }
-    } catch (error) {
-      handleFirestoreError(
-        error,
-        provisionType === "existing"
-          ? OperationType.UPDATE
-          : OperationType.CREATE,
-        provisionType === "existing" ? "accessControl" : "invites",
-      );
+
+      // 2. Set/Update user profile
+      await setDoc(doc(db, 'users', finalUid), {
+        uid: finalUid,
+        authCreated: true,
+        fullName: leaderForm.fullName,
+        email: emailLower,
+        role: leaderForm.role,
+        position: leaderForm.position,
+        districtId: districtId,
+        branchId: leaderForm.branchId || null,
+        requirePasswordChange: provisionType === 'new' || !!leaderForm.password,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      // 3. Set accessControl doc
+      await setDoc(doc(db, 'accessControl', emailLower), {
+        email: emailLower,
+        role: leaderForm.role,
+        districtId: districtId,
+        branchId: leaderForm.branchId || null,
+        uid: finalUid,
+        requirePasswordChange: provisionType === 'new' || !!leaderForm.password,
+        grantedAt: serverTimestamp(),
+        grantedBy: profile?.uid || 'district_admin'
+      });
+
+      setIsLeadershipModalOpen(false);
+      setLeaderForm({
+        fullName: '',
+        email: '',
+        password: '',
+        role: 'admin',
+        position: 'Branch Pastor',
+        branchId: '',
+        selectedMemberId: ''
+      });
+      alert('Leader profile updated successfully.');
+    } catch (error: any) {
+      console.error(error);
+      alert('Failed to update leader: ' + error.message);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleRemoveLeader = async (email: string) => {
-    if (!window.confirm(`Are you sure you want to revoke access for ${email}?`))
+  const handleRemoveLeader = async (leader: any) => {
+    if (!window.confirm(`Are you sure you want to revoke access for ${leader.email}?`))
       return;
     try {
-      await deleteDoc(doc(db, "accessControl", email.toLowerCase()));
+      if (leader.email) {
+        await deleteDoc(doc(db, "accessControl", leader.email.toLowerCase()));
+      }
+      await deleteDoc(doc(db, "users", leader.id));
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, "accessControl");
+      handleFirestoreError(error, OperationType.DELETE, "accessControl/users");
     }
   };
 
@@ -1362,7 +1389,7 @@ export default function DistrictDashboard() {
         </div>
       )}
 
-      {activeTab === "security" && (
+      {activeTab === "leadership" && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-3 space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
@@ -1376,11 +1403,23 @@ export default function DistrictDashboard() {
                   </p>
                 </div>
                 <button
-                  onClick={() => setIsLeadershipModalOpen(true)}
+                  onClick={() => {
+                    setLeaderForm({
+                      fullName: '',
+                      email: '',
+                      password: '',
+                      role: 'admin',
+                      position: 'Branch Pastor',
+                      branchId: '',
+                      selectedMemberId: ''
+                    });
+                    setProvisionType('existing');
+                    setIsLeadershipModalOpen(true);
+                  }}
                   className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-800 transition-all"
                 >
                   <UserPlus size={16} />
-                  Provision Admin Access
+                  Create Leader
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 p-6 gap-4">
@@ -1391,36 +1430,47 @@ export default function DistrictDashboard() {
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-blue-600 font-bold text-lg uppercase shadow-sm">
-                        {leader.email.charAt(0)}
+                        {leader.fullName ? leader.fullName.charAt(0) : leader.email.charAt(0)}
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-slate-900 truncate max-w-[150px]">
-                          {leader.email}
+                          {leader.fullName || leader.email}
                         </h4>
-                        <div className="flex items-center gap-2 mt-0.5">
+                        {leader.fullName && (
+                           <p className="text-[10px] text-slate-500 truncate max-w-[150px]">{leader.email}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
-                              leader.role === "admin"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-slate-200 text-slate-600"
+                              leader.role === "district"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-blue-100 text-blue-700"
                             }`}
                           >
-                            {leader.role}
+                            {leader.position || leader.role}
                           </span>
-                          <span className="text-[10px] text-slate-400 italic">
-                            Branch ID: {leader.branchId?.slice(0, 6)}...
-                          </span>
+                          {leader.branchId && (
+                            <span className="text-[10px] text-slate-400 italic truncate max-w-[100px]">
+                              Br: {branches.find(b => b.id === leader.branchId)?.name || 'Unknown'}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
                     <button
-                      onClick={() => handleRemoveLeader(leader.email)}
+                      onClick={() => handleRemoveLeader(leader)}
                       className="opacity-0 group-hover:opacity-100 p-2 text-slate-400 hover:text-red-600 transition-opacity"
                     >
                       <Trash2 size={16} />
                     </button>
                   </div>
                 ))}
+                {leaders.length === 0 && (
+                  <div className="col-span-full py-8 text-center text-sm text-slate-500 flex flex-col items-center">
+                    <Shield className="w-12 h-12 text-slate-200 mb-2" />
+                    No leadership profiles created yet.
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1523,203 +1573,168 @@ export default function DistrictDashboard() {
 
       <Modal
         isOpen={isLeadershipModalOpen}
-        onClose={() => {
-          setIsLeadershipModalOpen(false);
-          setInviteLink("");
-        }}
-        title={`Provision Admin Access`}
+        onClose={() => setIsLeadershipModalOpen(false)}
+        title="District Leader Profile"
       >
-        {inviteLink ? (
-          <div className="space-y-4">
-            <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex items-start gap-3">
-              <CheckCircle2
-                className="text-emerald-500 mt-0.5 flex-shrink-0"
-                size={18}
-              />
-              <div>
-                <p className="text-sm font-bold text-emerald-900 leading-tight mb-1">
-                  Invite Link Generated
-                </p>
-                <p className="text-xs text-emerald-700">
-                  Share this link with the new administrator. They will use it
-                  to set up their account credentials.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
-              <input
-                type="text"
-                readOnly
-                value={inviteLink}
-                className="flex-1 bg-transparent text-sm outline-none text-slate-600 min-w-0"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(inviteLink);
-                  alert("Link copied to clipboard!");
-                }}
-                className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
-                title="Copy to clipboard"
-              >
-                <FileText size={16} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <a
-                href={`mailto:?subject=Faith Healing Bible Church Admin Invitation&body=You have been invited to be an admin on Faith Healing Bible Church. Please click here to register and set your password: ${inviteLink}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-sm font-bold transition-colors"
-              >
-                <Mail size={16} />
-                Email Link
-              </a>
-              <a
-                href={`https://wa.me/?text=You have been invited to be an admin on Faith Healing Bible Church. Please click here to register and set your password: ${inviteLink}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white py-2 rounded-lg text-sm font-bold transition-colors"
-              >
-                <Phone size={16} />
-                WhatsApp
-              </a>
-            </div>
-
+        <form onSubmit={handleCreateLeader} className="space-y-4">
+          <div className="flex bg-slate-100 p-1 rounded-xl mb-4">
             <button
               type="button"
-              onClick={() => {
-                setIsLeadershipModalOpen(false);
-                setInviteLink("");
-              }}
-              className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors mt-2"
+              onClick={() => setProvisionType("existing")}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${provisionType === "existing" ? "bg-white shadow text-blue-600" : "text-slate-500 hover:text-slate-700"}`}
             >
-              Done
+              Promote Existing Member
+            </button>
+            <button
+              type="button"
+              onClick={() => setProvisionType("new")}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${provisionType === "new" ? "bg-white shadow text-blue-600" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              Add New Person
             </button>
           </div>
-        ) : (
-          <form onSubmit={handleAssignLeadership} className="space-y-6">
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setProvisionType("existing")}
-                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${provisionType === "existing" ? "bg-white shadow text-blue-600" : "text-slate-500 hover:text-slate-700"}`}
-              >
-                Existing Member
-              </button>
-              <button
-                type="button"
-                onClick={() => setProvisionType("new")}
-                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${provisionType === "new" ? "bg-white shadow text-blue-600" : "text-slate-500 hover:text-slate-700"}`}
-              >
-                Invite New User
-              </button>
-            </div>
 
-            {provisionType === "existing" ? (
+          <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
+            <p className="text-xs text-blue-700 font-medium tracking-tight leading-relaxed">
+              {provisionType === 'existing' 
+                ? 'Select a member to grant them leadership access. If they already have an account, their access will be updated automatically.' 
+                : 'Create a new profile and assign credentials. A new member record and login portal access will be generated.'}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {provisionType === 'existing' && (
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">
-                  Select Member
-                </label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Select Member</label>
                 <select
-                  value={selectedMemberId}
-                  onChange={(e) => setSelectedMemberId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   required
+                  value={leaderForm.selectedMemberId}
+                  onChange={(e) => {
+                    const m = members.find(x => x.id === e.target.value);
+                    if (m) {
+                      setLeaderForm({
+                        ...leaderForm, 
+                        selectedMemberId: m.id,
+                        fullName: m.fullName || '',
+                        email: m.email || '',
+                        branchId: m.branchId || ''
+                      });
+                    } else {
+                      setLeaderForm({...leaderForm, selectedMemberId: ''});
+                    }
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500"
                 >
                   <option value="">Choose a member...</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.fullName} {m.email ? `(${m.email})` : "(No Email)"}
-                    </option>
+                  {members.map(m => (
+                    <option key={m.id} value={m.id}>{m.fullName} {m.email ? `(${m.email})` : ''}</option>
                   ))}
                 </select>
-                <p className="text-[10px] text-slate-500 mt-1.5 ml-1">
-                  Member must have an email address tied to their profile.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-2">
-                  <p className="text-xs text-blue-700 font-medium leading-relaxed">
-                    Provide the user's email below to{" "}
-                    <span className="font-bold underline">pre-authorize</span>{" "}
-                    their admin access. They will be able to start managing
-                    their branch immediately after setting their password.
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">
-                    Invitee Email (Optional)
-                  </label>
-                  <div className="relative">
-                    <Mail
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                      size={16}
-                    />
-                    <input
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      placeholder="admin@example.com"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1.5 ml-1">
-                    If blank, they will need manual approval after registration.
-                  </p>
-                </div>
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+              <input 
+                type="text" 
+                required
+                value={leaderForm.fullName}
+                onChange={e => setLeaderForm({...leaderForm, fullName: e.target.value})}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className={`grid ${!(provisionType === 'existing' && leaderForm.selectedMemberId && members.find(m => m.id === leaderForm.selectedMemberId)?.uid) ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">
-                  Target Branch
-                </label>
-                <select
-                  value={leaderBranchId}
-                  onChange={(e) => setLeaderBranchId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                <label className="block text-xs font-bold text-slate-700 mb-1">Email</label>
+                <input 
+                  type="email" 
+                  required
+                  value={leaderForm.email}
+                  onChange={e => setLeaderForm({...leaderForm, email: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500"
+                />
+              </div>
+              {!(provisionType === 'existing' && leaderForm.selectedMemberId && members.find(m => m.id === leaderForm.selectedMemberId)?.uid) && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Temp Password</label>
+                  <input 
+                    type="text" 
+                    required={provisionType === 'new' || (provisionType === 'existing' && leaderForm.selectedMemberId && !members.find(m => m.id === leaderForm.selectedMemberId)?.uid)}
+                    value={leaderForm.password}
+                    onChange={e => setLeaderForm({...leaderForm, password: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">System Access Level</label>
+                <select 
+                  value={leaderForm.role}
+                  onChange={e => setLeaderForm({...leaderForm, role: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500"
                 >
-                  <option value="">None (District Global)</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
+                  <option value="district">District Admin</option>
+                  <option value="admin">Branch Admin</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">
-                  Role
-                </label>
-                <select
-                  value={leaderRole}
-                  onChange={(e) => setLeaderRole(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                <label className="block text-xs font-bold text-slate-700 mb-1">Leadership Position</label>
+                <select 
+                  value={leaderForm.position}
+                  onChange={e => {
+                    const pos = e.target.value;
+                    let role = leaderForm.role;
+                    if (pos.includes('District')) role = 'district';
+                    else role = 'admin';
+                    setLeaderForm({...leaderForm, position: pos, role});
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500"
                 >
-                  <option value="admin">Branch Admin</option>
-                  <option value="district">District Overseer</option>
+                  <option value="District Admin">District Admin</option>
+                  <option value="District Financial Secretary">District Financial Secretary</option>
+                  <option value="District Admin Secretary">District Admin Secretary</option>
+                  <option value="District Organising Secretary">District Organising Secretary</option>
+                  <option value="Senior Pastor">Senior Pastor</option>
+                  <option value="Branch Pastor">Branch Pastor</option>
+                  <option value="Assistant Pastor">Assistant Pastor</option>
+                  <option value="Branch Admin">Branch Admin</option>
+                  <option value="Branch Financial Secretary">Branch Financial Secretary</option>
+                  <option value="Branch Admin Secretary">Branch Admin Secretary</option>
+                  <option value="Branch Organising Secretary">Branch Organising Secretary</option>
                 </select>
               </div>
             </div>
+            
+            {leaderForm.role === 'admin' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Target Branch</label>
+                <select 
+                  required
+                  value={leaderForm.branchId}
+                  onChange={e => setLeaderForm({...leaderForm, branchId: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500"
+                >
+                  <option value="">Select Branch...</option>
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
 
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-800 transition-all disabled:opacity-50"
-            >
-              {saving
-                ? "Processing..."
-                : provisionType === "existing"
-                  ? "Provision Access"
-                  : "Generate Invite Link"}
-            </button>
-          </form>
-        )}
+          <button 
+            type="submit" 
+            disabled={saving}
+            className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-slate-800 transition-all disabled:opacity-50 mt-6"
+          >
+            {saving ? 'Processing...' : 'Save Profile'}
+          </button>
+        </form>
       </Modal>
 
       {/* Deleted old duplicate blocks */}
