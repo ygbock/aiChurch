@@ -37,6 +37,7 @@ import { MemberGivingTab } from './members/components/MemberGivingTab';
 import { MemberAttendanceTab } from './members/components/MemberAttendanceTab';
 import { MemberBioTab } from './members/components/MemberBioTab';
 import { MemberSignalTab } from './members/components/MemberSignalTab';
+import { MemberDiscipleshipTab } from './members/components/MemberDiscipleshipTab';
 import IDCardGenerator from '../components/IDCardGenerator';
 import { MemberData } from '../types/membership';
 
@@ -152,6 +153,7 @@ export default function MemberProfile() {
 
   const tabs = [
     { id: 'bio', label: 'Biography & Family', icon: User },
+    { id: 'discipleship', label: 'Growth & Discipleship', icon: Flame },
     { id: 'attendance', label: 'Attendance Telemetry', icon: Activity },
     { id: 'rsvps', label: 'Event Signal', icon: CalendarDays },
     { id: 'giving', label: 'Fiscal Contributions', icon: CircleDollarSign },
@@ -451,6 +453,8 @@ export default function MemberProfile() {
                </div>
             ) : activeTab === 'bio' ? (
               <MemberBioTab member={member} />
+            ) : activeTab === 'discipleship' ? (
+              <MemberDiscipleshipTab member={member} />
             ) : activeTab === 'attendance' ? (
               <MemberAttendanceTab member={member} />
             ) : activeTab === 'rsvps' ? (

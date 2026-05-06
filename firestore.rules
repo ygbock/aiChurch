@@ -241,7 +241,7 @@ service cloud.firestore {
         allow write: if (isSuperAdmin() || isDistrictLeader(districtId)) && isVerified();
         
         match /members/{memberId} {
-          allow read: if isBranchAdmin(districtId, branchId) || (isSignedIn() && request.auth.uid == memberId);
+          allow read: if isBranchAdmin(districtId, branchId) || hasUserRole("admin") || hasUserRole("district") || (isSignedIn() && request.auth.uid == memberId);
           allow list: if isBranchAdmin(districtId, branchId);
           allow create: if isBranchAdmin(districtId, branchId) && isVerified() && isValidMember(incoming());
           allow update: if isBranchAdmin(districtId, branchId) && isVerified() && isValidMember(incoming());
@@ -254,7 +254,17 @@ service cloud.firestore {
         }
 
         match /transactions/{transactionId} {
-          allow read: if isBranchAdmin(districtId, branchId);
+          allow read, list: if isBranchAdmin(districtId, branchId) || isSuperAdmin() || isDistrictLeader(districtId) || (isSignedIn() && resource.data.memberId == request.auth.uid);
+          allow write: if isBranchAdmin(districtId, branchId) && isVerified();
+        }
+
+        match /fundRequests/{requestId} {
+          allow read, list: if isBranchAdmin(districtId, branchId) || isSuperAdmin() || isDistrictLeader(districtId);
+          allow write, update: if (isBranchAdmin(districtId, branchId) || isDistrictLeader(districtId) || isSuperAdmin()) && isVerified();
+        }
+
+        match /serviceReports/{reportId} {
+          allow read, list: if isBranchAdmin(districtId, branchId) || isSuperAdmin() || isDistrictLeader(districtId);
           allow write: if isBranchAdmin(districtId, branchId) && isVerified();
         }
 
@@ -342,6 +352,13 @@ service cloud.firestore {
       allow create: if true;
       allow read: if isSuperAdmin() || isDistrictLeader('any');
       allow write: if (isSuperAdmin() || isDistrictLeader('any')) && isVerified();
+    }
+
+    match /transfers/{transferId} {
+      allow read, list: if isSuperAdmin() || isDistrictLeader('any') || isBranchAdmin('any', 'any');
+      allow create: if (isSuperAdmin() || isDistrictLeader('any') || isBranchAdmin('any', 'any')) && isVerified();
+      allow update: if (isSuperAdmin() || isDistrictLeader('any') || isBranchAdmin('any', 'any')) && isVerified();
+      allow delete: if isSuperAdmin() && isVerified();
     }
 
     // Collection Group Helpers for safety

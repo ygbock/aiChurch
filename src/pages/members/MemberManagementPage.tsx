@@ -15,7 +15,6 @@ import { MemberToolbar } from './components/MemberToolbar';
 import { MemberTable } from './components/MemberTable';
 import { VisualInsights } from './components/VisualInsights';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { SuperAdminAddMemberModal } from './components/SuperAdminAddMemberModal';
 import { BulkNotifyModal } from './components/BulkNotifyModal';
 import { BulkTransferModal } from './components/BulkTransferModal';
 import { ImportMembersModal } from './components/ImportMembersModal';
@@ -28,7 +27,6 @@ export default function MemberManagementPage() {
   const { profile } = useFirebase();
   const { members, loading } = useMembers();
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'insights'>('list');
-  const [showSuperAdminModal, setShowSuperAdminModal] = useState(false);
   const [showNotifyModal, setShowNotifyModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -321,25 +319,21 @@ export default function MemberManagementPage() {
         </div>
         
         <div className="flex flex-row md:flex-row items-center gap-3 w-full md:w-auto">
-          {profile?.role !== 'superadmin' && (
-            <Button 
-              variant="outline"
-              onClick={() => setShowNotifyModal(true)}
-              className="hidden sm:flex flex-1 md:flex-none rounded-xl px-5 font-bold border-slate-200 items-center justify-center gap-2 h-11"
-            >
-              <Send size={18} />
-              Bulk Notify
-            </Button>
-          )}
-          {profile?.role !== 'superadmin' && (
-            <Button 
-              onClick={handleAddClick}
-              className="w-full sm:flex-1 md:flex-none justify-center bg-slate-900 text-white rounded-xl px-6 h-11 font-bold flex items-center gap-2 shadow-lg shadow-slate-200 hover:shadow-xl hover:translate-y-[-1px] transition-all"
-            >
-              <Plus size={18} />
-              {activeTab === 'Member' ? 'Add Member' : activeTab === 'Visitor' ? 'Add First Timer' : 'Add Convert'}
-            </Button>
-          )}
+          <Button 
+            variant="outline"
+            onClick={() => setShowNotifyModal(true)}
+            className="hidden sm:flex flex-1 md:flex-none rounded-xl px-5 font-bold border-slate-200 items-center justify-center gap-2 h-11"
+          >
+            <Send size={18} />
+            Bulk Notify
+          </Button>
+          <Button 
+            onClick={handleAddClick}
+            className="w-full sm:flex-1 md:flex-none justify-center bg-slate-900 text-white rounded-xl px-6 h-11 font-bold flex items-center gap-2 shadow-lg shadow-slate-200 hover:shadow-xl hover:translate-y-[-1px] transition-all"
+          >
+            <Plus size={18} />
+            {activeTab === 'Member' ? 'Add Member' : activeTab === 'Visitor' ? 'Add First Timer' : 'Add Convert'}
+          </Button>
         </div>
       </div>
 
@@ -459,33 +453,6 @@ export default function MemberManagementPage() {
         </AnimatePresence>
       </div>
 
-      {profile?.role === 'superadmin' && (
-        <>
-          <button 
-            onClick={() => setShowSuperAdminModal(true)}
-            className="fixed bottom-8 right-8 h-14 w-14 bg-slate-900 text-white rounded-full shadow-2xl shadow-slate-900/20 flex items-center justify-center hover:scale-105 transition-all z-40 hidden sm:flex"
-          >
-            <Plus size={24} />
-          </button>
-          
-          {/* Mobile FAB */}
-          <button 
-            onClick={() => setShowSuperAdminModal(true)}
-            className="fixed bottom-[80px] right-6 h-12 w-12 bg-slate-900 text-white rounded-full shadow-2xl shadow-slate-900/20 flex items-center justify-center hover:scale-105 transition-all z-40 sm:hidden"
-          >
-            <Plus size={20} />
-          </button>
-
-          <SuperAdminAddMemberModal 
-            isOpen={showSuperAdminModal}
-            onClose={() => setShowSuperAdminModal(false)}
-            onSuccess={() => {
-              // Note: the useMembers hook listens to snap changes so it will auto-update.
-            }}
-          />
-        </>
-      )}
-
       {showNotifyModal && (
         <BulkNotifyModal
           isOpen={showNotifyModal}
@@ -564,16 +531,14 @@ export default function MemberManagementPage() {
                 <span className="hidden sm:inline">PDF</span>
               </Button>
               
-              {profile?.role === 'superadmin' && (
-                <Button 
-                  onClick={() => setShowTransferModal(true)}
-                  variant="ghost" 
-                  className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2 shrink-0"
-                >
-                  <Users size={16} />
-                  <span className="hidden sm:inline">Transfer</span>
-                </Button>
-              )}
+              <Button 
+                onClick={() => setShowTransferModal(true)}
+                variant="ghost" 
+                className="hover:bg-white/10 text-white px-3 py-1.5 h-auto text-sm font-bold rounded-xl flex items-center gap-2 shrink-0"
+              >
+                <Users size={16} />
+                <span className="hidden sm:inline">Transfer</span>
+              </Button>
 
               <Button 
                 onClick={() => setShowNotifyModal(true)}

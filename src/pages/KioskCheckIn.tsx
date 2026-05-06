@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, doc, setDoc, serverTimestamp, where, collectionGroup } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import { UserCheck, Search, CheckCircle, X, Check, ArrowLeft, Camera } from 'lucide-react';
+import { UserCheck, Search, CheckCircle, X, Check, ArrowLeft, Camera, Ticket } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useZxing } from 'react-zxing';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function KioskCheckIn() {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export default function KioskCheckIn() {
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [checkedInList, setCheckedInList] = useState<Set<string>>(new Set());
   const [isScanning, setIsScanning] = useState(false);
+  const [recentCheckIn, setRecentCheckIn] = useState<any>(null); // For ticket modal
   
   const { ref: zxingRef } = useZxing({
     onDecodeResult(result) {
@@ -128,6 +130,7 @@ export default function KioskCheckIn() {
 
         toast.success(`${member.fullName} checked in!`);
         setCheckedInList(prev => new Set([...prev, member.id]));
+        setRecentCheckIn(member);
         setSearchQuery('');
      } catch (error) {
         console.error("Error checking in", error);
@@ -165,6 +168,49 @@ export default function KioskCheckIn() {
         
         <div className="text-center mb-8 sm:mb-12 relative">
            <AnimatePresence>
+             {recentCheckIn && (
+               <motion.div
+                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                 className="fixed inset-0 z-50 flex items-center justify-center p-6"
+               >
+                 <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setRecentCheckIn(null)} />
+                 <motion.div 
+                   initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+                   className="relative bg-white text-slate-900 rounded-[2rem] p-8 max-w-sm w-full border border-slate-200 shadow-2xl overflow-hidden"
+                 >
+                   <div className="absolute top-0 right-0 p-4">
+                     <button onClick={() => setRecentCheckIn(null)} className="text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full p-2">
+                       <X size={20} />
+                     </button>
+                   </div>
+                   <div className="text-center mt-4">
+                     <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Check size={32} strokeWidth={3} />
+                     </div>
+                     <h3 className="text-2xl font-black text-slate-800 tracking-tight">{recentCheckIn.fullName}</h3>
+                     <p className="text-slate-500 font-medium">Checked in to {programName}</p>
+
+                     <div className="mt-8 border-t border-dashed border-slate-300 pt-8 flex justify-center">
+                       <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm inline-block">
+                         <QRCodeSVG 
+                           value={recentCheckIn.id} 
+                           size={160} 
+                           bgColor={"#ffffff"} 
+                           fgColor={"#0f172a"} 
+                           level={"Q"} 
+                         />
+                       </div>
+                     </div>
+                     <div className="mt-4 flex flex-col items-center">
+                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest bg-slate-100 px-3 py-1 rounded-full flex items-center gap-1.5">
+                           <Ticket size={12} /> Security / Event Tag Code
+                        </span>
+                        <p className="text-xs text-slate-500 mt-3 font-medium">Screen shot or scan this barcode for secure pick-up, seating, or kids check-out.</p>
+                     </div>
+                   </div>
+                 </motion.div>
+               </motion.div>
+             )}
              {programId && (
                <motion.div 
                  initial={{ opacity: 0, y: -10 }} 

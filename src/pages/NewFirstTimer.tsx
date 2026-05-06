@@ -85,8 +85,56 @@ export default function NewFirstTimer() {
         updatedAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db, path), newRecord);
-      toast.success("Encounter record executed successfully");
+      const docRef = await addDoc(collection(db, path), newRecord);
+
+      // Automated workflow: Schedule follow up tasks
+      try {
+        const tasksRef = collection(db, 'tasks');
+        
+        // 1. Welcome Call Task (Tomorrow)
+        const callDate = new Date();
+        callDate.setDate(callDate.getDate() + 1);
+        await addDoc(tasksRef, {
+          title: `Welcome Call: ${data.fullName}`,
+          description: `Please give a warm welcome call to ${data.fullName} (Phone: ${data.phone || 'N/A'}). Assigned automatically by First-Timer Registration Workflow.`,
+          status: 'pending',
+          priority: 'high',
+          assignedToRole: 'worker',
+          districtId: selectedBranch.districtId,
+          branchId: data.branchId,
+          targetMemberId: docRef.id,
+          targetMemberName: data.fullName,
+          dueDate: callDate.toISOString(),
+          type: 'call',
+          createdAt: serverTimestamp(),
+        });
+
+        // 2. Physical Visit Task (3 days later)
+        const visitDate = new Date();
+        visitDate.setDate(visitDate.getDate() + 3);
+        const addressParts = [data.street, data.area, data.community, data.publicLandmark].filter(Boolean);
+        const addressString = addressParts.length > 0 ? addressParts.join(', ') : 'No address provided';
+
+        await addDoc(tasksRef, {
+          title: `Physical Visit: ${data.fullName}`,
+          description: `Scheduled physical visit for ${data.fullName} at: ${addressString}. Phone: ${data.phone || 'N/A'}.`,
+          status: 'pending',
+          priority: 'medium',
+          assignedToRole: 'worker',
+          districtId: selectedBranch.districtId,
+          branchId: data.branchId,
+          targetMemberId: docRef.id,
+          targetMemberName: data.fullName,
+          dueDate: visitDate.toISOString(),
+          type: 'visit',
+          createdAt: serverTimestamp(),
+        });
+
+      } catch (workflowError) {
+         console.error('Error in automated workflow scheduling:', workflowError);
+      }
+
+      toast.success("Encounter record executed successfully. Follow-up tasks scheduled.");
       navigate('/members');
     } catch (err: any) {
       console.error("Failed to save first timer:", err);

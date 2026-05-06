@@ -314,6 +314,9 @@ export default function NewMember() {
               joinDate: data.joinDate || new Date().toISOString().split('T')[0],
               baptismDate: data.baptismDate || '',
               assignedDepartment: data.assignedDepartment || data.departmentId || '_none',
+              gender: data.gender ? String(data.gender).toLowerCase() : undefined,
+              status: data.status ? String(data.status).toLowerCase() : undefined,
+              maritalStatus: data.maritalStatus ? String(data.maritalStatus).toLowerCase() : undefined,
             };
 
             form.reset(formattedData as any);
@@ -631,7 +634,7 @@ export default function NewMember() {
                           <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Identification Matrix</Label>
                           <div className="h-px flex-1 bg-slate-100" />
                         </div>
-                        <div className="relative w-48 sm:w-56 lg:w-full aspect-square mx-auto lg:mx-0 rounded-[2rem] lg:rounded-[3rem] bg-slate-50 border-4 border-slate-100 overflow-hidden shadow-inner group flex items-center justify-center">
+                        <div className="relative w-32 sm:w-40 lg:w-full max-w-[200px] xl:max-w-xs aspect-square mx-auto lg:mx-0 rounded-[2rem] lg:rounded-[3rem] bg-slate-50 border-4 border-slate-100 overflow-hidden shadow-inner group flex items-center justify-center">
                           {showCamera ? (
                             <div className="relative w-full h-full bg-black">
                               <video 

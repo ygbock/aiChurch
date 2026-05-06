@@ -57,6 +57,13 @@ export interface MemberData {
   
   // Specific to First Timers
   serviceDate?: string;
+  // Discipleship
+  discipleship?: {
+    believersClass?: { status: 'pending' | 'in-progress' | 'completed'; date?: string };
+    baptismalClass?: { status: 'pending' | 'in-progress' | 'completed'; date?: string };
+    discipleshipTraining?: { status: 'pending' | 'in-progress' | 'completed'; date?: string };
+    workersInTraining?: { status: 'pending' | 'in-progress' | 'completed'; date?: string };
+  };
   firstVisit?: string;
   followUpStatus?: 'pending' | 'called' | 'visited' | 'completed';
   followUpNotes?: string;

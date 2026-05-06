@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ArrowDownToLine, ArrowUpToLine, LayoutGrid, List, FileText, Download, SortAsc, SortDesc, PieChart } from 'lucide-react';
+import { Search, ArrowDownToLine, ArrowUpToLine, LayoutGrid, List, FileText, Download, SortAsc, SortDesc, PieChart, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 interface MemberToolbarProps {
@@ -43,6 +44,13 @@ export const MemberToolbar = ({
 }: MemberToolbarProps) => {
   const [isViewModeExpanded, setIsViewModeExpanded] = useState(false);
 
+  // Count active filters
+  let activeFilterCount = 0;
+  if (filters.category && filters.category !== 'All') activeFilterCount++;
+  if (filters.status && filters.status !== 'All') activeFilterCount++;
+  if (filters.baptism && filters.baptism !== 'All') activeFilterCount++;
+  if (filters.level && filters.level !== 'All') activeFilterCount++;
+
   return (
     <div className="flex flex-col gap-4 bg-white p-3 rounded-2xl border border-slate-200 w-full">
       {/* Top Row: Filters & Actions */}
@@ -51,20 +59,98 @@ export const MemberToolbar = ({
         <div className="flex-1 flex items-center gap-3 min-w-0 overflow-x-auto no-scrollbar pb-1">
           {children}
           
-           {/* Filter Level Dropdown - only show if not superadmin since superadmin uses tabs for levels */}
-           {!showGlobalFilters && !children && (
-             <div className="shrink-0">
-               <select 
-                 className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                 value={filters.level}
-                 onChange={(e) => onFilterChange({...filters, level: e.target.value})}
-               >
-                 <option value="All">All Levels</option>
-                 <option value="Disciple">Disciple</option>
-                 <option value="Worker">Worker</option>
-                 <option value="Leader">Leader</option>
-               </select>
-             </div>
+           {/* Filtering Menu (Advanced Filters) */}
+           {!children && (
+             <Popover>
+               <PopoverTrigger className={cn("h-11 px-4 inline-flex items-center justify-center rounded-xl font-bold bg-white outline-none cursor-pointer border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors shadow-sm", activeFilterCount > 0 && "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800")}>
+                 <Filter size={18} className="mr-2" />
+                 Filters
+                 {activeFilterCount > 0 && (
+                   <span className="ml-2 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px]">
+                     {activeFilterCount}
+                   </span>
+                 )}
+               </PopoverTrigger>
+               <PopoverContent className="w-80 p-4 rounded-2xl border-slate-200 shadow-xl" align="start">
+                 <div className="space-y-4">
+                   <h4 className="font-bold text-sm text-slate-900">Filter Cohorts</h4>
+                   
+                   <div className="space-y-3">
+                     {!showGlobalFilters && (
+                       <div className="flex flex-col gap-1">
+                         <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Level</label>
+                         <select 
+                           className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 transition-all w-full"
+                           value={filters.level}
+                           onChange={(e) => onFilterChange({...filters, level: e.target.value})}
+                         >
+                           <option value="All">All Levels</option>
+                           <option value="Disciple">Disciple</option>
+                           <option value="Worker">Worker</option>
+                           <option value="Leader">Leader</option>
+                         </select>
+                       </div>
+                     )}
+
+                     <div className="flex flex-col gap-1">
+                       <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Category</label>
+                       <select 
+                         className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 transition-all w-full"
+                         value={filters.category}
+                         onChange={(e) => onFilterChange({...filters, category: e.target.value})}
+                       >
+                         <option value="All">All Categories</option>
+                         <option value="Adult">Adult</option>
+                         <option value="Youth">Youth</option>
+                         <option value="Child">Child</option>
+                         <option value="Senior">Senior</option>
+                       </select>
+                     </div>
+
+                     <div className="flex flex-col gap-1">
+                       <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Status</label>
+                       <select 
+                         className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 transition-all w-full"
+                         value={filters.status}
+                         onChange={(e) => onFilterChange({...filters, status: e.target.value})}
+                       >
+                         <option value="All">All Statuses</option>
+                         <option value="Active">Active</option>
+                         <option value="Inactive">Inactive</option>
+                         <option value="Pending">Pending</option>
+                         <option value="Transferred">Transferred</option>
+                       </select>
+                     </div>
+
+                     <div className="flex flex-col gap-1">
+                       <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Baptism</label>
+                       <select 
+                         className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 transition-all w-full"
+                         value={filters.baptism}
+                         onChange={(e) => onFilterChange({...filters, baptism: e.target.value})}
+                       >
+                         <option value="All">All Baptism Statuses</option>
+                         <option value="Baptised">Baptised</option>
+                         <option value="Not Baptised">Not Baptised</option>
+                         <option value="Pending">Pending</option>
+                         <option value="In Foundation Class">In Foundation Class</option>
+                       </select>
+                     </div>
+                   </div>
+                   
+                   <div className="pt-2 border-t border-slate-100 flex justify-end">
+                     <Button 
+                       variant="ghost" 
+                       size="sm" 
+                       className="text-[10px] uppercase font-bold tracking-widest text-slate-500 hover:text-slate-900"
+                       onClick={() => onFilterChange({...filters, level: 'All', category: 'All', status: 'All', baptism: 'All'})}
+                     >
+                       Clear Filters
+                     </Button>
+                   </div>
+                 </div>
+               </PopoverContent>
+             </Popover>
            )}
 
            {/* Sorting */}

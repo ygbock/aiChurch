@@ -50,6 +50,8 @@ const Help = () => (
   </div>
 );
 
+import ServiceReports from './pages/ServiceReports';
+
 export default function App() {
   return (
     <FirebaseProvider>
@@ -78,6 +80,7 @@ export default function App() {
             <Route path="departments/:departmentId" element={<DepartmentDashboard />} />
             <Route path="departments/:departmentId/members/:memberId" element={<DepartmentMemberProfile />} />
             <Route path="financials" element={<Financials />} />
+            <Route path="service-reports" element={<ServiceReports />} />
             <Route path="reports" element={<Reports />} />
             <Route path="events" element={<Events />} />
             <Route path="calendar" element={<Calendar />} />

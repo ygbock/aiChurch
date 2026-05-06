@@ -93,8 +93,54 @@ export default function NewConvert() {
         updatedAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db, path), newMember);
-      toast.success("Convert record initialized successfully");
+      const docRef = await addDoc(collection(db, path), newMember);
+
+      // Automated workflow: Schedule discipleship tasks
+      try {
+        const tasksRef = collection(db, 'tasks');
+        
+        // 1. Assimilation / Orientation Call (Tomorrow)
+        const callDate = new Date();
+        callDate.setDate(callDate.getDate() + 1);
+        await addDoc(tasksRef, {
+          title: `Orientation Call: ${data.fullName}`,
+          description: `Welcome the new convert ${data.fullName} into the family. Briefly orient them about worship times and foundational classes. Phone: ${data.phone || 'N/A'}. Assigned automatically by Neo-Convert Workflow.`,
+          status: 'pending',
+          priority: 'high',
+          assignedToRole: 'worker',
+          districtId: selectedBranch.districtId,
+          branchId: data.branchId,
+          targetMemberId: docRef.id,
+          targetMemberName: data.fullName,
+          dueDate: callDate.toISOString(),
+          type: 'call',
+          createdAt: serverTimestamp(),
+        });
+
+        // 2. Discipleship Assignment (Next week)
+        const visitDate = new Date();
+        visitDate.setDate(visitDate.getDate() + 7);
+
+        await addDoc(tasksRef, {
+          title: `Start Believers Class: ${data.fullName}`,
+          description: `Ensure ${data.fullName} is scheduled and begins their Believers Foundation Class. Follow up and track their progress on their profile.`,
+          status: 'pending',
+          priority: 'medium',
+          assignedToRole: 'worker',
+          districtId: selectedBranch.districtId,
+          branchId: data.branchId,
+          targetMemberId: docRef.id,
+          targetMemberName: data.fullName,
+          dueDate: visitDate.toISOString(),
+          type: 'milestone',
+          createdAt: serverTimestamp(),
+        });
+
+      } catch (workflowError) {
+         console.error('Error in automated workflow scheduling:', workflowError);
+      }
+
+      toast.success("Convert record initialized successfully. Ongoing spiritual tracking tasks initiated.");
       navigate('/members');
     } catch (err: any) {
       console.error("Failed to save convert:", err);

@@ -26,6 +26,7 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
   const [targetDistrictId, setTargetDistrictId] = useState('');
   const [targetBranchId, setTargetBranchId] = useState('');
   const [transferReason, setTransferReason] = useState('');
+  const [leadershipComment, setLeadershipComment] = useState('');
   const [newCapacity, setNewCapacity] = useState('');
   
   const [districts, setDistricts] = useState<{id: string, name: string}[]>([]);
@@ -37,8 +38,8 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadDistricts();
-      // Initialize with user's district if they are district level
-      if (profile?.role === 'district' && profile.districtId) {
+      // Initialize with user's district if they have one
+      if (profile?.districtId) {
          setTargetDistrictId(profile.districtId);
          loadBranches(profile.districtId);
       }
@@ -108,18 +109,20 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
         const isLeaderTransfer = ['District Overseer', 'Branch Pastor', 'Assistant Pastor', 'Department Head', 'Leader'].includes(member.level) || 
                                  ['District Overseer', 'Branch Pastor', 'Assistant Pastor', 'Department Head', 'Leader'].includes(newCapacity);
 
-        if (profile?.role !== 'superadmin' && isLeaderTransfer) {
+        // All non-superadmin transfers go to the pending queue to avoid permissions errors and maintain auditing
+        if (profile?.role !== 'superadmin') {
            const transferRef = doc(collection(db, 'transfers'));
            batch.set(transferRef, {
              memberId: member.id,
              memberName: member.fullName,
              fromDistrictId: member.districtId || 'unassigned',
              fromBranchId: member.branchId || 'unassigned',
-             fromBranchName: member.branch || 'Unknown',
+             fromBranchName: member.branch || member.branchName || 'Unknown',
              toDistrictId: targetDistrictId,
              toBranchId: targetBranchId,
              toBranchName: toBranchName,
              reason: transferReason,
+             leadershipComment: leadershipComment,
              newCapacity: newCapacity || member.level,
              requestedBy: profile?.uid || 'system',
              status: 'pending',
@@ -129,7 +132,7 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
            continue;
         }
 
-        // The member might be loaded via collectionGroup, the old path is `districts/${member.districtId}/branches/${member.branchId}/members/${member.id}`
+        // Direct transfer for superadmins
         const oldRef = doc(db, `districts/${member.districtId || 'unassigned'}/branches/${member.branchId || 'unassigned'}/members/${member.id}`);
         const newRef = doc(db, `districts/${targetDistrictId}/branches/${targetBranchId}/members/${member.id}`);
 
@@ -148,6 +151,7 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
                toDistrict: targetDistrictId,
                toBranch: targetBranchId,
                reason: transferReason,
+               leadershipComment: leadershipComment,
                newCapacity: newCapacity || member.level,
                transferredBy: profile?.uid || 'system'
              }
@@ -169,7 +173,7 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
            toast.success(`Successfully transferred ${transferCount} members.`);
          }
          if (needsApprovalCount > 0) {
-           toast.success(`${needsApprovalCount} leader transfers sent to HQ for approval.`);
+           toast.success(`${needsApprovalCount} transfer requests sent to the approval queue.`);
          }
          onSuccess();
       } else {
@@ -197,8 +201,7 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
           </div>
         </div>
 
-        <div className="space-y-4">
-           {profile?.role === 'superadmin' && (
+           <div className="space-y-4">
              <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Destination District</label>
               <select 
@@ -212,7 +215,6 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
                 ))}
               </select>
             </div>
-           )}
 
            <div className="space-y-2">
              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Destination Branch</label>
@@ -247,6 +249,16 @@ export const BulkTransferModal: React.FC<BulkTransferModalProps> = ({
                <option value="Personal Request">Personal Request</option>
                <option value="Other">Other</option>
              </select>
+           </div>
+
+           <div className="space-y-2 flex-1">
+             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Leadership Comment / Recommendation</label>
+             <textarea 
+               value={leadershipComment}
+               onChange={(e) => setLeadershipComment(e.target.value)}
+               placeholder="Add context on member's participation, spiritual level, reason for transfer..."
+               className="w-full bg-slate-50 border border-slate-200 min-h-[100px] p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+             />
            </div>
 
            <div className="space-y-2">

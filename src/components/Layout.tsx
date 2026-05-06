@@ -416,6 +416,14 @@ export default function Layout() {
                   onClick={() => setIsSidebarOpen(false)}
                 />
                 <NavItem
+                  to="/service-reports"
+                  icon={<ClipboardList size={18} />}
+                  label="Service Reports"
+                  active={location.pathname.startsWith("/service-reports")}
+                  isCollapsed={isCollapsed}
+                  onClick={() => setIsSidebarOpen(false)}
+                />
+                <NavItem
                   to="/volunteers"
                   icon={<Heart size={18} />}
                   label="Volunteers"

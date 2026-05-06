@@ -27,12 +27,14 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { MemberTransferModal } from '../components/MemberTransferModal';
 
 export default function MemberPortal() {
   const { profile } = useFirebase();
   const navigate = useNavigate();
   const [showScanner, setShowScanner] = useState(false);
   const [scannerInstance, setScannerInstance] = useState<Html5Qrcode | null>(null);
+  const [showTransferModal, setShowTransferModal] = useState(false);
 
   const startScanner = async () => {
     setShowScanner(true);
@@ -203,7 +205,7 @@ export default function MemberPortal() {
         </div>
         <div className="flex gap-2">
           <button 
-            onClick={() => navigate('/calendar')}
+            onClick={() => setShowTransferModal(true)}
             className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg font-medium text-sm hover:bg-slate-50 transition-colors flex items-center gap-2"
           >
             <ArrowLeftRight size={18} />
@@ -555,6 +557,12 @@ export default function MemberPortal() {
           </div>
         )}
       </AnimatePresence>
+
+      <MemberTransferModal 
+        isOpen={showTransferModal}
+        onClose={() => setShowTransferModal(false)}
+        onSuccess={() => {}}
+      />
     </motion.div>
   );
 }

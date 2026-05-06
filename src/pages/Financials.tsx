@@ -15,10 +15,14 @@ import {
   Search,
   Wallet,
   ArrowRight,
-  X
+  X,
+  CreditCard,
+  FileText,
+  CheckCircle,
+  Clock
 } from 'lucide-react';
 import { useRole } from '../components/Layout';
-import { collection, onSnapshot, query, orderBy, limit, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 import { 
@@ -26,13 +30,14 @@ import {
   Pie, 
   Cell, 
   ResponsiveContainer, 
-  Tooltip, 
+  Tooltip as RechartsTooltip, 
   AreaChart, 
   Area, 
   XAxis, 
   YAxis, 
   CartesianGrid 
 } from 'recharts';
+import { toast } from 'sonner';
 
 interface TransactionData {
   id: string;
@@ -42,6 +47,18 @@ interface TransactionData {
   category: string;
   date: any;
   memberId?: string;
+}
+
+interface FundRequestData {
+  id: string;
+  title: string;
+  amount: number;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  date: any;
+  branchId?: string;
+  districtId?: string;
+  requestedBy: string;
 }
 
 const budgetData = [
@@ -63,9 +80,15 @@ const cashFlowData = [
 export default function Financials() {
   const { role } = useRole();
   const { profile } = useFirebase();
+  const [activeTab, setActiveTab] = useState<'ledger' | 'requests'>('ledger');
   const [transactions, setTransactions] = useState<TransactionData[]>([]);
+  const [fundRequests, setFundRequests] = useState<FundRequestData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  
   const [showModal, setShowModal] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+
   const [newTx, setNewTx] = useState({
     description: '',
     amount: '',
@@ -73,23 +96,21 @@ export default function Financials() {
     category: 'Tithes'
   });
 
+  const [newReq, setNewReq] = useState({
+    title: '',
+    amount: '',
+    reason: ''
+  });
+
   useEffect(() => {
     const districtId = profile?.districtId || 'default-district';
     const branchId = profile?.branchId || 'default-branch';
-    const path = `districts/${districtId}/branches/${branchId}/transactions`;
     
-    const q = query(
-      collection(db, path),
-      orderBy('date', 'desc'),
-      limit(20)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as TransactionData[];
-      
+    // Transactions stream
+    const txPath = `districts/${districtId}/branches/${branchId}/transactions`;
+    const qTx = query(collection(db, txPath), orderBy('date', 'desc'), limit(20));
+    const unsubTx = onSnapshot(qTx, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TransactionData[];
       setTransactions(docs);
       setLoading(false);
     }, (error) => {
@@ -97,7 +118,20 @@ export default function Financials() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Fund requests stream
+    const reqPath = `districts/${districtId}/branches/${branchId}/fundRequests`;
+    const qReq = query(collection(db, reqPath), orderBy('date', 'desc'), limit(20));
+    const unsubReq = onSnapshot(qReq, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as FundRequestData[];
+      setFundRequests(docs);
+      setRequestsLoading(false);
+    }, (error) => {
+      // Don't throw loudly if it doesn't exist yet, just empty state
+      setFundRequests([]);
+      setRequestsLoading(false);
+    });
+
+    return () => { unsubTx(); unsubReq(); };
   }, [profile]);
 
   const handleRecordTx = async (e: React.FormEvent) => {
@@ -117,8 +151,50 @@ export default function Financials() {
 
       setShowModal(false);
       setNewTx({ description: '', amount: '', type: 'income', category: 'Tithes' });
+      toast.success('Transaction recorded successfully');
     } catch (err) {
       console.error("Failed to record transaction:", err);
+      toast.error('Failed to record transaction');
+    }
+  };
+
+  const handleCreateRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newReq.title || !newReq.amount) return;
+
+    try {
+      const districtId = profile?.districtId || 'default-district';
+      const branchId = profile?.branchId || 'default-branch';
+      const path = `districts/${districtId}/branches/${branchId}/fundRequests`;
+      
+      await addDoc(collection(db, path), {
+        ...newReq,
+        amount: parseFloat(newReq.amount),
+        status: 'pending',
+        date: serverTimestamp(),
+        branchId,
+        districtId,
+        requestedBy: profile?.fullName || 'Unknown'
+      });
+
+      setShowRequestModal(false);
+      setNewReq({ title: '', amount: '', reason: '' });
+      toast.success('Fund request submitted for approval');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'fundRequests');
+    }
+  };
+
+  const handleUpdateRequestStatus = async (id: string, status: 'approved' | 'rejected') => {
+    try {
+      const districtId = profile?.districtId || 'default-district';
+      const branchId = profile?.branchId || 'default-branch';
+      const docRef = doc(db, `districts/${districtId}/branches/${branchId}/fundRequests`, id);
+      
+      await updateDoc(docRef, { status });
+      toast.success(`Request ${status}`);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, 'fundRequests');
     }
   };
 
@@ -138,194 +214,289 @@ export default function Financials() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full -mr-32 -mt-32 opacity-50 z-0" />
         
         <div className="relative z-10">
-          <h2 className="text-3xl font-bold text-slate-900 leading-tight">Financial Ledger</h2>
+          <h2 className="text-3xl font-bold text-slate-900 leading-tight">Financials</h2>
           <p className="text-slate-500 mt-2 max-w-md">
-            {role === 'admin' ? 'Advanced fiscal management and audit logs for your branch location.' : 
-             role === 'district' ? 'Consolidated financial intelligence for the North America District.' :
+            {role === 'admin' ? 'Advanced fiscal management, budgeting and fund requests.' : 
+             role === 'district' ? 'Consolidated financial intelligence for the District.' :
              'System-wide financial auditing and global currency conversions.'}
           </p>
         </div>
 
-        <div className="flex gap-3 relative z-10">
-          <button className="px-6 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm">
-            <Download size={18} />
-            Export Audit
-          </button>
+        <div className="flex flex-col sm:flex-row gap-3 relative z-10">
+          <div className="bg-slate-100 p-1 rounded-xl flex">
+            <button 
+              onClick={() => setActiveTab('ledger')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'ledger' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Ledger
+            </button>
+            <button 
+              onClick={() => setActiveTab('requests')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'requests' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Fund Requests
+            </button>
+          </div>
           <button 
-            onClick={() => setShowModal(true)}
-            className="bg-slate-900 text-white px-8 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center gap-2 shadow-xl shadow-slate-200"
+            onClick={() => activeTab === 'ledger' ? setShowModal(true) : setShowRequestModal(true)}
+            className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all flex items-center gap-2 shadow-xl shadow-slate-200"
           >
             <Plus size={18} />
-            Add Entry
+            {activeTab === 'ledger' ? 'Add Entry' : 'New Request'}
           </button>
         </div>
       </div>
 
-      {/* Financial Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard 
-          label="Income (MTD)" 
-          value={`$${totals.income.toLocaleString()}`} 
-          trend="+12.5%" 
-          color="blue"
-          icon={<ArrowUpRight size={20} />}
-        />
-        <StatCard 
-          label="Expenses (MTD)" 
-          value={`$${totals.expense.toLocaleString()}`} 
-          trend="+4.2%" 
-          color="rose"
-          icon={<TrendingDown size={20} />}
-        />
-        <StatCard 
-          label="Net Balance" 
-          value={`$${(totals.income - totals.expense).toLocaleString()}`} 
-          trend="+18.3%" 
-          color="emerald"
-          icon={<Wallet size={20} />}
-        />
-        <StatCard 
-          label="Projected Savings" 
-          value="$12,450" 
-          trend="+2.1%" 
-          color="amber"
-          icon={<TrendingUp size={20} />}
-        />
-      </div>
+      {activeTab === 'ledger' ? (
+        <>
+          {/* Financial Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <StatCard 
+              label="Income (MTD)" 
+              value={`$${totals.income.toLocaleString()}`} 
+              trend="+12.5%" 
+              color="blue"
+              icon={<ArrowUpRight size={20} />}
+            />
+            <StatCard 
+              label="Expenses (MTD)" 
+              value={`$${totals.expense.toLocaleString()}`} 
+              trend="+4.2%" 
+              color="rose"
+              icon={<TrendingDown size={20} />}
+            />
+            <StatCard 
+              label="Net Balance" 
+              value={`$${(totals.income - totals.expense).toLocaleString()}`} 
+              trend="+18.3%" 
+              color="emerald"
+              icon={<Wallet size={20} />}
+            />
+            <StatCard 
+              label="Projected Savings" 
+              value="$12,450" 
+              trend="+2.1%" 
+              color="amber"
+              icon={<TrendingUp size={20} />}
+            />
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Trend Chart */}
-        <div className="lg:col-span-2 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-xl font-bold text-slate-900">Cash Flow Trends</h3>
-              <p className="text-xs text-slate-400 font-black uppercase tracking-widest mt-1">H1 Performance Review</p>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Trend Chart */}
+            <div className="lg:col-span-2 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-8">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">Cash Flow Trends</h3>
+                  <p className="text-xs text-slate-400 font-black uppercase tracking-widest mt-1">H1 Performance Review</p>
+                </div>
+                <div className="flex gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-blue-600 rounded-full" />
+                    <span className="text-[10px] font-black text-slate-400 uppercase">Income</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-rose-500 rounded-full" />
+                    <span className="text-[10px] font-black text-slate-400 uppercase">Expense</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={cashFlowData}>
+                    <defs>
+                      <linearGradient id="colorInc" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 900 }} dy={10} />
+                    <YAxis hide />
+                    <RechartsTooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }} />
+                    <Area type="monotone" dataKey="income" stroke="#2563eb" strokeWidth={4} fillOpacity={1} fill="url(#colorInc)" dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} />
+                    <Area type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={2} fill="none" strokeDasharray="5 5" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <div className="flex gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-blue-600 rounded-full" />
-                <span className="text-[10px] font-black text-slate-400 uppercase">Income</span>
+
+            {/* Budget Allocation */}
+            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
+               <div>
+                <h3 className="text-xl font-bold text-slate-900">Budget Allocation</h3>
+                <p className="text-xs text-slate-400 font-black uppercase tracking-widest mt-1">Resource Distribution</p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-rose-500 rounded-full" />
-                <span className="text-[10px] font-black text-slate-400 uppercase">Expense</span>
+
+              <div className="relative h-48 my-6">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={budgetData}
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {budgetData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-2xl font-bold text-slate-900">75%</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Efficiency</span>
+                </div>
               </div>
+
+              <div className="space-y-3">
+                {budgetData.map(item => (
+                  <div key={item.name} className="flex justify-between items-center group">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{item.name}</span>
+                    </div>
+                    <span className="text-xs font-black text-slate-900 tracking-tighter">${item.value.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h3 className="text-xl font-bold text-slate-900">Recent Transactions</h3>
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Search audit trail..." 
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-100 transition-all"
+                />
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-24 gap-4">
+                <Loader2 className="animate-spin text-blue-600" size={32} />
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Securing Ledger access...</span>
+              </div>
+            ) : transactions.length === 0 ? (
+              <div className="py-24 text-center space-y-4">
+                <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 mx-auto">
+                  <DollarSign size={32} />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900">No transactions recorded yet</p>
+                  <p className="text-xs text-slate-400">Start by recording tithes, offerings or bills.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50/50">
+                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Entry Details</th>
+                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Classification</th>
+                      <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Timestamp</th>
+                      <th className="px-8 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
+                      <th className="px-8 py-4 text-right"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {transactions.map(tx => (
+                      <TransactionListItem key={tx.id} tx={tx} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        /* Fund Requests Tab View */
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <div>
+               <h3 className="text-xl font-bold text-slate-900">Department / Branch Fund Requests</h3>
+               <p className="text-sm text-slate-500">Track and approve budget requests from various units.</p>
             </div>
           </div>
           
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={cashFlowData}>
-                <defs>
-                  <linearGradient id="colorInc" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 900 }} dy={10} />
-                <YAxis hide />
-                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }} />
-                <Area type="monotone" dataKey="income" stroke="#2563eb" strokeWidth={4} fillOpacity={1} fill="url(#colorInc)" dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} />
-                <Area type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={2} fill="none" strokeDasharray="5 5" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Budget Allocation */}
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
-           <div>
-            <h3 className="text-xl font-bold text-slate-900">Budget Allocation</h3>
-            <p className="text-xs text-slate-400 font-black uppercase tracking-widest mt-1">Resource Distribution</p>
-          </div>
-
-          <div className="relative h-48 my-6">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={budgetData}
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {budgetData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-2xl font-bold text-slate-900">75%</span>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Efficiency</span>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {budgetData.map(item => (
-              <div key={item.name} className="flex justify-between items-center group">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{item.name}</span>
+          {requestsLoading ? (
+             <div className="flex justify-center items-center py-24">
+                <Loader2 className="animate-spin text-slate-300" size={32} />
+             </div>
+          ) : fundRequests.length === 0 ? (
+             <div className="py-24 text-center space-y-4">
+                <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 mx-auto">
+                  <FileText size={32} />
                 </div>
-                <span className="text-xs font-black text-slate-900 tracking-tighter">${item.value.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-8 py-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h3 className="text-xl font-bold text-slate-900">Recent Transactions</h3>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input 
-              type="text" 
-              placeholder="Search audit trail..." 
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-blue-100 transition-all"
-            />
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <Loader2 className="animate-spin text-blue-600" size={32} />
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Securing Ledger access...</span>
-          </div>
-        ) : transactions.length === 0 ? (
-          <div className="py-24 text-center space-y-4">
-            <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 mx-auto">
-              <DollarSign size={32} />
+                <div>
+                  <p className="font-bold text-slate-900">No fund requests found</p>
+                  <p className="text-xs text-slate-400">Any active or historical fund requests will appear here.</p>
+                </div>
             </div>
-            <div>
-              <p className="font-bold text-slate-900">No transactions recorded yet</p>
-              <p className="text-xs text-slate-400">Start by recording tithes, offerings or bills.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-slate-50/50">
-                  <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Entry Details</th>
-                  <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Classification</th>
-                  <th className="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Timestamp</th>
-                  <th className="px-8 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
-                  <th className="px-8 py-4 text-right"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {transactions.map(tx => (
-                  <TransactionListItem key={tx.id} tx={tx} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+          ) : (
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8 bg-slate-50/50">
+               {fundRequests.map(req => (
+                  <div key={req.id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col">
+                     <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-2">
+                           <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                              <CreditCard size={20} />
+                           </div>
+                           <div>
+                              <h4 className="font-bold text-slate-900 leading-tight">{req.title}</h4>
+                              <p className="text-xs font-medium text-slate-500">By {req.requestedBy}</p>
+                           </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                          req.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                          req.status === 'rejected' ? 'bg-red-50 text-red-600 border border-red-100' :
+                          'bg-amber-50 text-amber-600 border border-amber-100'
+                        }`}>
+                          {req.status}
+                        </span>
+                     </div>
+                     <div className="flex-1 mb-6">
+                        <p className="text-3xl font-black text-slate-900 tracking-tight">${req.amount.toLocaleString()}</p>
+                        <p className="text-sm text-slate-600 mt-2 line-clamp-2">{req.reason}</p>
+                     </div>
+                     
+                     <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
+                           <Clock size={14} />
+                           {req.date?.seconds ? new Date(req.date.seconds * 1000).toLocaleDateString() : 'Pending...'}
+                        </div>
+                        
+                        {req.status === 'pending' && (role === 'admin' || role === 'district' || role === 'superadmin') && (
+                          <div className="flex gap-2">
+                             <button 
+                               onClick={() => handleUpdateRequestStatus(req.id, 'rejected')}
+                               className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                               title="Reject"
+                             >
+                                <X size={16} />
+                             </button>
+                             <button 
+                               onClick={() => handleUpdateRequestStatus(req.id, 'approved')}
+                               className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+                               title="Approve"
+                             >
+                                <CheckCircle size={16} />
+                             </button>
+                          </div>
+                        )}
+                     </div>
+                  </div>
+               ))}
+             </div>
+          )}
+        </div>
+      )}
 
       {/* Transaction Modal */}
       {showModal && (
@@ -357,7 +528,7 @@ export default function Financials() {
                     value={newTx.description}
                     onChange={e => setNewTx({...newTx, description: e.target.value})}
                     placeholder="e.g. Sunday Offering - 1st Service"
-                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-100 transition-all"
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                     required
                   />
                 </div>
@@ -370,7 +541,7 @@ export default function Financials() {
                       value={newTx.amount}
                       onChange={e => setNewTx({...newTx, amount: e.target.value})}
                       placeholder="0.00"
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-100 transition-all"
+                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
                       required
                     />
                   </div>
@@ -379,7 +550,7 @@ export default function Financials() {
                     <select 
                       value={newTx.type}
                       onChange={e => setNewTx({...newTx, type: e.target.value as any})}
-                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-600 focus:ring-2 focus:ring-blue-100 transition-all appearance-none"
+                      className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-600 focus:ring-2 focus:ring-blue-100 transition-all appearance-none outline-none"
                     >
                       <option value="income">Income</option>
                       <option value="expense">Expense</option>
@@ -392,7 +563,7 @@ export default function Financials() {
                   <select 
                     value={newTx.category}
                     onChange={e => setNewTx({...newTx, category: e.target.value})}
-                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-600 focus:ring-2 focus:ring-blue-100 transition-all appearance-none"
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-600 focus:ring-2 focus:ring-blue-100 transition-all appearance-none outline-none"
                   >
                     <option value="Tithes">Tithes</option>
                     <option value="Offering">Offering</option>
@@ -411,6 +582,76 @@ export default function Financials() {
                 className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-200"
               >
                 Record Transaction
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Fund Request Modal */}
+      {showRequestModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl shadow-2xl shadow-slate-900/20 w-full max-w-md overflow-hidden border border-slate-200"
+          >
+            <div className="px-8 py-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 leading-none">Request Funds</h3>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">Submit Budget Request</p>
+              </div>
+              <button 
+                onClick={() => setShowRequestModal(false)}
+                className="p-2 hover:bg-white rounded-xl transition-colors text-slate-400"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateRequest} className="p-8 space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Request Title</label>
+                  <input 
+                    type="text" 
+                    value={newReq.title}
+                    onChange={e => setNewReq({...newReq, title: e.target.value})}
+                    placeholder="e.g. New Sound Equipment"
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Amount ($)</label>
+                  <input 
+                    type="number" 
+                    value={newReq.amount}
+                    onChange={e => setNewReq({...newReq, amount: e.target.value})}
+                    placeholder="0.00"
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Justification / Reason</label>
+                  <textarea 
+                    value={newReq.reason}
+                    onChange={e => setNewReq({...newReq, reason: e.target.value})}
+                    placeholder="Explain why these funds are needed..."
+                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-medium placeholder:text-slate-300 focus:ring-2 focus:ring-blue-100 transition-all outline-none min-h-[100px]"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit"
+                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-200"
+              >
+                Submit Request
               </button>
             </form>
           </motion.div>

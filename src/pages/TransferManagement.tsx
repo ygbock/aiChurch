@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, collectionGroup, where, getDocs, doc, updateDoc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, collectionGroup, where, getDocs, doc, updateDoc, getDoc, setDoc, deleteDoc, or } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 import { 
@@ -18,6 +19,7 @@ import {
   AlertCircle,
   Loader2
 } from 'lucide-react';
+import { ResolveTransferModal } from '../components/ResolveTransferModal';
 
 interface TransferRequest {
   id: string;
@@ -30,6 +32,9 @@ interface TransferRequest {
   toBranchName: string;
   toDistrictId: string;
   reason: string;
+  leadershipComment?: string;
+  additionalComments?: string;
+  newCapacity?: string;
   status: 'pending' | 'approved' | 'rejected';
   requestedBy: string;
   requestedAt: any;
@@ -78,8 +83,16 @@ export default function TransferManagement() {
     // District leaders and branch admins should only see relevant transfers
     const transfersRef = collection(db, 'transfers');
     const transferConstraints = [];
-    if (profile.role !== 'superadmin') {
-      transferConstraints.push(where('fromDistrictId', '==', profile.districtId));
+    if (profile.role === 'admin') {
+      transferConstraints.push(or(
+        where('fromBranchId', '==', profile.branchId),
+        where('toBranchId', '==', profile.branchId)
+      ));
+    } else if (profile.role !== 'superadmin') {
+      transferConstraints.push(or(
+        where('fromDistrictId', '==', profile.districtId),
+        where('toDistrictId', '==', profile.districtId)
+      ));
     }
     const q = query(transfersRef, ...transferConstraints, orderBy('requestedAt', 'desc'));
     
@@ -492,14 +505,26 @@ const StatCard: React.FC<{ label: string, value: string, icon: React.ReactNode, 
 
 
 const TransferRequestItem: React.FC<{ request: TransferRequest }> = ({ request }) => {
+  const { profile } = useFirebase();
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [showResolveModal, setShowResolveModal] = useState(false);
 
-  const handleAction = async (newStatus: 'approved' | 'rejected', request: TransferRequest) => {
-    setProcessingId(request.id);
+  const handleAction = async (newStatus: 'approved' | 'rejected', requestObj: TransferRequest, resolvedData?: { toDistrictId: string, toBranchId: string, toBranchName: string, newCapacity: string, leadershipComment: string }) => {
+    setProcessingId(requestObj.id);
     try {
       if (newStatus === 'approved') {
+        const finalDistrictId = resolvedData ? resolvedData.toDistrictId : requestObj.toDistrictId;
+        const finalBranchId = resolvedData ? resolvedData.toBranchId : requestObj.toBranchId;
+        const finalBranchName = resolvedData ? resolvedData.toBranchName : requestObj.toBranchName;
+        const finalCapacity = resolvedData ? resolvedData.newCapacity : requestObj.newCapacity;
+        const finalComment = (resolvedData?.leadershipComment || requestObj.leadershipComment || '');
+
+        if (finalDistrictId === 'undecided' || finalBranchId === 'undecided') {
+          throw new Error('Please select a valid district and branch.');
+        }
+
         // 1. Get member data from source
-        const sourcePath = `/districts/${request.fromDistrictId}/branches/${request.fromBranchId}/members/${request.memberId}`;
+        const sourcePath = `districts/${requestObj.fromDistrictId}/branches/${requestObj.fromBranchId}/members/${requestObj.memberId}`;
         const memberSnap = await getDoc(doc(db, sourcePath));
         
         if (!memberSnap.exists()) {
@@ -509,12 +534,28 @@ const TransferRequestItem: React.FC<{ request: TransferRequest }> = ({ request }
         const memberData = memberSnap.data();
         
         // 2. Create in target
-        const targetPath = `/districts/${request.toDistrictId}/branches/${request.toBranchId}/members/${request.memberId}`;
+        const targetPath = `districts/${finalDistrictId}/branches/${finalBranchId}/members/${requestObj.memberId}`;
         await setDoc(doc(db, targetPath), {
           ...memberData,
-          branchId: request.toBranchId,
-          districtId: request.toDistrictId,
-          updatedAt: serverTimestamp()
+          branchId: finalBranchId,
+          districtId: finalDistrictId,
+          level: finalCapacity || memberData.level,
+          updatedAt: serverTimestamp(),
+          transferHistory: [
+             ...(memberData.transferHistory || []),
+             {
+               date: new Date().toISOString(),
+               fromDistrict: requestObj.fromDistrictId,
+               fromBranch: requestObj.fromBranchId,
+               toDistrict: finalDistrictId,
+               toBranch: finalBranchId,
+               toBranchName: finalBranchName,
+               reason: requestObj.reason,
+               leadershipComment: finalComment,
+               newCapacity: finalCapacity || memberData.level,
+               transferredBy: profile?.uid || 'system'
+             }
+          ]
         });
         
         // 3. Delete from source
@@ -526,31 +567,55 @@ const TransferRequestItem: React.FC<{ request: TransferRequest }> = ({ request }
           const accessDoc = await getDoc(doc(db, 'accessControl', emailLower));
           if (accessDoc.exists()) {
             await updateDoc(doc(db, 'accessControl', emailLower), {
-              branchId: request.toBranchId,
-              districtId: request.toDistrictId
+              branchId: finalBranchId,
+              districtId: finalDistrictId
             });
           }
         }
+        
+        // 5. Update transfer doc
+        await updateDoc(doc(db, 'transfers', requestObj.id), {
+          status: newStatus,
+          toDistrictId: finalDistrictId,
+          toBranchId: finalBranchId,
+          toBranchName: finalBranchName,
+          newCapacity: finalCapacity,
+          leadershipComment: finalComment,
+          resolvedAt: serverTimestamp()
+        });
+      } else {
+        await updateDoc(doc(db, 'transfers', requestObj.id), {
+          status: newStatus,
+          resolvedAt: serverTimestamp()
+        });
       }
-
-      await updateDoc(doc(db, 'transfers', request.id), {
-        status: newStatus,
-        resolvedAt: serverTimestamp()
-      });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'transfers');
+    } finally {
+      setShowResolveModal(false);
+      setProcessingId(null);
+    }
+  };
+
+  const handleApproveClick = () => {
+    if (request.toBranchId === 'undecided' || request.toDistrictId === 'undecided') {
+      setShowResolveModal(true);
+    } else {
+      handleAction('approved', request);
     }
   };
 
   return (
-    <div className="px-6 py-4 hover:bg-slate-50 transition-colors group">
+    <div className="px-6 py-4 hover:bg-slate-50 transition-colors group relative">
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm">
             {request.memberName.charAt(0)}
           </div>
           <div>
-            <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{request.memberName}</h4>
+            <Link to={`/members/profile/${request.memberId}?districtId=${request.fromDistrictId}&branchId=${request.fromBranchId}`} className="text-sm font-bold text-slate-900 group-hover:text-blue-600 hover:underline transition-colors block">
+              {request.memberName}
+            </Link>
             <p className="text-xs text-slate-500 mt-0.5">{request.reason}</p>
           </div>
         </div>
@@ -560,25 +625,54 @@ const TransferRequestItem: React.FC<{ request: TransferRequest }> = ({ request }
             {request.requestedAt?.toDate ? request.requestedAt.toDate().toLocaleDateString() : 'Just now'}
           </p>
           <div className="flex gap-2 mt-2">
-            <button 
-              disabled={processingId === request.id}
-              onClick={() => handleAction('approved', request)}
-              className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 transition-colors disabled:opacity-50 flex items-center gap-1"
-            >
-              {processingId === request.id && <Loader2 size={10} className="animate-spin" />}
-              Approve
-            </button>
-            <button 
-              disabled={processingId === request.id}
-              onClick={() => handleAction('rejected', request)}
-              className="text-[10px] font-bold text-red-600 hover:text-red-700 bg-red-50 px-2 py-1 rounded border border-red-100 transition-colors disabled:opacity-50 flex items-center gap-1"
-            >
-              {processingId === request.id && <Loader2 size={10} className="animate-spin" />}
-              Reject
-            </button>
+            {profile?.role === 'admin' ? (
+               <span className="text-[9px] font-bold text-amber-500 bg-amber-50 px-2 py-1 flex items-center rounded border border-amber-100" title="Approval must be granted by District leadership or HQ">
+                 Awaiting Superior Approval
+               </span>
+            ) : profile?.role !== 'superadmin' && request.fromDistrictId !== request.toDistrictId && request.toDistrictId !== 'undecided' ? (
+               <span className="text-[9px] font-bold text-amber-500 bg-amber-50 px-2 py-1 flex items-center rounded border border-amber-100" title="Cross-district transfers require Superadmin approval">
+                 HQ Approval Req
+               </span>
+            ) : (
+               <button 
+                 disabled={processingId === request.id}
+                 onClick={handleApproveClick}
+                 className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 transition-colors disabled:opacity-50 flex items-center gap-1"
+                 title="Approve Transfer"
+               >
+                 {processingId === request.id && <Loader2 size={10} className="animate-spin" />}
+                 Approve
+               </button>
+            )}
+            {!(profile?.role === 'admin' && profile.branchId !== request.toBranchId && profile.branchId !== request.fromBranchId) && (
+              <button 
+                disabled={processingId === request.id}
+                onClick={() => handleAction('rejected', request)}
+                className="text-[10px] font-bold text-red-600 hover:text-red-700 bg-red-50 px-2 py-1 rounded border border-red-100 transition-colors disabled:opacity-50 flex items-center gap-1"
+              >
+                {processingId === request.id && <Loader2 size={10} className="animate-spin" />}
+                Reject
+              </button>
+            )}
           </div>
         </div>
       </div>
+      {(request.leadershipComment || request.additionalComments) && (
+        <div className="mb-3 px-3 py-2 bg-blue-50/50 rounded-lg border border-blue-100/50 flex flex-col gap-2">
+          {request.additionalComments && (
+            <div>
+              <p className="text-[10px] font-black uppercase text-blue-800/70 tracking-widest mb-0.5 shadow-sm">Member Comment</p>
+              <p className="text-xs text-blue-900/80 italic">"{request.additionalComments}"</p>
+            </div>
+          )}
+          {request.leadershipComment && (
+            <div>
+              <p className="text-[10px] font-black uppercase text-blue-800/70 tracking-widest mb-0.5 shadow-sm">Leadership Comment</p>
+              <p className="text-xs text-blue-900/80 italic">"{request.leadershipComment}"</p>
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg border border-slate-100">
         <div className="flex-1 text-center">
           <p className="text-[10px] font-bold text-slate-400 uppercase">From</p>
@@ -587,9 +681,26 @@ const TransferRequestItem: React.FC<{ request: TransferRequest }> = ({ request }
         <ArrowRight size={14} className="text-slate-300" />
         <div className="flex-1 text-center">
           <p className="text-[10px] font-bold text-slate-400 uppercase">To</p>
-          <p className="text-xs font-semibold text-slate-700">{request.toBranchName}</p>
+          <p className="text-xs font-semibold text-slate-700">{request.toBranchName || 'Undecided'}</p>
         </div>
       </div>
+
+      <ResolveTransferModal 
+        isOpen={showResolveModal}
+        onClose={() => setShowResolveModal(false)}
+        initialDistrictId={request.toDistrictId}
+        initialBranchId={request.toBranchId}
+        isHQRequired={request.fromDistrictId !== request.toDistrictId && request.toDistrictId !== 'undecided'}
+        onApprove={(dId, bId, bName, cap, comment) => {
+           handleAction('approved', request, {
+             toDistrictId: dId,
+             toBranchId: bId,
+             toBranchName: bName,
+             newCapacity: cap,
+             leadershipComment: comment
+           });
+        }}
+      />
     </div>
   );
 }
