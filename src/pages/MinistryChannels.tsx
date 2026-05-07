@@ -10,14 +10,19 @@ import {
   Info, 
   Phone, 
   MoreVertical,
+  Camera,
+  Mic,
+  Paperclip,
   Search,
   MessageSquare,
   Pin,
   Users,
   FileText,
-  ChevronRight
+  ChevronRight,
+  ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface Message {
   id: string;
@@ -72,13 +77,15 @@ const INITIAL_MESSAGES: Record<string, Message[]> = {
 };
 
 export default function MinistryChannels() {
-  const [activeChannelId, setActiveChannelId] = useState('2');
+  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES['2'] || []);
   const [newMessage, setNewMessage] = useState('');
   const [showDetails, setShowDetails] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const activeChannel = CHANNELS.find(c => c.id === activeChannelId);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -109,9 +116,40 @@ export default function MinistryChannels() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-140px)] bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="flex flex-col gap-6">
+      {/* Social Tab Navigation */}
+      <div className={`-mx-4 px-4 md:-mx-6 md:px-6 lg:mx-0 lg:px-0 gap-6 md:gap-8 border-b border-slate-200 mb-2 overflow-x-auto no-scrollbar w-[calc(100%+32px)] md:w-[calc(100%+48px)] lg:w-full ${activeChannelId ? 'hidden lg:flex' : 'flex'}`}>
+        {[
+          { label: 'Community Feed', path: '/community-feed', mobileOnly: false },
+          { label: 'Ministry Channels', path: '/ministry-channels', mobileOnly: false },
+          { label: 'Direct Messages', path: '/direct-messages', mobileOnly: false },
+          { label: 'Announcements', path: '/communication', mobileOnly: true }
+        ].map((tab) => (
+          <button
+            key={tab.path}
+            onClick={() => navigate(tab.path)}
+            className={`shrink-0 pb-4 text-sm font-bold transition-all whitespace-nowrap relative ${
+              tab.mobileOnly ? 'md:hidden' : ''
+            } ${
+              location.pathname === tab.path 
+                ? 'text-indigo-600' 
+                : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            {tab.label}
+            {location.pathname === tab.path && (
+              <motion.div 
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"
+              />
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div className={`flex bg-white lg:rounded-2xl lg:border lg:border-slate-200 shadow-sm overflow-hidden relative -mx-4 md:-mx-6 lg:mx-0 w-[calc(100%+32px)] md:w-[calc(100%+48px)] lg:w-full ${activeChannelId ? 'h-[calc(100vh-100px)] lg:h-[calc(100vh-200px)] border-t border-slate-200 lg:border-t-0' : 'h-[calc(100vh-160px)] lg:h-[calc(100vh-200px)]'}`}>
       {/* Channel Sidebar */}
-      <div className="hidden md:flex flex-col w-64 bg-slate-50 border-r border-slate-200">
+      <div className={`flex flex-col w-full lg:w-72 lg:border-r border-slate-200 bg-slate-50 ${activeChannelId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="p-4 border-b border-slate-200 bg-white/50">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Ministry Channels</h3>
@@ -154,11 +192,19 @@ export default function MinistryChannels() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={`flex-1 flex-col min-w-0 bg-[#efeae2] ${activeChannelId ? 'flex' : 'hidden lg:flex'}`}>
+        {activeChannel ? (
+          <>
         {/* Chat Header */}
-        <div className="h-16 px-6 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="md:hidden p-2 text-slate-400">
+        <div className="h-16 px-4 lg:px-6 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+          <div className="flex items-center gap-2 lg:gap-3">
+            <button 
+              onClick={() => setActiveChannelId(null)}
+              className="lg:hidden p-2 -ml-2 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="hidden lg:block p-2 text-slate-400">
                <Hash size={20} />
             </div>
             <div>
@@ -201,9 +247,9 @@ export default function MinistryChannels() {
                 key={msg.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex gap-4 group"
+                className="flex gap-3 group"
               >
-                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-indigo-600 font-black shrink-0 mt-1">
+                <div className="w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-indigo-600 font-bold shrink-0 mt-6">
                   {msg.author.initials}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -211,8 +257,8 @@ export default function MinistryChannels() {
                     <span className="text-sm font-black text-slate-900">{msg.author.name}</span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{msg.time}</span>
                   </div>
-                  <div className="bg-white border border-slate-100 p-4 rounded-2xl rounded-tl-none shadow-sm inline-block max-w-[90%]">
-                    <p className="text-sm text-slate-700 leading-relaxed font-medium">
+                  <div className="bg-white border border-slate-100 px-3 py-2 rounded-2xl rounded-tl-none shadow-sm inline-block max-w-[90%] break-words whitespace-pre-wrap">
+                    <p className="text-[15px] text-[#111b21] leading-relaxed">
                       {msg.content}
                     </p>
                   </div>
@@ -247,46 +293,78 @@ export default function MinistryChannels() {
         </div>
 
         {/* Input Area */}
-        <div className="p-4 bg-white border-t border-slate-100 shrink-0">
+        <div className="p-2 md:p-3 bg-transparent mt-auto shrink-0 w-full border-t-0">
           <form 
             onSubmit={handleSendMessage}
-            className="bg-slate-50 border border-slate-200 rounded-2xl focus-within:ring-4 focus-within:ring-indigo-100/50 focus-within:border-indigo-200 transition-all overflow-hidden"
+            className="flex items-end gap-2 w-full max-w-full"
           >
-            <div className="flex items-center gap-1 p-2 border-b border-slate-200/50 bg-white/50">
-               <button type="button" className="p-2 text-slate-400 hover:bg-white rounded-lg transition-colors"><PlusCircle size={18} /></button>
-               <div className="w-px h-4 bg-slate-200 mx-1" />
-               <button type="button" className="p-2 text-slate-400 hover:bg-white rounded-lg transition-colors"><Smile size={18} /></button>
-               <button type="button" className="p-2 text-slate-400 hover:bg-white rounded-lg transition-colors"><AtSign size={18} /></button>
+            <div className="flex bg-white items-center gap-1 flex-1 border border-slate-200 shadow-sm rounded-3xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-[#00a884]/20 focus-within:border-[#00a884]">
+              <button type="button" className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0">
+                <Smile size={24} />
+              </button>
+              <textarea 
+                value={newMessage}
+                onChange={(e) => {
+                  setNewMessage(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && window.innerWidth >= 1024) {
+                    e.preventDefault();
+                    if (newMessage.trim()) {
+                      handleSendMessage(e as any);
+                    }
+                  }
+                }}
+                placeholder={`Message #${activeChannel?.name}...`}
+                className="flex-1 bg-transparent border-none py-1.5 text-[15px] font-normal text-slate-700 placeholder:text-slate-400 focus:ring-0 outline-none resize-none max-h-[120px] min-h-[24px] overflow-y-auto leading-tight"
+                rows={1}
+                style={{ minHeight: '24px' }}
+              />
+              <button type="button" className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0">
+                <Paperclip size={20} className="transform -rotate-45" />
+              </button>
+              {!newMessage.trim() && (
+                <button type="button" className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0 mr-1">
+                  <Camera size={24} />
+                </button>
+              )}
             </div>
-            <textarea 
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage(e);
-                }
-              }}
-              placeholder={`Message #${activeChannel?.name}...`}
-              className="w-full bg-transparent border-none p-4 text-sm font-medium text-slate-700 placeholder:text-slate-400 outline-none resize-none h-20"
-            />
-            <div className="flex items-center justify-between p-2 bg-white/50">
-              <span className="text-[10px] text-slate-400 font-bold ml-2">Press Enter to send</span>
+            {newMessage.trim() ? (
               <button 
                 type="submit"
-                disabled={!newMessage.trim()}
-                className="bg-indigo-600 text-white p-2 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-indigo-100"
+                className="w-12 h-12 shrink-0 bg-[#00a884] text-white rounded-full flex items-center justify-center hover:bg-[#008f6f] active:scale-95 transition-all shadow-sm"
               >
-                <Send size={18} />
+                <Send size={20} style={{ transform: 'translateX(1px)' }} />
               </button>
-            </div>
+            ) : (
+              <button 
+                type="button"
+                className="w-12 h-12 shrink-0 bg-[#00a884] text-white rounded-full flex items-center justify-center hover:bg-[#008f6f] active:scale-95 transition-all shadow-sm"
+              >
+                <Mic size={24} />
+              </button>
+            )}
           </form>
         </div>
+        </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-slate-50/30">
+            <div className="w-20 h-20 bg-white shadow-sm border border-slate-200 rounded-full flex items-center justify-center mb-6">
+              <Hash className="text-slate-300" size={40} />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900">Ministry Channels</h3>
+            <p className="text-slate-500 max-w-xs mt-2 text-sm leading-relaxed">
+              Select a channel from the sidebar to view conversations.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Right Sidebar Details */}
       <AnimatePresence>
-        {showDetails && (
+        {showDetails && activeChannel && (
           <motion.div 
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: 320, opacity: 1 }}
@@ -354,6 +432,7 @@ export default function MinistryChannels() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }

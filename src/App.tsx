@@ -23,6 +23,7 @@ import BibleSchool from './pages/BibleSchool';
 import CommunicationHub from './pages/CommunicationHub';
 import CommunityFeed from './pages/CommunityFeed';
 import MinistryChannels from './pages/MinistryChannels';
+import DirectMessages from './pages/DirectMessages';
 import CMS from './pages/CMS';
 import Volunteers from './pages/Volunteers';
 import Rosters from './pages/Rosters';
@@ -94,6 +95,7 @@ export default function App() {
             <Route path="communication" element={<CommunicationHub />} />
             <Route path="community-feed" element={<CommunityFeed />} />
             <Route path="ministry-channels" element={<MinistryChannels />} />
+            <Route path="direct-messages" element={<DirectMessages />} />
             <Route path="cms" element={<CMS />} />
             <Route path="volunteers" element={<Volunteers />} />
             <Route path="rosters" element={<Rosters />} />

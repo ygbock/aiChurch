@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Heart, 
   MessageCircle, 
@@ -107,8 +107,38 @@ export default function CommunityFeed() {
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="max-w-6xl mx-auto px-4 py-8"
+      className="max-w-6xl mx-auto py-2 md:py-8 w-full max-w-full"
     >
+      {/* Social Tab Navigation */}
+      <div className="-mx-4 px-4 md:mx-0 md:px-0 flex gap-6 md:gap-8 border-b border-slate-200 mb-6 md:mb-8 overflow-x-auto no-scrollbar w-[calc(100%+32px)] md:w-full">
+        {[
+          { label: 'Community Feed', path: '/community-feed', mobileOnly: false },
+          { label: 'Ministry Channels', path: '/ministry-channels', mobileOnly: false },
+          { label: 'Direct Messages', path: '/direct-messages', mobileOnly: false },
+          { label: 'Announcements', path: '/communication', mobileOnly: true }
+        ].map((tab) => (
+          <button
+            key={tab.path}
+            onClick={() => navigate(tab.path)}
+            className={`shrink-0 pb-4 text-sm font-bold transition-all whitespace-nowrap relative ${
+              tab.mobileOnly ? 'md:hidden' : ''
+            } ${
+              location.pathname === tab.path 
+                ? 'text-indigo-600' 
+                : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            {tab.label}
+            {location.pathname === tab.path && (
+              <motion.div 
+                layoutId="activeTab"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"
+              />
+            )}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Main Feed */}
         <div className="lg:col-span-8 space-y-6">
@@ -176,7 +206,7 @@ export default function CommunityFeed() {
                       </button>
                     </div>
 
-                    <p className="text-slate-700 text-sm leading-relaxed mb-4">
+                    <p className="text-slate-700 text-sm leading-relaxed mb-4 break-words whitespace-pre-wrap">
                       {post.content}
                     </p>
 

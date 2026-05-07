@@ -450,24 +450,17 @@ export default function Layout() {
                 <NavItem
                   to="/communication"
                   icon={<MessageSquare size={18} />}
-                  label="Communication"
+                  label="Announcements"
                   active={location.pathname.startsWith("/communication")}
                   isCollapsed={isCollapsed}
                   onClick={() => setIsSidebarOpen(false)}
+                  className="hidden md:flex"
                 />
                 <NavItem
                   to="/community-feed"
                   icon={<Globe size={18} />}
-                  label="Community Feed"
-                  active={location.pathname.startsWith("/community-feed")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/ministry-channels"
-                  icon={<Users size={18} />}
-                  label="Ministry Channels"
-                  active={location.pathname.startsWith("/ministry-channels")}
+                  label="Social Hub"
+                  active={location.pathname.startsWith("/community-feed") || location.pathname.startsWith("/ministry-channels") || location.pathname.startsWith("/direct-messages")}
                   isCollapsed={isCollapsed}
                   onClick={() => setIsSidebarOpen(false)}
                 />
@@ -828,6 +821,7 @@ function NavItem({
   active = false,
   isCollapsed = false,
   onClick,
+  className = "",
 }: {
   to: string;
   icon: React.ReactNode;
@@ -835,6 +829,7 @@ function NavItem({
   active?: boolean;
   isCollapsed?: boolean;
   onClick?: () => void;
+  className?: string;
 }) {
   return (
     <Link
@@ -845,7 +840,7 @@ function NavItem({
         active
           ? "bg-blue-50 text-blue-600"
           : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-      } ${isCollapsed ? "justify-center" : ""}`}
+      } ${isCollapsed ? "justify-center" : ""} ${className}`}
     >
       <div className="shrink-0">{icon}</div>
       {!isCollapsed && <span className="truncate">{label}</span>}

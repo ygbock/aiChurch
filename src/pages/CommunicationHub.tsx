@@ -27,9 +27,13 @@ import { db } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 import { toast } from 'sonner';
 
+import { useNavigate, useLocation } from 'react-router-dom';
+
 export default function CommunicationHub() {
   const { role } = useRole();
   const { profile } = useFirebase();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<'broadcasts' | 'automations'>('broadcasts');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [selectedChannel, setSelectedChannel] = useState<'Email' | 'SMS' | 'Push'>('Email');
@@ -81,6 +85,34 @@ export default function CommunicationHub() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-10 pb-12"
     >
+      {/* Social Tab Navigation for Mobile */}
+      <div className="flex md:hidden gap-6 border-b border-slate-200 mb-6 overflow-x-auto no-scrollbar -mx-4 px-4 w-[calc(100%+32px)]">
+        {[
+          { label: 'Community Feed', path: '/community-feed', mobileOnly: false },
+          { label: 'Ministry Channels', path: '/ministry-channels', mobileOnly: false },
+          { label: 'Direct Messages', path: '/direct-messages', mobileOnly: false },
+          { label: 'Announcements', path: '/communication', mobileOnly: true }
+        ].map((tab) => (
+          <button
+            key={tab.path}
+            onClick={() => navigate(tab.path)}
+            className={`shrink-0 pb-4 text-sm font-bold transition-all whitespace-nowrap relative ${
+              location.pathname === tab.path 
+                ? 'text-indigo-600' 
+                : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            {tab.label}
+            {location.pathname === tab.path && (
+              <motion.div 
+                layoutId="activeTabMobileComm"
+                className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"
+              />
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* Header Section */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div>
