@@ -39,6 +39,7 @@ export default function CommunicationHub() {
   const [membersCount, setMembersCount] = useState(0);
   const [showTemplates, setShowTemplates] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState('Default Branch Branding');
+  const [selectedMessage, setSelectedMessage] = useState<any>(null);
   
   const [automations, setAutomations] = useState({
     birthdays: true,
@@ -92,23 +93,23 @@ export default function CommunicationHub() {
              Manage omnichannel engagement across Email, SMS, and Mobile notifications.
            </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+        <div className="flex flex-row gap-2 sm:gap-3 w-full lg:w-auto">
           <button 
             onClick={() => {
               setSelectedChannel('Email');
               setIsComposeOpen(true);
               setShowTemplates(true);
             }}
-            className="flex-1 lg:flex-none px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+            className="flex-1 lg:flex-none px-4 sm:px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold text-xs sm:text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 sm:gap-2"
           >
-            <Layout size={18} />
+            <Layout size={16} className="sm:w-[18px] sm:h-[18px]" />
             Templates
           </button>
           <button 
             onClick={() => setIsComposeOpen(true)}
-            className="flex-1 lg:flex-none px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold text-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-xl shadow-indigo-100 active:scale-95"
+            className="flex-1 lg:flex-none px-4 sm:px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold text-xs sm:text-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-1.5 sm:gap-2 shadow-xl shadow-indigo-100 active:scale-95"
           >
-            <Send size={18} />
+            <Send size={16} className="sm:w-[18px] sm:h-[18px]" />
             Compose
           </button>
         </div>
@@ -170,6 +171,7 @@ export default function CommunicationHub() {
                       status="Delivered" 
                       time="2h ago" 
                       icon={<Smartphone />}
+                      onClick={() => setSelectedMessage({ title: "Sunday Service: Power of Faith", type: "Push", recipients: 1240, status: "Delivered", time: "2h ago", icon: <Smartphone /> })}
                     />
                     <ModernMessageItem 
                       title="Branch Q3 Financial Audit" 
@@ -178,6 +180,7 @@ export default function CommunicationHub() {
                       status="Sent" 
                       time="5h ago" 
                       icon={<Mail />}
+                      onClick={() => setSelectedMessage({ title: "Branch Q3 Financial Audit", type: "Email", recipients: 12, status: "Sent", time: "5h ago", icon: <Mail /> })}
                     />
                     <ModernMessageItem 
                       title="Youth Rally Postponement" 
@@ -186,6 +189,7 @@ export default function CommunicationHub() {
                       status="Delivered" 
                       time="Yesterday" 
                       icon={<MessageSquare />}
+                      onClick={() => setSelectedMessage({ title: "Youth Rally Postponement", type: "SMS", recipients: 450, status: "Delivered", time: "Yesterday", icon: <MessageSquare /> })}
                     />
                     <ModernMessageItem 
                       title="Mid-week Prayer Focus" 
@@ -194,6 +198,7 @@ export default function CommunicationHub() {
                       status="Failed" 
                       time="2 days ago" 
                       icon={<Smartphone />}
+                      onClick={() => setSelectedMessage({ title: "Mid-week Prayer Focus", type: "Push", recipients: 840, status: "Failed", time: "2 days ago", icon: <Smartphone /> })}
                     />
                     <ModernMessageItem 
                       title="Welcome to Our Branch" 
@@ -202,6 +207,7 @@ export default function CommunicationHub() {
                       status="Delivered" 
                       time="3 days ago" 
                       icon={<Mail />}
+                      onClick={() => setSelectedMessage({ title: "Welcome to Our Branch", type: "Email", recipients: 5, status: "Delivered", time: "3 days ago", icon: <Mail /> })}
                     />
                  </div>
 
@@ -481,6 +487,80 @@ export default function CommunicationHub() {
            </div>
         </form>
       </Modal>
+
+      <AnimatePresence>
+        {selectedMessage && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 relative"
+            >
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                 <div className="flex items-center gap-3">
+                   <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500 shadow-sm">
+                     {selectedMessage.icon}
+                   </div>
+                   <div>
+                     <h3 className="font-bold text-slate-900">{selectedMessage.type} Message</h3>
+                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{selectedMessage.time}</p>
+                   </div>
+                 </div>
+                 <button onClick={() => setSelectedMessage(null)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-xl transition-colors">
+                   <X size={20} />
+                 </button>
+              </div>
+              
+              <div className="p-6 space-y-6">
+                 <div>
+                   <h4 className="text-xl font-black text-slate-900 leading-tight">{selectedMessage.title}</h4>
+                   <div className="flex items-center gap-2 mt-3">
+                      <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${
+                         selectedMessage.status === 'Delivered' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                         selectedMessage.status === 'Sent' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
+                         'bg-rose-50 text-rose-600 border-rose-100'
+                      }`}>
+                         {selectedMessage.status}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                         <Users size={12} /> {selectedMessage.recipients} Recipients
+                      </span>
+                   </div>
+                 </div>
+                 
+                 <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 relative overflow-hidden">
+                    <p className="text-sm text-slate-600 leading-relaxed font-medium relative z-10">
+                       Greetings Branch Family,<br/><br/>
+                       This is a detailed record of the engagement titled <strong>"{selectedMessage.title}"</strong>. 
+                       We are continually seeking to communicate effectively and provide clear updates to all {selectedMessage.recipients} targeted individuals.<br/><br/>
+                       Blessings,<br/>
+                       Branch Administration
+                    </p>
+                    <div className="absolute top-4 right-4 text-slate-200 z-0">
+                      <MessageSquare size={48} className="opacity-20" />
+                    </div>
+                 </div>
+              </div>
+              
+              <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
+                 <button 
+                   onClick={() => {
+                     toast.success(`${selectedMessage?.type} message resent successfully`);
+                     setSelectedMessage(null);
+                   }} 
+                   className="px-6 py-2.5 bg-indigo-600 text-white font-bold text-sm rounded-xl hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-2"
+                 >
+                   <Send size={16} /> Resend Message
+                 </button>
+                 <button onClick={() => setSelectedMessage(null)} className="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm">
+                   Close Details
+                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -509,7 +589,7 @@ function ModernCommStat({ label, value, icon, color, trend }: any) {
   );
 }
 
-function ModernMessageItem({ title, type, recipients, status, time, icon }: any) {
+function ModernMessageItem({ title, type, recipients, status, time, icon, onClick }: any) {
   const statusColors: any = {
     Delivered: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     Sent: 'bg-indigo-50 text-indigo-600 border-indigo-100',
@@ -517,7 +597,10 @@ function ModernMessageItem({ title, type, recipients, status, time, icon }: any)
   };
 
   return (
-    <div className="px-4 py-4 sm:px-8 sm:py-5 hover:bg-slate-50/50 transition-all group cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0">
+    <div 
+      className="px-4 py-4 sm:px-8 sm:py-5 hover:bg-slate-50/50 transition-all group cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0"
+      onClick={onClick}
+    >
        <div className="flex items-center gap-3 sm:gap-5">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center justify-center shrink-0 text-slate-500 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-colors">
              {React.cloneElement(icon, { size: 20 })}

@@ -21,8 +21,11 @@ import LiveStreaming from './pages/LiveStreaming';
 import Settings from './pages/Settings';
 import BibleSchool from './pages/BibleSchool';
 import CommunicationHub from './pages/CommunicationHub';
+import CommunityFeed from './pages/CommunityFeed';
+import MinistryChannels from './pages/MinistryChannels';
 import CMS from './pages/CMS';
 import Volunteers from './pages/Volunteers';
+import Rosters from './pages/Rosters';
 import Tasks from './pages/Tasks';
 import TransferManagement from './pages/TransferManagement';
 import SuperadminDashboard from './pages/SuperadminDashboard';
@@ -89,8 +92,11 @@ export default function App() {
             <Route path="baptism" element={<BaptismManagement />} />
             <Route path="baptism/interviews" element={<BaptismInterviewPanel />} />
             <Route path="communication" element={<CommunicationHub />} />
+            <Route path="community-feed" element={<CommunityFeed />} />
+            <Route path="ministry-channels" element={<MinistryChannels />} />
             <Route path="cms" element={<CMS />} />
             <Route path="volunteers" element={<Volunteers />} />
+            <Route path="rosters" element={<Rosters />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="transfers" element={<TransferManagement />} />
             <Route path="directory" element={<Directory />} />

@@ -432,6 +432,14 @@ export default function Layout() {
                   onClick={() => setIsSidebarOpen(false)}
                 />
                 <NavItem
+                  to="/rosters"
+                  icon={<CalendarDays size={18} />}
+                  label="Ministry Rosters"
+                  active={location.pathname.startsWith("/rosters")}
+                  isCollapsed={isCollapsed}
+                  onClick={() => setIsSidebarOpen(false)}
+                />
+                <NavItem
                   to="/tasks"
                   icon={<CheckSquare size={18} />}
                   label="Tasks"
@@ -444,6 +452,22 @@ export default function Layout() {
                   icon={<MessageSquare size={18} />}
                   label="Communication"
                   active={location.pathname.startsWith("/communication")}
+                  isCollapsed={isCollapsed}
+                  onClick={() => setIsSidebarOpen(false)}
+                />
+                <NavItem
+                  to="/community-feed"
+                  icon={<Globe size={18} />}
+                  label="Community Feed"
+                  active={location.pathname.startsWith("/community-feed")}
+                  isCollapsed={isCollapsed}
+                  onClick={() => setIsSidebarOpen(false)}
+                />
+                <NavItem
+                  to="/ministry-channels"
+                  icon={<Users size={18} />}
+                  label="Ministry Channels"
+                  active={location.pathname.startsWith("/ministry-channels")}
                   isCollapsed={isCollapsed}
                   onClick={() => setIsSidebarOpen(false)}
                 />
