@@ -23,6 +23,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { useFirebase } from '../components/FirebaseProvider';
 
 interface Message {
   id: string;
@@ -50,42 +53,99 @@ interface Channel {
   unreadCount?: number;
 }
 
-const CHANNELS: Channel[] = [
-  { id: '1', name: 'Announcements', description: 'General church-wide updates and news.', membersCount: 1248 },
-  { id: '2', name: 'WorshipTeam', description: 'Planning and discussion for Sunday services.', membersCount: 15, unreadCount: 2 },
-  { id: '3', name: 'YouthMinistry', description: 'Events and coordination for the youth department.', membersCount: 450 },
-  { id: '4', name: 'Volunteers', description: 'General volunteer coordination and support.', membersCount: 85, unreadCount: 1 },
+const DEFAULT_CHANNELS = [
+  { name: 'Announcements', description: 'General church-wide updates and news.', membersCount: 1248 },
+  { name: 'WorshipTeam', description: 'Planning and discussion for Sunday services.', membersCount: 15 },
+  { name: 'YouthMinistry', description: 'Events and coordination for the youth department.', membersCount: 450 },
+  { name: 'Volunteers', description: 'General volunteer coordination and support.', membersCount: 85 },
 ];
 
-const INITIAL_MESSAGES: Record<string, Message[]> = {
-  '2': [
-    {
-      id: 'm1',
-      author: { name: 'Sarah Jenkins', initials: 'SJ', role: 'Worship Leader' },
-      content: "Good morning team! Just uploaded the setlist for this coming Sunday. Please review the transitions between song 2 and 3.",
-      time: '9:14 AM',
-      attachment: { name: 'Sunday_Setlist_V1.pdf', type: 'PDF Document', size: '1.2 MB' }
-    },
-    {
-      id: 'm2',
-      author: { name: 'Marcus Chen', initials: 'MC', role: 'Guitar' },
-      content: "Looks great Sarah. I might need a bit more time on the acoustic intro for 'Great Are You Lord'. Can we rehearse that specifically on Thursday?",
-      time: '9:22 AM',
-      reactions: [{ emoji: '👍', count: 2 }]
-    }
-  ]
-};
-
 export default function MinistryChannels() {
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES['2'] || []);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [showDetails, setShowDetails] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  const activeChannel = CHANNELS.find(c => c.id === activeChannelId);
+  
+  const { user, profile } = useFirebase();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const activeChannel = channels.find(c => c.id === activeChannelId);
+
+  // Initialize channels if empty, and subscribe to channels
+  useEffect(() => {
+    if (!user) return;
+    
+    const unsubscribe = onSnapshot(collection(db, 'ministryChannels'), async (snapshot) => {
+      try {
+        if (snapshot.empty) {
+            // Seed default channels
+            for (const ch of DEFAULT_CHANNELS) {
+              await addDoc(collection(db, 'ministryChannels'), {
+                ...ch,
+                createdAt: serverTimestamp()
+              });
+            }
+        } else {
+            const fetchedChannels = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as Channel[];
+            
+            // Sort by name for consistency
+            fetchedChannels.sort((a,b) => a.name.localeCompare(b.name));
+            setChannels(fetchedChannels);
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, 'ministryChannels');
+      }
+    }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'ministryChannels');
+    });
+    
+    return () => unsubscribe();
+  }, [user]);
+
+  // Subscribe to messages in active channel
+  useEffect(() => {
+    if (!user || !activeChannelId) {
+        setMessages([]);
+        return;
+    }
+    
+    const messagesRef = collection(db, 'ministryChannels', activeChannelId, 'messages');
+    const q = query(messagesRef, orderBy('createdAt', 'asc'));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      try {
+          const fetchedMessages = snapshot.docs.map(doc => {
+            const data = doc.data();
+            const createdAt = data.createdAt ? data.createdAt.toDate() : new Date();
+            
+            return {
+              id: doc.id,
+              author: {
+                name: data.authorName || 'Unknown',
+                initials: data.authorInitials || '?',
+                role: data.authorRole || 'Member'
+              },
+              content: data.content,
+              time: createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+          }) as Message[];
+          setMessages(fetchedMessages);
+      } catch (error) {
+         handleFirestoreError(error, OperationType.LIST, `ministryChannels/${activeChannelId}/messages`);
+      }
+    }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, `ministryChannels/${activeChannelId}/messages`);
+    });
+    
+    return () => unsubscribe();
+  }, [user, activeChannelId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -93,25 +153,29 @@ export default function MinistryChannels() {
     }
   }, [messages]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !user || !profile || !activeChannelId || isSubmitting) return;
 
-    const msg: Message = {
-      id: Date.now().toString(),
-      author: { name: 'You', initials: 'ME', role: 'Member' },
-      content: newMessage,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
+    setIsSubmitting(true);
+    try {
+      const messagesRef = collection(db, 'ministryChannels', activeChannelId, 'messages');
+      const initials = profile.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
 
-    setMessages([...messages, msg]);
-    setNewMessage('');
-    
-    // Simulate auto-reply for demo
-    if (newMessage.toLowerCase().includes('hello')) {
-      setTimeout(() => {
-        toast.info('New message in #WorshipTeam');
-      }, 1000);
+      await addDoc(messagesRef, {
+          authorId: user.uid,
+          authorName: profile.fullName,
+          authorInitials: initials,
+          authorRole: profile.role || 'Member',
+          content: newMessage,
+          createdAt: serverTimestamp()
+      });
+      setNewMessage('');
+    } catch (error) {
+      toast.error('Failed to send message');
+      handleFirestoreError(error, OperationType.CREATE, `ministryChannels/${activeChannelId}/messages`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -120,9 +184,9 @@ export default function MinistryChannels() {
       {/* Social Tab Navigation */}
       <div className={`-mx-4 px-4 md:-mx-6 md:px-6 lg:mx-0 lg:px-0 gap-6 md:gap-8 border-b border-slate-200 mb-2 overflow-x-auto no-scrollbar w-[calc(100%+32px)] md:w-[calc(100%+48px)] lg:w-full ${activeChannelId ? 'hidden lg:flex' : 'flex'}`}>
         {[
-          { label: 'Community Feed', path: '/community-feed', mobileOnly: false },
-          { label: 'Ministry Channels', path: '/ministry-channels', mobileOnly: false },
-          { label: 'Direct Messages', path: '/direct-messages', mobileOnly: false },
+          { label: 'Feed', path: '/community-feed', mobileOnly: false },
+          { label: 'Channels', path: '/ministry-channels', mobileOnly: false },
+          { label: 'Messages', path: '/direct-messages', mobileOnly: false },
           { label: 'Announcements', path: '/communication', mobileOnly: true }
         ].map((tab) => (
           <button

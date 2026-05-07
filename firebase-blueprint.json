@@ -324,6 +324,101 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "targetDate", "status"]
+    },
+    "CommunityPost": {
+      "title": "Community Post",
+      "description": "A post in the community feed.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorRole": { "type": "string" },
+        "authorInitials": { "type": "string" },
+        "content": { "type": "string" },
+        "image": { "type": "string" },
+        "likes": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "authorName", "content", "createdAt", "likes", "commentsCount"]
+    },
+    "CommunityPostLike": {
+      "title": "Community Post Like",
+      "description": "A like on a community post by a user.",
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["createdAt"]
+    },
+    "MinistryChannel": {
+      "title": "Ministry Channel",
+      "description": "A group discussion channel.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "membersCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "description", "createdAt"]
+    },
+    "ChannelMessage": {
+      "title": "Channel Message",
+      "description": "A message within a ministry channel.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorInitials": { "type": "string" },
+        "authorRole": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "authorName", "authorInitials", "content", "createdAt"]
+    },
+    "DirectMessageChat": {
+      "title": "Direct Message Chat",
+      "description": "A chat between two users.",
+      "type": "object",
+      "properties": {
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "lastMessage": { "type": "string" },
+        "lastMessageTime": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["participants", "createdAt", "updatedAt"]
+    },
+    "DirectMessage": {
+      "title": "Direct Message",
+      "description": "A direct message between two users.",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "status": { "type": "string", "enum": ["sent", "delivered", "read"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "text", "status", "createdAt"]
+    },
+    "Broadcast": {
+      "title": "Broadcast",
+      "description": "An email, SMS or push notification broadcast.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "channel": { "type": "string", "enum": ["Email", "SMS", "Push"] },
+        "targetGroup": { "type": "string" },
+        "recipientsCount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Sent", "Delivered", "Failed"] },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "channel", "targetGroup", "status", "senderId", "createdAt"]
     }
   },
   "firestore": {
@@ -390,6 +485,34 @@
     "/baptismPrograms/{programId}": {
       "schema": "BaptismProgram",
       "description": "Collection of baptism programs."
+    },
+    "/communityPosts/{postId}": {
+      "schema": "CommunityPost",
+      "description": "Collection of community feed posts."
+    },
+    "/communityPosts/{postId}/likes/{userId}": {
+      "schema": "CommunityPostLike",
+      "description": "Collection of likes on a community post."
+    },
+    "/ministryChannels/{channelId}": {
+      "schema": "MinistryChannel",
+      "description": "Collection of ministry channels."
+    },
+    "/ministryChannels/{channelId}/messages/{messageId}": {
+      "schema": "ChannelMessage",
+      "description": "Collection of messages in a ministry channel."
+    },
+    "/directMessageChats/{chatId}": {
+      "schema": "DirectMessageChat",
+      "description": "Collection of direct message chats."
+    },
+    "/directMessageChats/{chatId}/messages/{messageId}": {
+      "schema": "DirectMessage",
+      "description": "Collection of direct messages within a chat."
+    },
+    "/broadcasts/{broadcastId}": {
+      "schema": "Broadcast",
+      "description": "Collection of all broadcasts sent."
     }
   }
 }

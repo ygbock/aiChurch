@@ -361,6 +361,126 @@ service cloud.firestore {
       allow delete: if isSuperAdmin() && isVerified();
     }
 
+    function isValidCommunityPost(data) {
+      return data.keys().hasAll(['authorId', 'authorName', 'content', 'createdAt', 'likes', 'commentsCount']) &&
+             data.authorId == request.auth.uid &&
+             data.authorName is string &&
+             data.content is string && data.content.size() <= 2000 &&
+             data.likes is number && data.likes == 0 &&
+             data.commentsCount is number && data.commentsCount == 0 &&
+             data.createdAt == request.time &&
+             (!('authorRole' in data) || data.authorRole is string) &&
+             (!('authorInitials' in data) || data.authorInitials is string) &&
+             (!('image' in data) || data.image is string) &&
+             (!('tags' in data) || data.tags is list);
+    }
+
+    function isValidMinistryChannel(data) {
+      return data.keys().hasAll(['name', 'description', 'createdAt']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.description is string && data.description.size() <= 500 &&
+             data.createdAt == request.time &&
+             (!('membersCount' in data) || data.membersCount is number);
+    }
+
+    function isValidChannelMessage(data) {
+      return data.keys().hasAll(['authorId', 'authorName', 'authorInitials', 'content', 'createdAt']) &&
+             data.authorId == request.auth.uid &&
+             data.authorName is string && data.authorName.size() <= 100 &&
+             data.authorInitials is string && data.authorInitials.size() <= 10 &&
+             data.content is string && data.content.size() <= 4000 &&
+             data.createdAt == request.time &&
+             (!('authorRole' in data) || data.authorRole is string);
+    }
+
+    function isValidDirectMessageChat(data) {
+      return data.keys().hasAll(['participants', 'createdAt', 'updatedAt']) &&
+             data.participants is list && data.participants.size() == 2 &&
+             request.auth.uid in data.participants &&
+             data.createdAt == request.time &&
+             data.updatedAt == request.time &&
+             (!('lastMessage' in data) || data.lastMessage is string) &&
+             (!('lastMessageTime' in data) || data.lastMessageTime is timestamp);
+    }
+
+    function isValidDirectMessage(data) {
+      return data.keys().hasAll(['senderId', 'text', 'status', 'createdAt']) &&
+             data.senderId == request.auth.uid &&
+             data.text is string && data.text.size() <= 4000 &&
+             data.status in ['sent', 'delivered', 'read'] &&
+             data.createdAt == request.time;
+    }
+
+    match /directMessageChats/{chatId} {
+      allow read, list: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow create: if isSignedIn() && isVerified() && isValidDirectMessageChat(incoming());
+      allow update: if isSignedIn() && isVerified() && request.auth.uid in existing().participants && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageTime', 'updatedAt']) &&
+        incoming().updatedAt == request.time
+      );
+      
+      match /messages/{messageId} {
+        allow read, list: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/directMessageChats/$(chatId)).data.participants;
+        allow create: if isSignedIn() && isVerified() && request.auth.uid in get(/databases/$(database)/documents/directMessageChats/$(chatId)).data.participants && isValidDirectMessage(incoming());
+        allow update: if isSignedIn() && isVerified() && request.auth.uid in get(/databases/$(database)/documents/directMessageChats/$(chatId)).data.participants && (
+           incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
+           existing().senderId != request.auth.uid // Cannot update own message status
+        );
+      }
+    }
+
+    function isValidBroadcast(data) {
+      return data.keys().hasAll(['title', 'channel', 'targetGroup', 'status', 'senderId', 'createdAt']) &&
+             data.senderId == request.auth.uid &&
+             data.title is string && data.title.size() <= 200 &&
+             data.channel in ['Email', 'SMS', 'Push'] &&
+             data.targetGroup is string &&
+             data.status in ['Sent', 'Delivered', 'Failed'] &&
+             data.createdAt == request.time &&
+             (!('body' in data) || data.body is string) &&
+             (!('recipientsCount' in data) || data.recipientsCount is number) &&
+             (!('senderName' in data) || data.senderName is string);
+    }
+
+    match /broadcasts/{broadcastId} {
+      // Only admins/leaders should see this ideally, but for demo we can allow read to everyone or verified users
+      allow read, list: if isSignedIn() && isVerified();
+      allow create: if isSignedIn() && isVerified() && isValidBroadcast(incoming());
+      // No updates needed typically, but we will prevent defaults
+    }
+
+    match /ministryChannels/{channelId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && isVerified() && isValidMinistryChannel(incoming());
+      // For demo we allow people to update membersCount 
+      allow update: if isSignedIn() && isVerified() && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['membersCount'])
+      );
+      
+      match /messages/{messageId} {
+        allow read, list: if isSignedIn();
+        allow create: if isSignedIn() && isVerified() && isValidChannelMessage(incoming());
+        allow delete: if isSignedIn() && isVerified() && (existing().authorId == request.auth.uid || isSuperAdmin());
+      }
+    }
+
+    match /communityPosts/{postId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && isVerified() && isValidCommunityPost(incoming());
+      allow update: if isSignedIn() && isVerified() && (
+        (incoming().diff(existing()).affectedKeys().hasOnly(['likes'])) ||
+        (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content']))
+      );
+      allow delete: if isSignedIn() && isVerified() && (existing().authorId == request.auth.uid || isSuperAdmin());
+
+      match /likes/{userId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.auth.uid == userId && isVerified() &&
+                      incoming().createdAt == request.time;
+        allow delete: if isSignedIn() && request.auth.uid == userId && isVerified();
+      }
+    }
+
     // Collection Group Helpers for safety
     match /{path=**}/members/{memberId} {
       allow read: if isSignedIn() && (request.auth.uid == memberId || isBranchAdmin('any', 'any'));

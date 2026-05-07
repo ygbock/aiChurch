@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, increment, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { useFirebase } from '../components/FirebaseProvider';
 import { 
   Heart, 
   MessageCircle, 
@@ -15,7 +18,9 @@ import {
   Sparkles,
   Users,
   Search,
-  MessageSquare
+  MessageSquare,
+  Menu,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -36,71 +41,146 @@ interface Post {
   tags?: string[];
 }
 
-const INITIAL_POSTS: Post[] = [
-  {
-    id: '1',
-    author: { name: 'Pastor David Wilson', role: 'Head Pastor', initials: 'DW' },
-    content: "What a powerful service we had today! The message on 'Walking in Grace' reminded us all that God's love is sufficient in every season. Let's carry this spirit into the week ahead.",
-    likes: 124,
-    commentsCount: 18,
-    time: '2h ago',
-    tags: ['SundayService', 'Grace'],
-    image: 'https://images.unsplash.com/photo-1438029071396-1e831a7fa6d8?auto=format&fit=crop&q=80&w=800'
-  },
-  {
-    id: '2',
-    author: { name: 'Sarah Jenkins', role: 'Choir Lead', initials: 'SJ' },
-    content: "Choir rehearsal tonight at 6 PM! We're preparing something special for the upcoming revival. See you all there! 🎶",
-    likes: 45,
-    commentsCount: 7,
-    time: '5h ago',
-    tags: ['Worship', 'Choir']
-  },
-  {
-    id: '3',
-    author: { name: 'James Oloyede', role: 'Youth Ministry', initials: 'JO' },
-    content: "Prayer Request: Please join me in praying for our university students as they begin their final exams this week. Strength and clarity of mind for every one of them.",
-    likes: 89,
-    commentsCount: 24,
-    time: 'Yesterday',
-    isLiked: true
-  }
-];
-
 export default function CommunityFeed() {
-  const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [newPostContent, setNewPostContent] = useState('');
+  const [showWidgets, setShowWidgets] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, profile } = useFirebase();
 
-  const handleLike = (postId: string) => {
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(db, 'communityPosts'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      try {
+        const fetchedPosts = snapshot.docs.map(doc => {
+          const data = doc.data();
+          const createdAt = data.createdAt ? data.createdAt.toDate() : new Date();
+          
+          let timeString = 'Just now';
+          const diffInMinutes = Math.floor((new Date().getTime() - createdAt.getTime()) / 60000);
+          if (diffInMinutes > 0 && diffInMinutes < 60) {
+            timeString = `${diffInMinutes}m ago`;
+          } else if (diffInMinutes >= 60 && diffInMinutes < 1440) {
+            timeString = `${Math.floor(diffInMinutes / 60)}h ago`;
+          } else if (diffInMinutes >= 1440) {
+            timeString = `${Math.floor(diffInMinutes / 1440)}d ago`;
+          }
+
+          return {
+            id: doc.id,
+            author: { 
+              name: data.authorName || 'Unknown', 
+              role: data.authorRole || 'Member', 
+              initials: data.authorInitials || '?' 
+            },
+            content: data.content,
+            image: data.image,
+            likes: data.likes || 0,
+            commentsCount: data.commentsCount || 0,
+            time: timeString,
+            tags: data.tags,
+            // we will query likes subcollection if we need isLiked tracking, but for simplicity assume false and then load
+            isLiked: false, 
+          } as Post;
+        });
+        
+        setPosts(fetchedPosts);
+
+        // Fetch user's likes for these posts
+        // We'll update the 'isLiked' dynamically
+        for (const postDoc of snapshot.docs) {
+          const likeDocRef = doc(db, 'communityPosts', postDoc.id, 'likes', user.uid);
+          getDoc(likeDocRef).then((likeDoc) => {
+            if (likeDoc.exists()) {
+               setPosts(prev => prev.map(p => p.id === postDoc.id ? { ...p, isLiked: true } : p));
+            }
+          }).catch(err => {
+             // Ignore offline issues here
+          });
+        }
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, 'communityPosts');
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'communityPosts');
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleLike = async (postId: string) => {
+    if (!user) return;
+    
+    // Optimistic UI updates
+    const isCurrentlyLiked = posts.find(p => p.id === postId)?.isLiked;
+    
     setPosts(prev => prev.map(post => {
       if (post.id === postId) {
         return {
           ...post,
-          likes: post.isLiked ? post.likes - 1 : post.likes + 1,
+          likes: post.isLiked ? Math.max(0, post.likes - 1) : post.likes + 1,
           isLiked: !post.isLiked
         };
       }
       return post;
     }));
+
+    try {
+      const postRef = doc(db, 'communityPosts', postId);
+      const likeRef = doc(db, 'communityPosts', postId, 'likes', user.uid);
+
+      if (isCurrentlyLiked) {
+        await deleteDoc(likeRef);
+        await updateDoc(postRef, {
+          likes: increment(-1)
+        });
+      } else {
+        await setDoc(likeRef, { createdAt: serverTimestamp() });
+        await updateDoc(postRef, {
+          likes: increment(1)
+        });
+      }
+    } catch (error) {
+      toast.error('Failed to update like status');
+      console.error(error);
+    }
   };
 
-  const handlePostSubmit = (e: React.FormEvent) => {
+  const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPostContent.trim()) return;
+    if (!newPostContent.trim() || !user || !profile || isSubmitting) return;
 
-    const newPost: Post = {
-      id: Date.now().toString(),
-      author: { name: 'You', role: 'Member', initials: 'ME' },
-      content: newPostContent,
-      likes: 0,
-      commentsCount: 0,
-      time: 'Just now'
-    };
-
-    setPosts([newPost, ...posts]);
-    setNewPostContent('');
-    toast.success('Post shared with the community!');
+    setIsSubmitting(true);
+    try {
+      const initials = profile.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
+      
+      await addDoc(collection(db, 'communityPosts'), {
+        authorId: user.uid,
+        authorName: profile.fullName,
+        authorRole: profile.role || 'Member',
+        authorInitials: initials,
+        content: newPostContent,
+        likes: 0,
+        commentsCount: 0,
+        createdAt: serverTimestamp()
+      });
+      
+      setNewPostContent('');
+      toast.success('Post shared with the community!');
+    } catch (error) {
+      toast.error('Failed to create post. Please try again.');
+      handleFirestoreError(error, OperationType.CREATE, 'communityPosts');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -112,9 +192,9 @@ export default function CommunityFeed() {
       {/* Social Tab Navigation */}
       <div className="-mx-4 px-4 md:mx-0 md:px-0 flex gap-6 md:gap-8 border-b border-slate-200 mb-6 md:mb-8 overflow-x-auto no-scrollbar w-[calc(100%+32px)] md:w-full">
         {[
-          { label: 'Community Feed', path: '/community-feed', mobileOnly: false },
-          { label: 'Ministry Channels', path: '/ministry-channels', mobileOnly: false },
-          { label: 'Direct Messages', path: '/direct-messages', mobileOnly: false },
+          { label: 'Feed', path: '/community-feed', mobileOnly: false },
+          { label: 'Channels', path: '/ministry-channels', mobileOnly: false },
+          { label: 'Messages', path: '/direct-messages', mobileOnly: false },
           { label: 'Announcements', path: '/communication', mobileOnly: true }
         ].map((tab) => (
           <button
@@ -139,9 +219,9 @@ export default function CommunityFeed() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="max-w-3xl mx-auto space-y-6">
         {/* Main Feed */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className="space-y-6">
           {/* Create Post */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <div className="flex gap-4">
@@ -169,10 +249,10 @@ export default function CommunityFeed() {
                   </div>
                   <button 
                     onClick={handlePostSubmit}
-                    disabled={!newPostContent.trim()}
+                    disabled={!newPostContent.trim() || isSubmitting}
                     className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2"
                   >
-                    Post <Send size={16} />
+                    {isSubmitting ? 'Posting...' : 'Post'} <Send size={16} />
                   </button>
                 </div>
               </div>
@@ -249,9 +329,43 @@ export default function CommunityFeed() {
             </AnimatePresence>
           </div>
         </div>
+      </div>
 
-        {/* Sidebar Widgets */}
-        <div className="lg:col-span-4 space-y-6">
+      {/* Floating Button */}
+      <button 
+        onClick={() => setShowWidgets(true)}
+        className="fixed bottom-6 right-6 lg:bottom-12 lg:right-12 w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-2xl hover:bg-indigo-700 hover:scale-105 active:scale-95 transition-all z-40"
+      >
+        <Menu size={24} />
+      </button>
+
+      {/* Side Popout Drawer */}
+      <AnimatePresence>
+        {showWidgets && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowWidgets(false)}
+              className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-50"
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 h-full w-full max-w-sm bg-slate-50 border-l border-slate-200 shadow-2xl z-50 overflow-y-auto p-6 space-y-6"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-black text-slate-900">Community Hub</h2>
+                <button 
+                  onClick={() => setShowWidgets(false)}
+                  className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
           {/* Trending */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <div className="flex items-center gap-2 mb-6">
@@ -357,8 +471,10 @@ export default function CommunityFeed() {
             </div>
             <Users className="absolute -right-4 -bottom-4 text-white/10 w-24 h-24 group-hover:scale-110 transition-transform" />
           </div>
-        </div>
-      </div>
+        </motion.div>
+        </>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

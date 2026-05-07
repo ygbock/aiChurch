@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { useFirebase } from '../components/FirebaseProvider';
 import { 
   Camera,
   Mic,
@@ -40,72 +43,130 @@ interface User {
 
 interface Chat {
   id: string;
-  user: User;
+  participants: string[];
+  user: User; // The other user
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
   messages: ChatMessage[];
 }
 
-const CHATS: Chat[] = [
-  {
-    id: '1',
-    user: { 
-      id: 'u1', 
-      name: 'Pastor John', 
-      role: 'Head Pastor', 
-      initials: 'PJ', 
-      status: 'online' 
-    },
-    lastMessage: 'Looking forward to seeing you at the service this Sunday!',
-    lastMessageTime: '10:42 AM',
-    unreadCount: 2,
-    messages: [
-      { id: 'm1', senderId: 'u1', text: 'Hello! How are the preparations going for the weekend retreat?', time: '10:35 AM', status: 'read' },
-      { id: 'm2', senderId: 'me', text: 'Hi Pastor John! Everything is moving along well. We just finalized the catering order this morning.', time: '10:38 AM', status: 'read' },
-      { id: 'm3', senderId: 'u1', text: 'Excellent news. Looking forward to seeing you at the service this Sunday!', time: '10:42 AM', status: 'read' }
-    ]
-  },
-  {
-    id: '2',
-    user: { 
-      id: 'u2', 
-      name: 'Sarah Jenkins', 
-      role: 'Choir Lead', 
-      initials: 'SJ', 
-      status: 'offline',
-      lastSeen: '2h ago'
-    },
-    lastMessage: 'Thanks for the update on the youth group schedule.',
-    lastMessageTime: 'Yesterday',
-    unreadCount: 0,
-    messages: []
-  },
-  {
-    id: '3',
-    user: { 
-      id: 'u3', 
-      name: 'Michael Thompson', 
-      role: 'Technical Team', 
-      initials: 'MT', 
-      status: 'away' 
-    },
-    lastMessage: 'The new sound system arrives tomorrow morning.',
-    lastMessageTime: 'Tuesday',
-    unreadCount: 0,
-    messages: []
-  }
-];
-
 export default function DirectMessages() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [chats, setChats] = useState<Chat[]>(CHATS);
+  const [chats, setChats] = useState<Chat[]>([]);
   const [messageText, setMessageText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useFirebase();
 
   const activeChat = chats.find(c => c.id === activeChatId);
+
+  // Load basic chats
+  useEffect(() => {
+    if (!user) return;
+
+    // In a real app we would query directMessageChats where participants array contains user.uid
+    // For now we just load DMs involving this user.
+    const q = query(
+      collection(db, 'directMessageChats'),
+      where('participants', 'array-contains', user.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+        try {
+            // Need to fetch other user profiles but for demo we will create placeholder users based on participants
+            const loadedChats = snapshot.docs.map(doc => {
+                const data = doc.data();
+                 const createdAt = data.createdAt ? data.createdAt.toDate() : new Date();
+                 const updatedAt = data.updatedAt ? data.updatedAt.toDate() : createdAt;
+                 const otherParticipantId = data.participants.find((p: string) => p !== user.uid) || 'unknown';
+                
+                 let timeString = '';
+                 const diffInMinutes = Math.floor((new Date().getTime() - updatedAt.getTime()) / 60000);
+                 if (diffInMinutes < 60) timeString = `${diffInMinutes}m ago`;
+                 else if (diffInMinutes < 1440) timeString = `${Math.floor(diffInMinutes / 60)}h ago`;
+                 else timeString = 'Yesterday';
+
+                return {
+                    id: doc.id,
+                    participants: data.participants,
+                    lastMessage: data.lastMessage || 'Start a conversation',
+                    lastMessageTime: data.lastMessageTime ? data.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }) : timeString,
+                    unreadCount: 0,
+                    user: {
+                         id: otherParticipantId,
+                         name: 'Demo User',
+                         role: 'Member',
+                         initials: 'DU',
+                         status: 'online'
+                    },
+                    messages: []
+                } as Chat;
+            });
+            setChats(loadedChats);
+        } catch(error) {
+            handleFirestoreError(error, OperationType.LIST, 'directMessageChats');
+        }
+    }, (error) => {
+        handleFirestoreError(error, OperationType.LIST, 'directMessageChats');
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Load messages for active chat
+  useEffect(() => {
+    if (!user || !activeChatId) return;
+
+    const messagesRef = collection(db, 'directMessageChats', activeChatId, 'messages');
+    const q = query(messagesRef, orderBy('createdAt', 'asc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        try {
+            const fetchedMessages = snapshot.docs.map(doc => {
+                const data = doc.data();
+                const createdAt = data.createdAt ? data.createdAt.toDate() : new Date();
+                
+                return {
+                    id: doc.id,
+                    senderId: data.senderId === user.uid ? 'me' : data.senderId,
+                    text: data.text,
+                    status: data.status,
+                    time: createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                } as ChatMessage;
+            });
+
+            setChats(prev => prev.map(chat => {
+                if (chat.id === activeChatId) {
+                    return { ...chat, messages: fetchedMessages };
+                }
+                return chat;
+            }));
+            
+            // Mark non-me messages as read
+            snapshot.docs.forEach(docSnap => {
+                const data = docSnap.data();
+                if (data.senderId !== user.uid && data.status !== 'read') {
+                    updateDoc(doc(db, 'directMessageChats', activeChatId, 'messages', docSnap.id), {
+                        status: 'read'
+                    }).catch(error => {
+                        // ignore failures if permission denied on read
+                    });
+                }
+            });
+
+        } catch (error) {
+            handleFirestoreError(error, OperationType.LIST, `directMessageChats/${activeChatId}/messages`);
+        }
+    }, error => {
+        handleFirestoreError(error, OperationType.LIST, `directMessageChats/${activeChatId}/messages`);
+    });
+
+    return () => unsubscribe();
+  }, [activeChatId, user]);
+
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -113,44 +174,35 @@ export default function DirectMessages() {
     }
   }, [activeChatId, chats]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageText.trim() || !activeChat) return;
+    if (!messageText.trim() || !activeChat || !user || isSubmitting) return;
 
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      senderId: 'me',
-      text: messageText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      status: 'sent'
-    };
+    setIsSubmitting(true);
+    try {
+        const chatRef = doc(db, 'directMessageChats', activeChatId);
+        const messagesRef = collection(db, 'directMessageChats', activeChatId, 'messages');
+        
+        await addDoc(messagesRef, {
+            senderId: user.uid,
+            text: messageText,
+            status: 'sent',
+            createdAt: serverTimestamp()
+        });
 
-    setChats(prev => prev.map(chat => {
-      if (chat.id === activeChatId) {
-        return {
-          ...chat,
-          messages: [...chat.messages, newMessage],
-          lastMessage: messageText,
-          lastMessageTime: 'Just now'
-        };
-      }
-      return chat;
-    }));
+        await updateDoc(chatRef, {
+            lastMessage: messageText,
+            lastMessageTime: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
 
-    setMessageText('');
-    
-    // Simulate delivery
-    setTimeout(() => {
-      setChats(prev => prev.map(chat => {
-        if (chat.id === activeChatId) {
-          return {
-            ...chat,
-            messages: chat.messages.map(m => m.id === newMessage.id ? { ...m, status: 'delivered' as const } : m)
-          };
-        }
-        return chat;
-      }));
-    }, 1500);
+        setMessageText('');
+    } catch(error) {
+       toast.error('Failed to send message');
+       handleFirestoreError(error, OperationType.CREATE, `directMessageChats/${activeChatId}/messages`);
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   return (
@@ -158,9 +210,9 @@ export default function DirectMessages() {
       {/* Social Tab Navigation */}
       <div className={`-mx-4 px-4 md:-mx-6 md:px-6 lg:mx-0 lg:px-0 gap-6 md:gap-8 border-b border-slate-200 mb-2 overflow-x-auto no-scrollbar w-[calc(100%+32px)] md:w-[calc(100%+48px)] lg:w-full ${activeChatId ? 'hidden lg:flex' : 'flex'}`}>
         {[
-          { label: 'Community Feed', path: '/community-feed', mobileOnly: false },
-          { label: 'Ministry Channels', path: '/ministry-channels', mobileOnly: false },
-          { label: 'Direct Messages', path: '/direct-messages', mobileOnly: false },
+          { label: 'Feed', path: '/community-feed', mobileOnly: false },
+          { label: 'Channels', path: '/ministry-channels', mobileOnly: false },
+          { label: 'Messages', path: '/direct-messages', mobileOnly: false },
           { label: 'Announcements', path: '/communication', mobileOnly: true }
         ].map((tab) => (
           <button

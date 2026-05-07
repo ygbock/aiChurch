@@ -22,8 +22,8 @@ import {
 } from 'lucide-react';
 import { useRole } from '../components/Layout';
 import Modal from '../components/Modal';
-import { collection, query, getDocs, limit } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { collection, query, getDocs, limit, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 import { toast } from 'sonner';
 
@@ -44,6 +44,9 @@ export default function CommunicationHub() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState('Default Branch Branding');
   const [selectedMessage, setSelectedMessage] = useState<any>(null);
+  const [broadcasts, setBroadcasts] = useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useFirebase();
   
   const [automations, setAutomations] = useState({
     birthdays: true,
@@ -63,13 +66,72 @@ export default function CommunicationHub() {
     fetchCount();
   }, [profile]);
 
-  const handleSend = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'broadcasts'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      try {
+        const fetched = snapshot.docs.map(doc => {
+          const data = doc.data();
+          const createdAt = data.createdAt ? data.createdAt.toDate() : new Date();
+          let timeString = 'Just now';
+          const diffInMinutes = Math.floor((new Date().getTime() - createdAt.getTime()) / 60000);
+          if (diffInMinutes > 0 && diffInMinutes < 60) {
+            timeString = `${diffInMinutes}m ago`;
+          } else if (diffInMinutes >= 60 && diffInMinutes < 1440) {
+            timeString = `${Math.floor(diffInMinutes / 60)}h ago`;
+          } else if (diffInMinutes >= 1440) {
+            timeString = `${Math.floor(diffInMinutes / 1440)}d ago`;
+          }
+
+          return {
+            id: doc.id,
+            title: data.title,
+            type: data.channel,
+            recipients: data.recipientsCount || 0,
+            status: data.status,
+            time: timeString,
+            icon: data.channel === 'Email' ? <Mail /> : data.channel === 'SMS' ? <MessageSquare /> : <Smartphone />
+          };
+        });
+        setBroadcasts(fetched);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, 'broadcasts');
+      }
+    }, error => {
+      handleFirestoreError(error, OperationType.LIST, 'broadcasts');
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would trigger a Firebase function or third-party API (Twilio/SendGrid)
-    toast.success(`${selectedChannel} message dispatched successfully`);
-    setIsComposeOpen(false);
-    setMessageTitle('');
-    setMessageBody('');
+    if (!user || !profile || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, 'broadcasts'), {
+        title: messageTitle,
+        body: messageBody,
+        channel: selectedChannel,
+        targetGroup: targetGroup,
+        recipientsCount: membersCount,
+        status: 'Sent',
+        senderId: user.uid,
+        senderName: profile.fullName || 'Unknown',
+        createdAt: serverTimestamp()
+      });
+      toast.success(`${selectedChannel} message dispatched successfully`);
+      setIsComposeOpen(false);
+      setMessageTitle('');
+      setMessageBody('');
+    } catch (error) {
+      toast.error('Failed to dispatch message');
+      handleFirestoreError(error, OperationType.CREATE, 'broadcasts');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleApplyTemplate = (template: any) => {
@@ -88,9 +150,9 @@ export default function CommunicationHub() {
       {/* Social Tab Navigation for Mobile */}
       <div className="flex md:hidden gap-6 border-b border-slate-200 mb-6 overflow-x-auto no-scrollbar -mx-4 px-4 w-[calc(100%+32px)]">
         {[
-          { label: 'Community Feed', path: '/community-feed', mobileOnly: false },
-          { label: 'Ministry Channels', path: '/ministry-channels', mobileOnly: false },
-          { label: 'Direct Messages', path: '/direct-messages', mobileOnly: false },
+          { label: 'Feed', path: '/community-feed', mobileOnly: false },
+          { label: 'Channels', path: '/ministry-channels', mobileOnly: false },
+          { label: 'Messages', path: '/direct-messages', mobileOnly: false },
           { label: 'Announcements', path: '/communication', mobileOnly: true }
         ].map((tab) => (
           <button
@@ -195,52 +257,23 @@ export default function CommunicationHub() {
                     </div>
                  </div>
 
-                 <div className="flex-1 divide-y divide-slate-50">
-                    <ModernMessageItem 
-                      title="Sunday Service: Power of Faith" 
-                      type="Push" 
-                      recipients={1240} 
-                      status="Delivered" 
-                      time="2h ago" 
-                      icon={<Smartphone />}
-                      onClick={() => setSelectedMessage({ title: "Sunday Service: Power of Faith", type: "Push", recipients: 1240, status: "Delivered", time: "2h ago", icon: <Smartphone /> })}
-                    />
-                    <ModernMessageItem 
-                      title="Branch Q3 Financial Audit" 
-                      type="Email" 
-                      recipients={12} 
-                      status="Sent" 
-                      time="5h ago" 
-                      icon={<Mail />}
-                      onClick={() => setSelectedMessage({ title: "Branch Q3 Financial Audit", type: "Email", recipients: 12, status: "Sent", time: "5h ago", icon: <Mail /> })}
-                    />
-                    <ModernMessageItem 
-                      title="Youth Rally Postponement" 
-                      type="SMS" 
-                      recipients={450} 
-                      status="Delivered" 
-                      time="Yesterday" 
-                      icon={<MessageSquare />}
-                      onClick={() => setSelectedMessage({ title: "Youth Rally Postponement", type: "SMS", recipients: 450, status: "Delivered", time: "Yesterday", icon: <MessageSquare /> })}
-                    />
-                    <ModernMessageItem 
-                      title="Mid-week Prayer Focus" 
-                      type="Push" 
-                      recipients={840} 
-                      status="Failed" 
-                      time="2 days ago" 
-                      icon={<Smartphone />}
-                      onClick={() => setSelectedMessage({ title: "Mid-week Prayer Focus", type: "Push", recipients: 840, status: "Failed", time: "2 days ago", icon: <Smartphone /> })}
-                    />
-                    <ModernMessageItem 
-                      title="Welcome to Our Branch" 
-                      type="Email" 
-                      recipients={5} 
-                      status="Delivered" 
-                      time="3 days ago" 
-                      icon={<Mail />}
-                      onClick={() => setSelectedMessage({ title: "Welcome to Our Branch", type: "Email", recipients: 5, status: "Delivered", time: "3 days ago", icon: <Mail /> })}
-                    />
+                 <div className="flex-1 divide-y divide-slate-50 overflow-y-auto">
+                    {broadcasts.length === 0 ? (
+                      <div className="p-12 text-center text-slate-500 font-medium">No broadcasts found. Compose a new message to get started.</div>
+                    ) : (
+                      broadcasts.map(b => (
+                        <ModernMessageItem 
+                          key={b.id}
+                          title={b.title} 
+                          type={b.type} 
+                          recipients={b.recipients} 
+                          status={b.status} 
+                          time={b.time} 
+                          icon={b.icon}
+                          onClick={() => setSelectedMessage({ title: b.title, type: b.type, recipients: b.recipients, status: b.status, time: b.time, icon: b.icon })}
+                        />
+                      ))
+                    )}
                  </div>
 
                  <div className="px-8 py-4 bg-slate-50 border-t border-slate-100">
@@ -501,13 +534,14 @@ export default function CommunicationHub() {
            <div className="flex gap-4 pt-2">
               <button 
                 type="submit" 
-                className={`flex-[2] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 ${
+                disabled={isSubmitting}
+                className={`flex-[2] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 ${
                    selectedChannel === 'SMS' 
                      ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-100' 
                      : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
                 }`}
               >
-                {selectedChannel === 'SMS' ? 'Send Urgent SMS' : 'Dispatch Message'}
+                {isSubmitting ? 'Dispatching...' : (selectedChannel === 'SMS' ? 'Send Urgent SMS' : 'Dispatch Message')}
                 <Send size={16} />
               </button>
               <button 
