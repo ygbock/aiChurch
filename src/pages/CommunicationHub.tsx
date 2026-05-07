@@ -148,7 +148,7 @@ export default function CommunicationHub() {
       </div>
 
       {/* Modern Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="hidden lg:grid lg:grid-cols-3 gap-6">
         <ModernCommStat label="Sent Broadcasts" value="12,480" icon={<Send />} color="indigo" trend="+15% MTD" />
         <ModernCommStat label="Success Rate" value="99.2%" icon={<CheckCircle2 />} color="emerald" trend="Optimal" />
         <ModernCommStat label="Global Reach" value="8.4k" icon={<Users />} color="amber" trend="Active Users" />
