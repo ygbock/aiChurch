@@ -231,7 +231,7 @@ export default function MinistryChannels() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {CHANNELS.map(channel => (
+          {channels.map(channel => (
             <button
               key={channel.id}
               onClick={() => setActiveChannelId(channel.id)}

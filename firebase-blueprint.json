@@ -20,6 +20,7 @@
              "endTime": { "type": "string" }
           }
         },
+        "visibility": { "type": "string", "enum": ["public", "district", "branch", "hidden"] },
         "notificationPrefs": {
           "type": "object",
           "properties": {
@@ -334,11 +335,16 @@
         "authorName": { "type": "string" },
         "authorRole": { "type": "string" },
         "authorInitials": { "type": "string" },
+        "authorAvatar": { "type": "string", "nullable": true },
         "content": { "type": "string" },
         "image": { "type": "string" },
         "likes": { "type": "number" },
         "commentsCount": { "type": "number" },
         "tags": { "type": "array", "items": { "type": "string" } },
+        "privacy": { "type": "string", "enum": ["public", "district", "branch", "friends", "only_me"] },
+        "commentPrivacy": { "type": "string", "enum": ["global", "district", "branch", "friends"] },
+        "isPinned": { "type": "boolean" },
+        "hiddenBy": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["authorId", "authorName", "content", "createdAt", "likes", "commentsCount"]
@@ -351,6 +357,45 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["createdAt"]
+    },
+    "CommunityPostComment": {
+      "title": "Community Post Comment",
+      "description": "A comment on a community post.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorInitials": { "type": "string" },
+        "authorAvatar": { "type": "string", "nullable": true },
+        "content": { "type": "string" },
+        "likes": { "type": "number" },
+        "repliesCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "authorName", "authorInitials", "content", "likes", "repliesCount", "createdAt"]
+    },
+    "CommunityPostCommentLike": {
+      "title": "Community Post Comment Like",
+      "description": "A like on a community post comment by a user.",
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["createdAt"]
+    },
+    "CommunityPostCommentReply": {
+      "title": "Community Post Comment Reply",
+      "description": "A reply to a community post comment.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorInitials": { "type": "string" },
+        "authorAvatar": { "type": "string", "nullable": true },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "authorName", "authorInitials", "content", "createdAt"]
     },
     "MinistryChannel": {
       "title": "Ministry Channel",
@@ -402,6 +447,20 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["senderId", "text", "status", "createdAt"]
+    },
+    "Friendship": {
+      "title": "Friendship",
+      "description": "A friendship relationship between two users.",
+      "type": "object",
+      "properties": {
+        "user1Id": { "type": "string" },
+        "user2Id": { "type": "string" },
+        "initiatorId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected", "blocked"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user1Id", "user2Id", "initiatorId", "status", "createdAt", "updatedAt"]
     },
     "Broadcast": {
       "title": "Broadcast",
@@ -494,6 +553,18 @@
       "schema": "CommunityPostLike",
       "description": "Collection of likes on a community post."
     },
+    "/communityPosts/{postId}/comments/{commentId}": {
+      "schema": "CommunityPostComment",
+      "description": "Collection of comments on a community post."
+    },
+    "/communityPosts/{postId}/comments/{commentId}/likes/{userId}": {
+      "schema": "CommunityPostCommentLike",
+      "description": "Likes on a comment."
+    },
+    "/communityPosts/{postId}/comments/{commentId}/replies/{replyId}": {
+      "schema": "CommunityPostCommentReply",
+      "description": "Replies to a comment."
+    },
     "/ministryChannels/{channelId}": {
       "schema": "MinistryChannel",
       "description": "Collection of ministry channels."
@@ -509,6 +580,10 @@
     "/directMessageChats/{chatId}/messages/{messageId}": {
       "schema": "DirectMessage",
       "description": "Collection of direct messages within a chat."
+    },
+    "/friendships/{friendshipId}": {
+      "schema": "Friendship",
+      "description": "Collection of friendships/connections between users."
     },
     "/broadcasts/{broadcastId}": {
       "schema": "Broadcast",

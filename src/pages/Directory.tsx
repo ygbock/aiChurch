@@ -35,15 +35,17 @@ interface DirectoryEntry {
   role: string;
   email?: string;
   phone?: string;
+  districtId?: string;
   branchId?: string;
   department?: string;
   type: 'staff' | 'member';
   photoUrl?: string;
+  visibility?: 'public' | 'district' | 'branch' | 'hidden';
 }
 
 export default function Directory() {
   const navigate = useNavigate();
-  const { profile } = useFirebase();
+  const { profile, user } = useFirebase();
   const [entries, setEntries] = useState<DirectoryEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'staff' | 'member'>('all');
@@ -63,10 +65,12 @@ export default function Directory() {
         fullName: doc.data().fullName,
         role: doc.data().role,
         email: doc.data().email,
+        districtId: doc.data().districtId,
         branchId: doc.data().branchId,
         department: doc.data().department || 'Administration',
         type: 'staff' as const,
-        photoUrl: doc.data().photoUrl
+        photoUrl: doc.data().photoUrl,
+        visibility: doc.data().visibility || 'public'
       }));
       
       setEntries(prev => {
@@ -88,10 +92,12 @@ export default function Directory() {
         role: doc.data().level || 'Member',
         email: doc.data().email,
         phone: doc.data().phone,
+        districtId: doc.data().districtId,
         branchId: doc.data().branchId,
         department: doc.data().department || 'Community',
         type: 'member' as const,
-        photoUrl: doc.data().photoUrl
+        photoUrl: doc.data().photoUrl,
+        visibility: doc.data().visibility || 'public'
       }));
 
       setEntries(prev => {
@@ -109,6 +115,13 @@ export default function Directory() {
   }, []);
 
   const filteredEntries = entries.filter(e => {
+    // Check Visibility Rule
+    if (e.id !== user?.uid) {
+      if (e.visibility === 'hidden') return false;
+      if (e.visibility === 'district' && e.districtId !== profile?.districtId) return false;
+      if (e.visibility === 'branch' && e.branchId !== profile?.branchId) return false;
+    }
+
     const matchesSearch = e.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          e.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (e.department && e.department.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -265,6 +278,32 @@ function DirectoryCard({ entry }: { entry: DirectoryEntry }) {
     }
   };
 
+  const handleFriendRequest = async () => {
+    if (!user) {
+      toast.error('Please login to connect');
+      return;
+    }
+    if (user.uid === entry.id) {
+      toast.error("You can't friend yourself");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, 'friendships'), {
+        user1Id: user.uid,
+        user2Id: entry.id,
+        initiatorId: user.uid,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      toast.success('Friend request sent!');
+    } catch (error) {
+      console.error("Friend request error:", error);
+      toast.error('Failed to send friend request');
+    }
+  };
+
   return (
     <motion.div
       layout
@@ -324,11 +363,10 @@ function DirectoryCard({ entry }: { entry: DirectoryEntry }) {
             <MessageSquare size={18} />
           </button>
           <button 
-            onClick={startChat}
-            disabled={isConnecting}
-            className="flex-1 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg active:scale-95 group/btn overflow-hidden relative disabled:opacity-50"
+            onClick={handleFriendRequest}
+            className="flex-1 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg active:scale-95 group/btn overflow-hidden relative"
           >
-            <span className="relative z-10">{isConnecting ? 'Opening...' : 'Connect'}</span>
+            <span className="relative z-10">Add Friend</span>
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-indigo-400 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
           </button>
         </div>

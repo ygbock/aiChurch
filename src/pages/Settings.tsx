@@ -42,6 +42,8 @@ export default function Settings() {
     endTime: '17:00'
   });
 
+  const [visibility, setVisibility] = useState('public');
+
   const [notificationPrefs, setNotificationPrefs] = useState({
     bookings: true,
     reminders: true,
@@ -57,6 +59,9 @@ export default function Settings() {
         startTime: profile.availability.startTime ?? '09:00',
         endTime: profile.availability.endTime ?? '17:00'
       });
+    }
+    if (profile?.visibility) {
+      setVisibility(profile.visibility);
     }
     if (profile?.notificationPrefs) {
       setNotificationPrefs({
@@ -93,6 +98,22 @@ export default function Settings() {
         updatedAt: serverTimestamp()
       });
       toast.success('Notification preferences updated');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const saveVisibility = async () => {
+    if (!db || !user?.uid) return;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        visibility,
+        updatedAt: serverTimestamp()
+      });
+      toast.success('Network visibility updated');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
     } finally {
@@ -168,6 +189,13 @@ export default function Settings() {
                color="amber"
             />
           )}
+          <ModernSettingsTab 
+             onClick={() => setActiveTab('network')} 
+             icon={<Globe />} 
+             label="Network Privacy" 
+             active={activeTab === 'network'} 
+             color="indigo"
+          />
           <ModernSettingsTab 
              onClick={() => setActiveTab('security')} 
              icon={<Lock />} 
@@ -346,6 +374,52 @@ export default function Settings() {
                        ) : <Save size={16} />}
                        Synchronize Schedule
                      </button>
+                  </div>
+               </div>
+            </motion.div>
+          ) : activeTab === 'network' ? (
+            <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+               <div className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="px-10 py-8 border-b border-slate-50 bg-slate-50/30">
+                     <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
+                       <Globe className="text-indigo-500" />
+                       Network Privacy
+                     </h3>
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Control who can discover you in the directory</p>
+                  </div>
+                  <div className="p-10 space-y-8">
+                     <div className="space-y-6 max-w-2xl">
+                        {[
+                          { id: 'public', label: 'Public', desc: 'Anyone in the app can find your profile' },
+                          { id: 'district', label: 'My District', desc: 'Visible only to members in the same district' },
+                          { id: 'branch', label: 'My Branch', desc: 'Visible only to members in your specific branch' },
+                          { id: 'hidden', label: 'Hidden', desc: 'Hidden from everyone except administrators' }
+                        ].map(opt => (
+                           <button
+                             key={opt.id}
+                             onClick={() => setVisibility(opt.id)}
+                             className={`w-full flex items-center p-5 rounded-2xl border-2 transition-all text-left ${visibility === opt.id ? 'border-indigo-600 bg-indigo-50/50 shadow-sm' : 'border-slate-100 hover:border-slate-300 bg-white'}`}
+                           >
+                              <div className="flex-1">
+                                 <h4 className={`text-sm font-bold ${visibility === opt.id ? 'text-indigo-900' : 'text-slate-900'}`}>{opt.label}</h4>
+                                 <p className={`text-xs font-medium mt-1 ${visibility === opt.id ? 'text-indigo-600' : 'text-slate-500'}`}>{opt.desc}</p>
+                              </div>
+                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${visibility === opt.id ? 'border-indigo-600 bg-white' : 'border-slate-300'}`}>
+                                {visibility === opt.id && <div className="w-3 h-3 rounded-full bg-indigo-600" />}
+                              </div>
+                           </button>
+                        ))}
+                     </div>
+                     <div className="pt-6 border-t border-slate-100 flex justify-end">
+                        <button 
+                          onClick={saveVisibility}
+                          disabled={isSaving}
+                          className="bg-indigo-600 text-white font-bold text-sm px-8 py-4 rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95 disabled:opacity-70 flex items-center gap-2"
+                        >
+                          {isSaving ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <ShieldCheck size={18} />}
+                          Save Privacy Settings
+                        </button>
+                     </div>
                   </div>
                </div>
             </motion.div>

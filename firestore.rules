@@ -70,6 +70,7 @@ service cloud.firestore {
              data.uid == request.auth.uid &&
              data.fullName is string && data.fullName.size() <= 100 &&
              data.email == getEmail() &&
+             (!('visibility' in data) || data.visibility in ['public', 'district', 'branch', 'hidden']) &&
              (!data.keys().contains('availability') || (
                data.availability is map &&
                data.availability.enabled is bool &&
@@ -215,6 +216,8 @@ service cloud.firestore {
       ) && isValidUser(incoming());
       allow update: if isSignedIn() && isVerified() && (
         (request.auth.uid == uid && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'photoUrl', 'availability', 'notificationPrefs', 'requirePasswordChange'])) ||
+        (request.auth.uid == uid && incoming().diff(existing()).affectedKeys().hasOnly(['visibility'])) ||
+        (request.auth.uid == uid && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'photoUrl', 'availability', 'notificationPrefs', 'visibility', 'requirePasswordChange'])) ||
         isSuperAdmin() ||
         (isDistrictLeader(resource.data.districtId)) ||
         (isBranchAdmin(resource.data.districtId, resource.data.branchId))
@@ -371,8 +374,35 @@ service cloud.firestore {
              data.createdAt == request.time &&
              (!('authorRole' in data) || data.authorRole is string) &&
              (!('authorInitials' in data) || data.authorInitials is string) &&
+             (!('authorAvatar' in data) || (data.authorAvatar is string || data.authorAvatar == null)) &&
              (!('image' in data) || data.image is string) &&
-             (!('tags' in data) || data.tags is list);
+             (!('tags' in data) || data.tags is list) &&
+             (!('privacy' in data) || data.privacy in ['public', 'district', 'branch', 'friends', 'only_me']) &&
+             (!('commentPrivacy' in data) || data.commentPrivacy in ['global', 'district', 'branch', 'friends']) &&
+             (!('isPinned' in data) || data.isPinned is bool) &&
+             (!('hiddenBy' in data) || data.hiddenBy is list);
+    }
+
+    function isValidCommunityPostComment(data) {
+      return data.keys().hasAll(['authorId', 'authorName', 'authorInitials', 'content', 'likes', 'repliesCount', 'createdAt']) &&
+             data.authorId == request.auth.uid &&
+             data.authorName is string && data.authorName.size() <= 100 &&
+             data.authorInitials is string && data.authorInitials.size() <= 10 &&
+             data.content is string && data.content.size() <= 1000 &&
+             data.likes is number && data.likes == 0 &&
+             data.repliesCount is number && data.repliesCount == 0 &&
+             (!('authorAvatar' in data) || (data.authorAvatar is string || data.authorAvatar == null)) &&
+             data.createdAt == request.time;
+    }
+
+    function isValidCommunityPostCommentReply(data) {
+      return data.keys().hasAll(['authorId', 'authorName', 'authorInitials', 'content', 'createdAt']) &&
+             data.authorId == request.auth.uid &&
+             data.authorName is string && data.authorName.size() <= 100 &&
+             data.authorInitials is string && data.authorInitials.size() <= 10 &&
+             data.content is string && data.content.size() <= 1000 &&
+             (!('authorAvatar' in data) || (data.authorAvatar is string || data.authorAvatar == null)) &&
+             data.createdAt == request.time;
     }
 
     function isValidMinistryChannel(data) {
@@ -409,6 +439,26 @@ service cloud.firestore {
              data.text is string && data.text.size() <= 4000 &&
              data.status in ['sent', 'delivered', 'read'] &&
              data.createdAt == request.time;
+    }
+
+    function isValidFriendship(data) {
+      return data.keys().hasAll(['user1Id', 'user2Id', 'initiatorId', 'status', 'createdAt', 'updatedAt']) &&
+             data.user1Id is string && data.user2Id is string && data.initiatorId is string &&
+             (data.user1Id == request.auth.uid || data.user2Id == request.auth.uid) &&
+             data.status in ['pending', 'accepted', 'rejected', 'blocked'] &&
+             data.createdAt == request.time &&
+             data.updatedAt == request.time &&
+             data.user1Id != data.user2Id;
+    }
+
+    match /friendships/{friendshipId} {
+      allow read, list: if isSignedIn() && (request.auth.uid == resource.data.user1Id || request.auth.uid == resource.data.user2Id);
+      allow create: if isSignedIn() && isVerified() && isValidFriendship(incoming());
+      allow update: if isSignedIn() && isVerified() && 
+                    (existing().user1Id == request.auth.uid || existing().user2Id == request.auth.uid) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+                    incoming().updatedAt == request.time;
+      allow delete: if isSignedIn() && isVerified() && (existing().user1Id == request.auth.uid || existing().user2Id == request.auth.uid);
     }
 
     match /directMessageChats/{chatId} {
@@ -469,7 +519,12 @@ service cloud.firestore {
       allow create: if isSignedIn() && isVerified() && isValidCommunityPost(incoming());
       allow update: if isSignedIn() && isVerified() && (
         (incoming().diff(existing()).affectedKeys().hasOnly(['likes'])) ||
-        (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content']))
+        (incoming().diff(existing()).affectedKeys().hasOnly(['commentsCount'])) ||
+        (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content'])) ||
+        (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['isPinned'])) ||
+        (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['privacy'])) ||
+        (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['commentPrivacy'])) ||
+        (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'isPinned', 'privacy', 'commentPrivacy']))
       );
       allow delete: if isSignedIn() && isVerified() && (existing().authorId == request.auth.uid || isSuperAdmin());
 
@@ -478,6 +533,29 @@ service cloud.firestore {
         allow create: if isSignedIn() && request.auth.uid == userId && isVerified() &&
                       incoming().createdAt == request.time;
         allow delete: if isSignedIn() && request.auth.uid == userId && isVerified();
+      }
+
+      match /comments/{commentId} {
+        allow read, list: if isSignedIn();
+        allow create: if isSignedIn() && isVerified() && isValidCommunityPostComment(incoming());
+        allow update: if isSignedIn() && isVerified() && (
+          (incoming().diff(existing()).affectedKeys().hasOnly(['likes'])) ||
+          (incoming().diff(existing()).affectedKeys().hasOnly(['repliesCount']))
+        );
+        allow delete: if isSignedIn() && isVerified() && (existing().authorId == request.auth.uid || isSuperAdmin());
+        
+        match /likes/{userId} {
+          allow read: if isSignedIn();
+          allow create: if isSignedIn() && request.auth.uid == userId && isVerified() &&
+                        incoming().createdAt == request.time;
+          allow delete: if isSignedIn() && request.auth.uid == userId && isVerified();
+        }
+
+        match /replies/{replyId} {
+          allow read, list: if isSignedIn();
+          allow create: if isSignedIn() && isVerified() && isValidCommunityPostCommentReply(incoming());
+          allow delete: if isSignedIn() && isVerified() && (existing().authorId == request.auth.uid || isSuperAdmin());
+        }
       }
     }
 
