@@ -69,7 +69,7 @@ service cloud.firestore {
       return data.keys().hasAll(['uid', 'fullName', 'email', 'role']) &&
              data.uid == request.auth.uid &&
              data.fullName is string && data.fullName.size() <= 100 &&
-             data.email == getEmail() &&
+             (!('phone' in data) || data.phone is string) &&
              (!('visibility' in data) || data.visibility in ['public', 'district', 'branch', 'hidden']) &&
              (!data.keys().contains('availability') || (
                data.availability is map &&
@@ -215,9 +215,9 @@ service cloud.firestore {
         (isBranchAdmin(incoming().districtId, incoming().branchId))
       ) && isValidUser(incoming());
       allow update: if isSignedIn() && isVerified() && (
-        (request.auth.uid == uid && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'photoUrl', 'availability', 'notificationPrefs', 'requirePasswordChange'])) ||
+        (request.auth.uid == uid && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'email', 'phone', 'photoUrl', 'availability', 'notificationPrefs', 'requirePasswordChange'])) ||
         (request.auth.uid == uid && incoming().diff(existing()).affectedKeys().hasOnly(['visibility'])) ||
-        (request.auth.uid == uid && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'photoUrl', 'availability', 'notificationPrefs', 'visibility', 'requirePasswordChange'])) ||
+        (request.auth.uid == uid && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'email', 'phone', 'photoUrl', 'availability', 'notificationPrefs', 'visibility', 'requirePasswordChange'])) ||
         isSuperAdmin() ||
         (isDistrictLeader(resource.data.districtId)) ||
         (isBranchAdmin(resource.data.districtId, resource.data.branchId))
@@ -378,6 +378,8 @@ service cloud.firestore {
              (!('authorInitials' in data) || data.authorInitials is string) &&
              (!('authorAvatar' in data) || (data.authorAvatar is string || data.authorAvatar == null)) &&
              (!('image' in data) || data.image is string || data.image == null) &&
+             (!('images' in data) || data.images is list) &&
+             (!('sharedPostId' in data) || data.sharedPostId is string || data.sharedPostId == null) &&
              (!('tags' in data) || data.tags is list) &&
              (!('privacy' in data) || data.privacy in ['public', 'district', 'branch', 'friends', 'only_me']) &&
              (!('commentPrivacy' in data) || data.commentPrivacy in ['global', 'district', 'branch', 'friends']) &&
@@ -440,27 +442,26 @@ service cloud.firestore {
              data.senderId == request.auth.uid &&
              data.text is string && data.text.size() <= 4000 &&
              data.status in ['sent', 'delivered', 'read'] &&
+             (!('sharedPostId' in data) || data.sharedPostId is string || data.sharedPostId == null) &&
              data.createdAt == request.time;
     }
 
     function isValidFriendship(data) {
-      return data.keys().hasAll(['user1Id', 'user2Id', 'initiatorId', 'status', 'createdAt', 'updatedAt']) &&
+      return data.keys().hasAll(['user1Id', 'user2Id', 'initiatorId', 'status']) &&
              data.user1Id is string && data.user2Id is string && data.initiatorId is string &&
              (data.user1Id == request.auth.uid || data.user2Id == request.auth.uid) &&
              data.status in ['pending', 'accepted', 'rejected', 'blocked'] &&
-             data.createdAt == request.time &&
-             data.updatedAt == request.time &&
              data.user1Id != data.user2Id;
     }
 
     match /friendships/{friendshipId} {
-      allow read, list: if isSignedIn() && (request.auth.uid == resource.data.user1Id || request.auth.uid == resource.data.user2Id);
-      allow create: if isSignedIn() && isVerified() && isValidFriendship(incoming());
-      allow update: if isSignedIn() && isVerified() && 
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && isValidFriendship(incoming());
+      allow update: if isSignedIn() && 
                     (existing().user1Id == request.auth.uid || existing().user2Id == request.auth.uid) &&
                     incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
                     incoming().updatedAt == request.time;
-      allow delete: if isSignedIn() && isVerified() && (existing().user1Id == request.auth.uid || existing().user2Id == request.auth.uid);
+      allow delete: if isSignedIn() && (existing().user1Id == request.auth.uid || existing().user2Id == request.auth.uid);
     }
 
     match /directMessageChats/{chatId} {

@@ -10,12 +10,16 @@ import {
   Users,
   Check,
   Building,
-  User
+  User,
+  Share2,
+  Grid,
+  List
 } from 'lucide-react';
 import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, setDoc, or } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 import { toast } from 'sonner';
+import { PostCard } from '../components/PostCard';
 
 export default function PublicUserProfile() {
   const { userId } = useParams();
@@ -24,6 +28,11 @@ export default function PublicUserProfile() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [friendshipStatus, setFriendshipStatus] = useState<'none' | 'pending' | 'friends'>('none');
+  const [districtName, setDistrictName] = useState<string>('');
+  const [branchName, setBranchName] = useState<string>('');
+  const [recentPosts, setRecentPosts] = useState<any[]>([]);
+  const [friendsList, setFriendsList] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'posts' | 'pictures' | 'friends'>('posts');
 
   useEffect(() => {
     if (!userId) return;
@@ -34,7 +43,118 @@ export default function PublicUserProfile() {
         const docSnap = await getDoc(docRef);
         
         if (docSnap.exists()) {
-          setProfile({ id: docSnap.id, ...docSnap.data() });
+          const data = docSnap.data();
+          setProfile({ id: docSnap.id, ...data });
+
+          // Fetch district name
+          if (data.districtId) {
+            try {
+              const dSnap = await getDoc(doc(db, 'districts', data.districtId));
+              if (dSnap.exists()) setDistrictName(dSnap.data().name || data.districtId);
+            } catch (e) { console.error(e); }
+            
+            // Fetch branch name
+            if (data.branchId) {
+              try {
+                const bSnap = await getDoc(doc(db, 'districts', data.districtId, 'branches', data.branchId));
+                if (bSnap.exists()) setBranchName(bSnap.data().name || data.branchId);
+              } catch (e) { console.error(e); }
+            }
+          }
+          
+          // Fetch recent posts
+          try {
+            const { orderBy } = await import('firebase/firestore');
+            const postsQ = query(
+              collection(db, 'communityPosts'),
+              where('authorId', '==', userId),
+              orderBy('createdAt', 'desc')
+            );
+            const postsSnap = await getDocs(postsQ);
+            
+            const fetchedPosts = postsSnap.docs.map(doc => {
+              const data = doc.data();
+              const createdAt = data.createdAt ? data.createdAt.toDate() : new Date();
+              let timeString = 'Just now';
+              const diffInMinutes = Math.floor((new Date().getTime() - createdAt.getTime()) / 60000);
+              if (diffInMinutes > 0 && diffInMinutes < 60) {
+                timeString = `${diffInMinutes}m ago`;
+              } else if (diffInMinutes >= 60 && diffInMinutes < 1440) {
+                timeString = `${Math.floor(diffInMinutes / 60)}h ago`;
+              } else if (diffInMinutes >= 1440) {
+                timeString = `${Math.floor(diffInMinutes / 1440)}d ago`;
+              }
+
+              return {
+                id: doc.id,
+                authorId: data.authorId,
+                author: { 
+                  name: data.authorName || 'Unknown', 
+                  role: data.authorRole || 'Member', 
+                  districtId: data.authorDistrictId,
+                  branchId: data.authorBranchId,
+                  initials: data.authorInitials || '?',
+                  avatar: data.authorAvatar
+                },
+                content: data.content,
+                image: data.image || data.imageUrl,
+                images: data.images || [],
+                sharedPostId: data.sharedPostId || null,
+                likes: data.likes || data.likesCount || 0,
+                commentsCount: data.commentsCount || 0,
+                time: timeString,
+                tags: data.tags,
+                privacy: data.privacy || 'public',
+                commentPrivacy: data.commentPrivacy || 'global',
+                isPinned: data.isPinned || false,
+                hiddenBy: data.hiddenBy || [],
+                isLiked: false, 
+              };
+            });
+            
+            if (currentUser) {
+              for (const post of fetchedPosts) {
+                const likeDocRef = doc(db, 'communityPosts', post.id, 'likes', currentUser.uid);
+                const likeDoc = await getDoc(likeDocRef);
+                if (likeDoc.exists()) {
+                  post.isLiked = true;
+                }
+              }
+            }
+            
+            setRecentPosts(fetchedPosts);
+          } catch (e) { console.error(e); }
+
+          // Fetch friends list
+          try {
+            const friendsQ1 = query(
+               collection(db, 'friendships'),
+               where('user1Id', '==', userId),
+               where('status', '==', 'accepted')
+            );
+            const friendsQ2 = query(
+               collection(db, 'friendships'),
+               where('user2Id', '==', userId),
+               where('status', '==', 'accepted')
+            );
+            
+            const [snap1, snap2] = await Promise.all([getDocs(friendsQ1), getDocs(friendsQ2)]);
+            const friendIds = [
+               ...snap1.docs.map(d => d.data().user2Id),
+               ...snap2.docs.map(d => d.data().user1Id)
+            ];
+
+            if (friendIds.length > 0) {
+               const friendDocs = await Promise.all(
+                  friendIds.map(id => getDoc(doc(db, 'users', id)))
+               );
+               const loadedFriends = friendDocs
+                  .filter(d => d.exists())
+                  .map(d => ({ id: d.id, ...d.data() }));
+               setFriendsList(loadedFriends);
+            }
+          } catch(e) { console.error("Error fetching friends:", e); }
+
         } else {
           toast.error("User not found");
           navigate('/community-feed');
@@ -136,9 +256,13 @@ export default function PublicUserProfile() {
       });
       setFriendshipStatus('pending');
       toast.success("Friend request sent!");
-    } catch(err) {
-      handleFirestoreError(err, OperationType.CREATE, 'friendships');
-      toast.error('Failed to send request');
+    } catch(err: any) {
+      console.error("Error creating friendship:", err);
+      if (err?.message?.includes("Missing or insufficient permissions")) {
+         toast.error("Permission denied creating friendship.");
+      } else {
+         toast.error('Failed to send request: ' + err?.message);
+      }
     }
   };
 
@@ -151,6 +275,8 @@ export default function PublicUserProfile() {
   }
 
   if (!profile) return null;
+
+  const avatarUrl = profile.photoUrl || profile.photoURL || (currentUser?.uid === userId ? currentUser?.photoURL : null);
 
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50 overflow-y-auto">
@@ -181,53 +307,68 @@ export default function PublicUserProfile() {
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 sm:gap-4 -mt-12 sm:-mt-16 mb-4">
                {/* Avatar */}
                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-white border-4 border-white shadow-xl flex items-center justify-center overflow-hidden z-10">
-                 {profile.photoUrl ? (
-                   <img src={profile.photoUrl} alt={profile.fullName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                 {avatarUrl ? (
+                   <img src={avatarUrl} alt={profile.fullName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                  ) : (
                    <span className="text-3xl font-bold text-indigo-200">
-                     {profile.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                     {profile.fullName?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || '?'}
                    </span>
                  )}
                </div>
 
                {/* Action Buttons */}
-               {currentUser?.uid !== userId && (
-                 <div className="flex gap-3 mt-4 sm:mt-0">
-                    {friendshipStatus === 'none' && (
-                      <button 
-                        onClick={handleAddFriend}
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-sm"
-                      >
-                        <UserPlus size={18} />
-                        Add Friend
-                      </button>
-                    )}
-                    {friendshipStatus === 'pending' && (
-                      <button 
-                        disabled
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm"
-                      >
-                        <Check size={18} />
-                        Request Sent
-                      </button>
-                    )}
-                    {friendshipStatus === 'friends' && (
-                      <button 
-                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-indigo-50 text-indigo-700 rounded-xl font-bold text-sm"
-                      >
-                        <Users size={18} />
-                        Friends
-                      </button>
-                    )}
+               <div className="flex gap-3 mt-4 sm:mt-0 flex-wrap justify-end">
+                  {currentUser?.uid === userId && (
                     <button 
-                      onClick={handleCreateChat}
+                      onClick={() => {
+                         navigator.clipboard.writeText(window.location.href);
+                         toast.success('Profile link copied to clipboard');
+                      }}
                       className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-50 transition-colors shadow-sm"
                     >
-                      <MessageCircle size={18} />
-                      Message
+                      <Share2 size={18} />
+                      Share
                     </button>
-                 </div>
-               )}
+                  )}
+
+                  {currentUser?.uid !== userId && (
+                    <>
+                       {friendshipStatus === 'none' && (
+                         <button 
+                           onClick={handleAddFriend}
+                           className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-sm"
+                         >
+                           <UserPlus size={18} />
+                           Add Friend
+                         </button>
+                       )}
+                       {friendshipStatus === 'pending' && (
+                         <button 
+                           disabled
+                           className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm"
+                         >
+                           <Check size={18} />
+                           Request Sent
+                         </button>
+                       )}
+                       {friendshipStatus === 'friends' && (
+                         <button 
+                           className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-indigo-50 text-indigo-700 rounded-xl font-bold text-sm"
+                         >
+                           <Users size={18} />
+                           Friends
+                         </button>
+                       )}
+                       <button 
+                         onClick={handleCreateChat}
+                         className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors shadow-sm"
+                       >
+                         <MessageCircle size={18} />
+                         Message
+                       </button>
+                    </>
+                  )}
+               </div>
             </div>
 
             <div className="space-y-1">
@@ -240,11 +381,11 @@ export default function PublicUserProfile() {
             <div className="flex flex-wrap gap-4 mt-6">
                <div className="flex items-center gap-2 text-sm text-slate-600 font-medium">
                  <Building size={18} className="text-slate-400" />
-                 District: {profile.districtId || 'Unspecified'}
+                 District: {districtName || profile.districtId || 'Unspecified'}
                </div>
                <div className="flex items-center gap-2 text-sm text-slate-600 font-medium">
                  <MapPin size={18} className="text-slate-400" />
-                 Branch: {profile.branchId || 'Unspecified'}
+                 Branch: {branchName || profile.branchId || 'Unspecified'}
                </div>
                <div className="flex items-center gap-2 text-sm text-slate-600 font-medium">
                  <Heart size={18} className="text-slate-400" />
@@ -283,18 +424,128 @@ export default function PublicUserProfile() {
               </div>
            </div>
 
-           {/* Feed placeholder */}
            <div className="md:col-span-2 space-y-6">
-              {/* Here we could query and render recent posts by this user */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
-                 <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 mx-auto mb-4">
-                    <MessageCircle size={28} />
-                 </div>
-                 <h3 className="text-lg font-bold text-slate-900 mb-2">No Recent Activity</h3>
-                 <p className="text-slate-500 max-w-sm mx-auto">
-                    {profile.fullName} hasn't posted anything in the community feed recently.
-                 </p>
+              {/* Tabs */}
+              <div className="flex border-b border-slate-200 overflow-x-auto hide-scrollbar">
+                <button 
+                  onClick={() => setActiveTab('posts')}
+                  className={`flex-1 py-4 px-4 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors whitespace-nowrap min-w-fit ${activeTab === 'posts' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
+                >
+                  <List size={20} />
+                  Posts
+                </button>
+                <button 
+                  onClick={() => setActiveTab('pictures')}
+                  className={`flex-1 py-4 px-4 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors whitespace-nowrap min-w-fit ${activeTab === 'pictures' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
+                >
+                  <Grid size={20} />
+                  Pictures
+                </button>
+                <button 
+                  onClick={() => setActiveTab('friends')}
+                  className={`flex-1 py-4 px-4 text-sm font-bold flex items-center justify-center gap-2 border-b-2 transition-colors whitespace-nowrap min-w-fit ${activeTab === 'friends' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'}`}
+                >
+                  <Users size={20} />
+                  Friends
+                </button>
               </div>
+
+              {activeTab === 'posts' && (
+                <div className="space-y-6">
+                  {recentPosts.length > 0 ? (
+                    recentPosts.map((post) => (
+                      <PostCard key={post.id} post={post} />
+                    ))
+                  ) : (
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center">
+                       <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 mx-auto mb-4">
+                          <MessageCircle size={28} />
+                       </div>
+                       <h3 className="text-lg font-bold text-slate-900 mb-2">No Recent Activity</h3>
+                       <p className="text-slate-500 max-w-sm mx-auto">
+                          {profile.fullName} hasn't posted anything in the community feed recently.
+                       </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'pictures' && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                   {recentPosts.filter(p => !!p.image || (p.images && p.images.length > 0)).length > 0 ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                         {recentPosts.filter(p => !!p.image || (p.images && p.images.length > 0)).flatMap(post => {
+                            const imgs = post.images && post.images.length > 0 ? post.images : (post.image ? [post.image] : []);
+                            return imgs.map((img, idx) => (
+                              <div key={`pic-${post.id}-${idx}`} className="aspect-square rounded-xl overflow-hidden shadow-sm border border-slate-100 bg-slate-50 group relative cursor-pointer" onClick={() => setActiveTab('posts')}>
+                                 <img src={img} alt="Post image" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                              </div>
+                            ));
+                         })}
+                      </div>
+                   ) : (
+                      <div className="text-center py-8">
+                         <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 mx-auto mb-4">
+                            <Grid size={28} />
+                         </div>
+                         <h3 className="text-lg font-bold text-slate-900 mb-2">No Pictures</h3>
+                         <p className="text-slate-500 max-w-sm mx-auto">
+                            {profile.fullName} hasn't shared any pictures yet.
+                         </p>
+                      </div>
+                   )}
+                </div>
+              )}
+
+              {activeTab === 'friends' && (
+                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+                    {friendsList.length > 0 ? (
+                       <div className="divide-y divide-slate-100">
+                          {friendsList.map(friend => (
+                             <div 
+                               key={friend.id} 
+                               className="p-4 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors"
+                               onClick={() => navigate(`/community-profile/${friend.id}`)}
+                             >
+                                <div className="flex items-center gap-4">
+                                   <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-100 shrink-0">
+                                      {friend.photoUrl || friend.photoURL ? (
+                                         <img src={friend.photoUrl || friend.photoURL} alt={friend.fullName} className="w-full h-full object-cover" />
+                                      ) : (
+                                         <div className="w-full h-full flex items-center justify-center text-slate-600 font-bold bg-indigo-100">
+                                            {friend.fullName?.substring(0, 2).toUpperCase() || '?'}
+                                         </div>
+                                      )}
+                                   </div>
+                                   <div>
+                                      <p className="font-bold text-slate-900">{friend.fullName}</p>
+                                   </div>
+                                </div>
+                                <div className="shrink-0">
+                                   <button 
+                                     onClick={(e) => { e.stopPropagation(); navigate(`/direct-messages?to=${friend.id}`); }} 
+                                     className="p-2.5 rounded-full bg-slate-50 border border-slate-200 text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors"
+                                     title="Send Message"
+                                   >
+                                      <MessageCircle size={20} />
+                                   </button>
+                                </div>
+                             </div>
+                          ))}
+                       </div>
+                    ) : (
+                      <div className="text-center py-8">
+                         <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 mx-auto mb-4">
+                            <Users size={28} />
+                         </div>
+                         <h3 className="text-lg font-bold text-slate-900 mb-2">No Friends Yet</h3>
+                         <p className="text-slate-500 max-w-sm mx-auto">
+                            {profile.fullName} hasn't added any friends.
+                         </p>
+                      </div>
+                    )}
+                 </div>
+              )}
            </div>
         </div>
 

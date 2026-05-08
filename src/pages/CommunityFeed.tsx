@@ -20,6 +20,8 @@ import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, u
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 import Modal from '../components/Modal';
+import { ShareModal } from '../components/ShareModal';
+import { PostCard } from '../components/PostCard';
 import { 
   Heart, 
   MessageCircle, 
@@ -87,11 +89,12 @@ export default function CommunityFeed() {
   const [showWidgets, setShowWidgets] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
+  const [activeSharePost, setActiveSharePost] = useState<Post | null>(null);
   const [activeMenuPostId, setActiveMenuPostId] = useState<string | null>(null);
 
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   
-  const [newPostImage, setNewPostImage] = useState<string | null>(null);
+  const [newPostImages, setNewPostImages] = useState<string[]>([]);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showComposer, setShowComposer] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
@@ -104,6 +107,22 @@ export default function CommunityFeed() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, profile } = useFirebase();
+
+  useEffect(() => {
+    // Check for post param
+    const params = new URLSearchParams(location.search);
+    const postIdStr = params.get('post');
+    if (postIdStr && posts.length > 0) {
+      setTimeout(() => {
+        const el = document.getElementById(`post-${postIdStr}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('ring-4', 'ring-indigo-500', 'ring-offset-4', 'transition-all', 'duration-1000');
+          setTimeout(() => el.classList.remove('ring-4', 'ring-indigo-500', 'ring-offset-4', 'transition-all', 'duration-1000'), 2000);
+        }
+      }, 500);
+    }
+  }, [location.search, posts.length]);
 
   useEffect(() => {
     if (!user || !profile) return;
@@ -170,6 +189,8 @@ export default function CommunityFeed() {
             },
             content: data.content,
             image: data.image,
+            images: data.images || [],
+            sharedPostId: data.sharedPostId || null,
             likes: data.likes || 0,
             commentsCount: data.commentsCount || 0,
             time: timeString,
@@ -288,54 +309,72 @@ export default function CommunityFeed() {
     }
   };
 
-  const handleImageSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image is too large. Please select an image under 2MB.');
+    const currentImagesCount = newPostImages.length;
+    if (currentImagesCount + files.length > 4) {
+      toast.error('You can only upload up to 4 images per post.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800;
-        const MAX_HEIGHT = 800;
-        let width = img.width;
-        let height = img.height;
+    const processFile = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1200;
+            let width = img.width;
+            let height = img.height;
 
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+              }
+            }
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        
-        // compress
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-        setNewPostImage(dataUrl);
-      };
-      img.src = event.target?.result as string;
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            
+            // compress aggressively to fit within 1MB total sizes combined
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+            resolve(dataUrl);
+          };
+          img.onerror = reject;
+          img.src = event.target?.result as string;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
     };
-    reader.readAsDataURL(file);
+
+    try {
+      const newImages = await Promise.all(Array.from(files).map(processFile));
+      setNewPostImages(prev => [...prev, ...newImages].slice(0, 4));
+    } catch(err) {
+      toast.error('Failed to process one or more images');
+    }
+    
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
   };
 
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPostContent.trim() && !newPostImage) return;
+    if (!newPostContent.trim() && newPostImages.length === 0) return;
     if (!user || !profile || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -352,7 +391,8 @@ export default function CommunityFeed() {
         authorInitials: initials,
         authorAvatar: user.photoURL || null,
         content: newPostContent,
-        image: newPostImage || null,
+        image: newPostImages[0] || null,
+        images: newPostImages,
         tags: extractedTags,
         likes: 0,
         commentsCount: 0,
@@ -364,7 +404,7 @@ export default function CommunityFeed() {
       });
       
       setNewPostContent('');
-      setNewPostImage(null);
+      setNewPostImages([]);
       setShowEmojiPicker(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       
@@ -502,13 +542,16 @@ export default function CommunityFeed() {
         <div className="space-y-6">
           {/* Create Post Entry */}
           <div className="flex gap-3 sm:gap-4 items-center mb-6">
-            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold overflow-hidden shrink-0">
+            <button 
+              onClick={() => navigate(`/community-profile/${user?.uid}`)}
+              className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold overflow-hidden shrink-0 hover:ring-2 hover:ring-indigo-500 hover:ring-offset-2 transition-all cursor-pointer"
+            >
               {user?.photoURL ? (
                 <img src={user.photoURL} alt={profile?.fullName || ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
                 profile?.fullName ? profile.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : 'ME'
               )}
-            </div>
+            </button>
             <button 
               onClick={() => setShowComposer(true)}
               className="flex-1 bg-white border border-slate-200 shadow-sm hover:bg-slate-50 text-slate-500 text-left rounded-full px-4 py-3 text-sm font-medium transition-colors"
@@ -521,132 +564,7 @@ export default function CommunityFeed() {
           <div className="space-y-6">
             <AnimatePresence>
               {visiblePosts.map((post) => (
-                <motion.article 
-                  key={post.id}
-                  layout
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
-                >
-                  <div className="p-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex gap-3 items-center">
-                        <button 
-                          onClick={() => navigate(`/community-profile/${post.authorId}`)}
-                          className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 font-bold overflow-hidden shrink-0 hover:ring-2 hover:ring-indigo-600 hover:ring-offset-2 transition-all cursor-pointer"
-                        >
-                          {post.author.avatar ? (
-                            <img src={post.author.avatar} alt={post.author.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          ) : (
-                            post.author.initials
-                          )}
-                        </button>
-                        <div>
-                          <button 
-                            onClick={() => navigate(`/community-profile/${post.authorId}`)}
-                            className="text-sm font-bold text-slate-900 hover:text-indigo-600 transition-colors text-left"
-                          >
-                            {post.author.name}
-                          </button>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{post.author.role} • {post.time}</p>
-                        </div>
-                      </div>
-                      <div className="relative">
-                        <button 
-                          onClick={() => setActiveMenuPostId(activeMenuPostId === post.id ? null : post.id)}
-                          className="p-2 text-slate-400 hover:text-slate-600 rounded-lg transition-all"
-                        >
-                          <MoreHorizontal size={20} />
-                        </button>
-
-                        <AnimatePresence>
-                          {activeMenuPostId === post.id && !isMobile && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                              className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 overflow-hidden z-20"
-                            >
-                              <PostMenuContent 
-                                post={post} 
-                                user={user} 
-                                onClose={() => setActiveMenuPostId(null)} 
-                                onEditPost={(p: Post) => { setEditingPostId(p.id); setEditingPostContent(p.content); }}
-                                onEditPrivacy={(p: Post) => setPrivacyModalPost(p)}
-                                onEditCommentPrivacy={(p: Post) => setCommentPrivacyModalPost(p)}
-                              />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-
-                    <Modal isOpen={activeMenuPostId === post.id && isMobile} onClose={() => setActiveMenuPostId(null)} title="Post Options">
-                      <div className="-mx-6 -mt-2 -mb-6 pb-2">
-                        <PostMenuContent 
-                          post={post} 
-                          user={user} 
-                          onClose={() => setActiveMenuPostId(null)} 
-                          onEditPost={(p: Post) => { setEditingPostId(p.id); setEditingPostContent(p.content); }}
-                          onEditPrivacy={(p: Post) => setPrivacyModalPost(p)}
-                          onEditCommentPrivacy={(p: Post) => setCommentPrivacyModalPost(p)}
-                        />
-                      </div>
-                    </Modal>
-
-                    <p className="text-slate-700 text-sm leading-relaxed mb-4 break-words whitespace-pre-wrap">
-                      {post.content}
-                    </p>
-
-                    {post.image && (
-                      <div className="mb-4 rounded-xl overflow-hidden border border-slate-100">
-                        <img src={post.image} alt="Post content" className="w-full h-auto" />
-                      </div>
-                    )}
-
-                    {post.tags && (
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {post.tags.map(tag => (
-                          <span key={tag} className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-6 pt-4 border-t border-slate-50">
-                      <button 
-                        onClick={() => handleLike(post.id)}
-                        className={`flex items-center gap-2 text-xs font-bold transition-all ${post.isLiked ? 'text-rose-500' : 'text-slate-500 hover:text-rose-500'}`}
-                      >
-                        <Heart size={18} fill={post.isLiked ? "currentColor" : "none"} />
-                        {post.likes}
-                      </button>
-                      <button 
-                        onClick={() => setActiveCommentPostId(post.id)}
-                        className={`flex items-center gap-2 text-xs font-bold transition-all text-slate-500 hover:text-indigo-600`}
-                      >
-                        <MessageCircle size={18} />
-                        {post.commentsCount}
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const url = `${window.location.origin}/community-feed?post=${post.id}`;
-                          if (navigator.share) {
-                            navigator.share({ title: 'Community Post', url }).catch(() => {});
-                          } else {
-                            navigator.clipboard.writeText(url);
-                            toast.success('Link copied to clipboard!');
-                          }
-                        }}
-                        className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-all ml-auto"
-                      >
-                        <Share2 size={18} />
-                        Share
-                      </button>
-                    </div>
-                  </div>
-                </motion.article>
+                <PostCard key={post.id} post={post} onLike={handleLike} />
               ))}
             </AnimatePresence>
             
@@ -657,6 +575,14 @@ export default function CommunityFeed() {
             >
               {activeCommentPostId && <PostComments postId={activeCommentPostId} />}
             </Modal>
+
+            {activeSharePost && (
+              <ShareModal 
+                isOpen={!!activeSharePost}
+                onClose={() => setActiveSharePost(null)}
+                post={activeSharePost}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -918,11 +844,11 @@ export default function CommunityFeed() {
                 <button 
                   onClick={(e) => {
                     handlePostSubmit(e as any);
-                    if ((newPostContent.trim() || newPostImage) && !isSubmitting) {
+                    if ((newPostContent.trim() || newPostImages.length > 0) && !isSubmitting) {
                       setShowComposer(false);
                     }
                   }}
-                  disabled={(!newPostContent.trim() && !newPostImage) || isSubmitting}
+                  disabled={(!newPostContent.trim() && newPostImages.length === 0) || isSubmitting}
                   className="px-4 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-500 hover:bg-indigo-700 transition-colors"
                 >
                   {isSubmitting ? 'Posting...' : 'Post'}
@@ -969,22 +895,26 @@ export default function CommunityFeed() {
                     placeholder="What's on your mind?"
                     className="flex-1 w-full border-none focus:ring-0 text-slate-800 bg-transparent p-0 text-xl md:text-2xl font-medium placeholder:text-slate-400 resize-none min-h-[120px]"
                   />
-                  {newPostImage && (
-                    <div className="relative mt-2 inline-block mb-4 shrink-0 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                      <img src={newPostImage} alt="Preview" className="w-full rounded-xl object-cover max-h-[300px]" />
-                      <button 
-                        onClick={() => { setNewPostImage(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                        className="absolute top-2 right-2 p-2 bg-slate-900/50 text-white hover:bg-rose-500 rounded-full transition-colors backdrop-blur-md"
-                      >
-                        <X size={16} />
-                      </button>
+                  {newPostImages.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto pb-4 mb-2 scrollbar-hide">
+                      {newPostImages.map((img, idx) => (
+                        <div key={idx} className="relative shrink-0 border border-slate-200 rounded-xl overflow-hidden shadow-sm w-[200px] h-[200px]">
+                          <img src={img} alt="Preview" className="w-full h-full object-cover" />
+                          <button 
+                            onClick={() => setNewPostImages(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute top-2 right-2 p-1.5 bg-slate-900/50 text-white hover:bg-rose-500 rounded-full transition-colors backdrop-blur-md"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
 
                 {/* Attachments list taking up bottom area */}
                 <div className="mt-auto border-t border-slate-100 bg-white shrink-0">
-                  <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleImageSelected} />
+                  <input type="file" ref={fileInputRef} hidden accept="image/*" multiple onChange={handleImageSelected} />
                   
                   {!showMoreActions ? (
                     <div className="flex items-center justify-between px-4 py-3 border border-slate-200 rounded-xl m-4 shadow-sm">

@@ -51,7 +51,20 @@ export default function Settings() {
     news: false
   });
 
+  const [profileData, setProfileData] = useState({
+    fullName: '',
+    email: '',
+    phone: ''
+  });
+
   useEffect(() => {
+    if (profile) {
+      setProfileData({
+        fullName: profile.fullName || '',
+        email: profile.email || '',
+        phone: (profile as any).phone || ''
+      });
+    }
     if (profile?.availability) {
       setAvailability({
         enabled: profile.availability.enabled ?? false,
@@ -72,6 +85,24 @@ export default function Settings() {
       });
     }
   }, [profile]);
+
+  const saveProfile = async () => {
+    if (!db || !user?.uid) return;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        fullName: profileData.fullName,
+        email: profileData.email,
+        phone: profileData.phone,
+        updatedAt: serverTimestamp()
+      });
+      toast.success('Stakeholder profile updated');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const saveAvailability = async () => {
     if (!db || !user?.uid) return;
@@ -267,15 +298,33 @@ export default function Settings() {
                      </div>
 
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <ModernInput label="Full Name" defaultValue={profile?.fullName} />
-                        <ModernInput label="Email Architecture" defaultValue={profile?.email} />
-                        <ModernInput label="Personal Identifier" placeholder="Phone Number" />
-                        <ModernInput label="Timezone Protocol" defaultValue="UTC-05:00 Eastern Time" />
+                        <ModernInput 
+                          label="Full Name" 
+                          value={profileData.fullName} 
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData(p => ({ ...p, fullName: e.target.value }))} 
+                        />
+                        <ModernInput 
+                          label="Email Architecture" 
+                          value={profileData.email} 
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData(p => ({ ...p, email: e.target.value }))} 
+                        />
+                        <ModernInput 
+                          label="Personal Identifier" 
+                          placeholder="Phone Number" 
+                          value={profileData.phone} 
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProfileData(p => ({ ...p, phone: e.target.value }))}  
+                        />
+                        <ModernInput label="Timezone Protocol" defaultValue="UTC-05:00 Eastern Time" disabled />
                      </div>
                   </div>
 
                   <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 flex justify-end">
-                     <button className="px-10 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10 active:scale-95">
+                     <button 
+                       onClick={saveProfile}
+                       disabled={isSaving}
+                       className="px-10 py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10 active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                     >
+                        {isSaving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : null}
                         Synchronize Profile
                      </button>
                   </div>

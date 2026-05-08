@@ -22,11 +22,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import { SharedPostEmbed } from '../components/PostCard';
 
 interface ChatMessage {
   id: string;
   senderId: string;
   text: string;
+  sharedPostId?: string;
   time: string;
   status: 'sent' | 'delivered' | 'read';
 }
@@ -251,6 +253,7 @@ export default function DirectMessages() {
                     id: doc.id,
                     senderId: data.senderId === user.uid ? 'me' : data.senderId,
                     text: data.text,
+                    sharedPostId: data.sharedPostId || null,
                     status: data.status,
                     time: createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 } as ChatMessage;
@@ -493,6 +496,11 @@ export default function DirectMessages() {
                           : 'bg-white text-[#111b21] rounded-2xl rounded-tl-none'
                       }`}>
                         {msg.text}
+                        {msg.sharedPostId && (
+                          <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                            <SharedPostEmbed sharedPostId={msg.sharedPostId} />
+                          </div>
+                        )}
                       </div>
                       <div className={`flex items-center gap-1.5 px-2 mt-1 ${msg.senderId === 'me' ? 'justify-end' : 'justify-start'}`}>
                         <span className="text-[10px] font-bold text-slate-400 uppercase">{msg.time}</span>
