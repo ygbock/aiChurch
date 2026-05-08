@@ -334,6 +334,8 @@
         "authorId": { "type": "string" },
         "authorName": { "type": "string" },
         "authorRole": { "type": "string" },
+        "authorDistrictId": { "type": "string", "nullable": true },
+        "authorBranchId": { "type": "string", "nullable": true },
         "authorInitials": { "type": "string" },
         "authorAvatar": { "type": "string", "nullable": true },
         "content": { "type": "string" },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 function useMediaQuery(query: string) {
@@ -16,7 +16,7 @@ function useMediaQuery(query: string) {
   return matches;
 }
 import { useNavigate, useLocation } from 'react-router-dom';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, increment, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, increment, getDoc, setDoc, deleteDoc, where, or } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 import Modal from '../components/Modal';
@@ -36,7 +36,16 @@ import {
   Search,
   MessageSquare,
   Menu,
-  X
+  X,
+  MapPin,
+  Video,
+  Camera,
+  Flag,
+  Phone,
+  Palette,
+  ChevronDown,
+  ChevronLeft,
+  Globe
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -65,6 +74,10 @@ interface Post {
 export default function CommunityFeed() {
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [posts, setPosts] = useState<Post[]>([]);
+  const [ministryChannels, setMinistryChannels] = useState<{id: string, name: string, membersCount: number}[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [friendIds, setFriendIds] = useState<string[]>([]);
+  const [friendRequests, setFriendRequests] = useState<any[]>([]);
   const [newPostContent, setNewPostContent] = useState('');
   const [privacy, setPrivacy] = useState('public');
   const [commentPrivacy, setCommentPrivacy] = useState('global');
@@ -74,6 +87,14 @@ export default function CommunityFeed() {
   const [activeMenuPostId, setActiveMenuPostId] = useState<string | null>(null);
 
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  
+  const [newPostImage, setNewPostImage] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showComposer, setShowComposer] = useState(false);
+  const [showMoreActions, setShowMoreActions] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const EMOJIS = ['😀', '😂', '😍', '🙏', '🙌', '🔥', '❤️', '🎉', '💡', '✨'];
   const [editingPostContent, setEditingPostContent] = useState('');
   const [privacyModalPost, setPrivacyModalPost] = useState<Post | null>(null);
   const [commentPrivacyModalPost, setCommentPrivacyModalPost] = useState<Post | null>(null);
@@ -82,14 +103,42 @@ export default function CommunityFeed() {
   const { user, profile } = useFirebase();
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !profile) return;
+
+    // 1. Listen for friendships (accepted and pending)
+    const friendshipsQuery = query(
+      collection(db, 'friendships'),
+      or(
+        where('user1Id', '==', user.uid),
+        where('user2Id', '==', user.uid)
+      )
+    );
+    
+    // We can't filter by `or` and `orderBy` effectively with inequality, so we just fetch all for the user
+
+    const unsubscribeFriendships = onSnapshot(friendshipsQuery, (snap) => {
+      let pending: any[] = [];
+      let friends: string[] = [];
+      
+      snap.forEach(doc => {
+        const data = doc.data();
+        if (data.status === 'accepted') {
+          friends.push(data.user1Id === user.uid ? data.user2Id : data.user1Id);
+        } else if (data.status === 'pending' && data.initiatorId !== user.uid) {
+          pending.push({ id: doc.id, ...data });
+        }
+      });
+      
+      setFriendIds(friends);
+      setFriendRequests(pending);
+    });
 
     const q = query(
       collection(db, 'communityPosts'),
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
+    const unsubscribePosts = onSnapshot(q, async (snapshot) => {
       try {
         const fetchedPosts = snapshot.docs.map(doc => {
           const data = doc.data();
@@ -111,6 +160,8 @@ export default function CommunityFeed() {
             author: { 
               name: data.authorName || 'Unknown', 
               role: data.authorRole || 'Member', 
+              districtId: data.authorDistrictId,
+              branchId: data.authorBranchId,
               initials: data.authorInitials || '?',
               avatar: data.authorAvatar
             },
@@ -156,8 +207,45 @@ export default function CommunityFeed() {
       handleFirestoreError(error, OperationType.LIST, 'communityPosts');
     });
 
-    return () => unsubscribe();
-  }, [user]);
+    const unsubscribeMinistryChannels = onSnapshot(query(collection(db, 'ministryChannels'), orderBy('createdAt', 'desc')), (snap) => {
+      setMinistryChannels(snap.docs.map(d => ({ id: d.id, name: d.data().name, membersCount: d.data().membersCount || 0 })).slice(0, 4));
+    }, (error) => {
+      // safe fallback
+      console.warn("Could not load ministryChannels in widget", error);
+    });
+
+    return () => {
+      unsubscribePosts();
+      unsubscribeFriendships();
+      unsubscribeMinistryChannels();
+    };
+  }, [user, profile]);
+
+  // Determine visibility of posts based on friendIds and privacy settings
+  const visiblePosts = posts.filter(post => {
+    if (post.authorId === user?.uid) return true; // Always see my own posts
+    
+    switch (post.privacy) {
+      case 'public':
+        return true;
+      case 'district':
+        return post.author.districtId === profile?.districtId;
+      case 'branch':
+        return post.author.branchId === profile?.branchId;
+      case 'friends':
+        return friendIds.includes(post.authorId);
+      case 'only_me':
+        return false;
+      default:
+        return true;
+    }
+  }).filter(post => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return post.content.toLowerCase().includes(term) || 
+           post.author.name.toLowerCase().includes(term) || 
+           post.tags?.some(t => t.toLowerCase().includes(term));
+  });
 
   const handleLike = async (postId: string) => {
     if (!user) return;
@@ -197,21 +285,72 @@ export default function CommunityFeed() {
     }
   };
 
+  const handleImageSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image is too large. Please select an image under 2MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // compress
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        setNewPostImage(dataUrl);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPostContent.trim() || !user || !profile || isSubmitting) return;
+    if (!newPostContent.trim() && !newPostImage) return;
+    if (!user || !profile || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
       const initials = profile.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
+      const extractedTags = newPostContent.match(/#\w+/g)?.map(t => t.substring(1).toLowerCase()) || [];
       
       await addDoc(collection(db, 'communityPosts'), {
         authorId: user.uid,
         authorName: profile.fullName,
         authorRole: profile.role || 'Member',
+        authorDistrictId: profile.districtId || null,
+        authorBranchId: profile.branchId || null,
         authorInitials: initials,
         authorAvatar: user.photoURL || null,
         content: newPostContent,
+        image: newPostImage || null,
+        tags: extractedTags,
         likes: 0,
         commentsCount: 0,
         privacy,
@@ -222,6 +361,10 @@ export default function CommunityFeed() {
       });
       
       setNewPostContent('');
+      setNewPostImage(null);
+      setShowEmojiPicker(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      
       toast.success('Post shared with the community!');
     } catch (error) {
       toast.error('Failed to create post. Please try again.');
@@ -272,6 +415,30 @@ export default function CommunityFeed() {
     }
   };
 
+  const handleAcceptFriendRequest = async (requestId: string) => {
+    try {
+      await updateDoc(doc(db, 'friendships', requestId), {
+        status: 'accepted',
+        updatedAt: serverTimestamp()
+      });
+      toast.success('Friend request accepted');
+    } catch (error) {
+       handleFirestoreError(error, OperationType.UPDATE, 'friendships');
+    }
+  };
+
+  const handleRejectFriendRequest = async (requestId: string) => {
+    try {
+      await updateDoc(doc(db, 'friendships', requestId), {
+        status: 'rejected',
+        updatedAt: serverTimestamp()
+      });
+      toast.success('Friend request removed');
+    } catch (error) {
+       handleFirestoreError(error, OperationType.UPDATE, 'friendships');
+    }
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -309,53 +476,48 @@ export default function CommunityFeed() {
       </div>
 
       <div className="max-w-3xl mx-auto space-y-6">
+        <div className="relative mb-6">
+          <input 
+            type="text" 
+            placeholder="Search feed..." 
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-2xl py-3 pl-12 pr-4 text-sm font-medium outline-none transition-all shadow-sm"
+          />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          {searchTerm && (
+            <button 
+              onClick={() => setSearchTerm('')}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+
         {/* Main Feed */}
         <div className="space-y-6">
-          {/* Create Post */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-            <div className="flex gap-4">
-              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold overflow-hidden shrink-0">
-                {user?.photoURL ? (
-                  <img src={user.photoURL} alt={profile?.fullName || ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  profile?.fullName ? profile.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : 'ME'
-                )}
-              </div>
-              <div className="flex-1">
-                <textarea 
-                  value={newPostContent}
-                  onChange={(e) => setNewPostContent(e.target.value)}
-                  placeholder="Share a word of encouragement or a prayer request..."
-                  className="w-full border-none focus:ring-0 text-slate-700 bg-slate-50 rounded-xl p-4 min-h-[100px] resize-none text-sm font-medium placeholder:text-slate-400"
-                />
-                <div className="mt-4 flex items-center justify-between">
-                  <div className="flex gap-1">
-                    <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
-                      <ImageIcon size={20} />
-                    </button>
-                    <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
-                      <Hash size={20} />
-                    </button>
-                    <button className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
-                      <Smile size={20} />
-                    </button>
-                  </div>
-                  <button 
-                    onClick={handlePostSubmit}
-                    disabled={!newPostContent.trim() || isSubmitting}
-                    className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {isSubmitting ? 'Posting...' : 'Post'} <Send size={16} />
-                  </button>
-                </div>
-              </div>
+          {/* Create Post Entry */}
+          <div className="flex gap-3 sm:gap-4 items-center mb-6">
+            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold overflow-hidden shrink-0">
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt={profile?.fullName || ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                profile?.fullName ? profile.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : 'ME'
+              )}
             </div>
+            <button 
+              onClick={() => setShowComposer(true)}
+              className="flex-1 bg-white border border-slate-200 shadow-sm hover:bg-slate-50 text-slate-500 text-left rounded-full px-4 py-3 text-sm font-medium transition-colors"
+            >
+              What's on your mind?
+            </button>
           </div>
 
           {/* Feed Posts */}
           <div className="space-y-6">
             <AnimatePresence>
-              {posts.map((post) => (
+              {visiblePosts.map((post) => (
                 <motion.article 
                   key={post.id}
                   layout
@@ -530,50 +692,75 @@ export default function CommunityFeed() {
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Trending in Community</h3>
             </div>
             <div className="space-y-4">
-              {[
-                { label: 'SundayService', posts: '1.2k' },
-                { label: 'SpringRetreat24', posts: '850' },
-                { label: 'YouthNight', posts: '420' },
-                { label: 'WorshipTeam', posts: '310' }
-              ].map(topic => (
-                <div key={topic.label} className="group cursor-pointer">
-                  <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">#{topic.label}</p>
-                  <p className="text-[10px] text-slate-400 font-medium">{topic.posts} posts</p>
-                </div>
-              ))}
+              {(() => {
+                const tagCounts: Record<string, number> = {};
+                posts.forEach(p => {
+                  p.tags?.forEach(tag => {
+                    tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+                  });
+                });
+                const trendingTags = Object.entries(tagCounts)
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 5);
+                
+                if (trendingTags.length === 0) {
+                  return <p className="text-xs font-medium text-slate-500">No trending topics yet</p>;
+                }
+                return trendingTags.map(([label, count]) => (
+                  <div key={label} className="group cursor-pointer" onClick={() => setSearchTerm(label)}>
+                    <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">#{label}</p>
+                    <p className="text-[10px] text-slate-400 font-medium">{count} posts</p>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
 
-          {/* New Members */}
+          {/* Friend Requests / Connections */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
             <div className="flex items-center gap-2 mb-6">
               <UserPlus className="text-emerald-500" size={18} />
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Suggested Connections</h3>
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                {friendRequests.length > 0 ? 'Friend Requests' : 'Suggested Connections'}
+              </h3>
             </div>
             <div className="space-y-4">
-              {[
-                { name: 'Michael Chen', role: 'New Member', initials: 'MC' },
-                { name: 'Grace Adebayo', role: 'Protocol Team', initials: 'GA' }
-              ].map(member => (
-                <div key={member.name} className="flex justify-between items-center group">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-[10px] font-bold">
-                      {member.initials}
+              {friendRequests.length > 0 ? (
+                 friendRequests.map(req => (
+                   <FriendRequestItem 
+                     key={req.id} 
+                     request={req} 
+                     onAccept={() => handleAcceptFriendRequest(req.id)}
+                     onReject={() => handleRejectFriendRequest(req.id)}
+                   />
+                 ))
+              ) : (
+                [
+                  { name: 'Michael Chen', role: 'New Member', initials: 'MC' },
+                  { name: 'Grace Adebayo', role: 'Protocol Team', initials: 'GA' }
+                ].map(member => (
+                  <div key={member.name} className="flex justify-between items-center group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-[10px] font-bold">
+                        {member.initials}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{member.name}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">{member.role}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{member.name}</p>
-                      <p className="text-[10px] text-slate-400 font-medium">{member.role}</p>
-                    </div>
+                    <button onClick={() => navigate('/directory')} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
+                      <UserPlus size={16} />
+                    </button>
                   </div>
-                  <button className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
-                    <UserPlus size={16} />
-                  </button>
-                </div>
-              ))}
+                ))
+              )}
             </div>
-            <button className="w-full mt-6 py-2 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-all">
-              View All Members
-            </button>
+            {friendRequests.length === 0 && (
+              <button onClick={() => navigate('/directory')} className="w-full mt-6 py-2 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-all">
+                Find Friends in Directory
+              </button>
+            )}
           </div>
 
           {/* Ministry Channels Widget */}
@@ -591,28 +778,25 @@ export default function CommunityFeed() {
               </button>
             </div>
             <div className="space-y-3">
-              {[
-                { name: 'Announcements', count: 0 },
-                { name: 'WorshipTeam', count: 2 },
-                { name: 'YouthMinistry', count: 0 },
-                { name: 'Volunteers', count: 1 }
-              ].map(channel => (
+              {ministryChannels.length > 0 ? ministryChannels.map(channel => (
                 <div 
-                  key={channel.name} 
-                  onClick={() => navigate('/ministry-channels')}
+                  key={channel.id} 
+                  onClick={() => navigate(`/ministry-channels?channel=${channel.id}`)}
                   className="flex items-center justify-between group cursor-pointer p-2 hover:bg-slate-50 rounded-xl transition-all"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-slate-400 font-medium group-hover:text-indigo-600">#</span>
                     <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900">{channel.name}</span>
                   </div>
-                  {channel.count > 0 && (
-                    <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
-                      {channel.count}
+                  {channel.membersCount > 0 && (
+                    <span className="bg-indigo-100 text-indigo-600 text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                      {channel.membersCount}
                     </span>
                   )}
                 </div>
-              ))}
+              )) : (
+                <p className="text-xs text-slate-500 font-medium pb-2">No channels yet.</p>
+              )}
             </div>
           </div>
 
@@ -700,6 +884,187 @@ export default function CommunityFeed() {
           ))}
         </div>
       </Modal>
+
+      <AnimatePresence>
+        {showComposer && (
+          <div className="fixed inset-0 z-[100] flex flex-col bg-white sm:bg-slate-900/40 sm:p-4 sm:backdrop-blur-sm sm:items-center sm:justify-center">
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="w-full h-full sm:h-auto sm:max-w-xl sm:rounded-2xl bg-white shadow-2xl flex flex-col overflow-hidden relative sm:max-h-[85vh] sm:min-h-[600px]"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100 shrink-0">
+                <button onClick={() => setShowComposer(false)} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors sm:hidden">
+                  <ChevronLeft size={24} />
+                </button>
+                <button onClick={() => setShowComposer(false)} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors hidden sm:block">
+                  <X size={24} />
+                </button>
+                <span className="text-sm font-semibold text-slate-900 absolute left-1/2 -translate-x-1/2">Create post</span>
+                <button 
+                  onClick={(e) => {
+                    handlePostSubmit(e as any);
+                    if ((newPostContent.trim() || newPostImage) && !isSubmitting) {
+                      setShowComposer(false);
+                    }
+                  }}
+                  disabled={(!newPostContent.trim() && !newPostImage) || isSubmitting}
+                  className="px-4 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-500 hover:bg-indigo-700 transition-colors"
+                >
+                  {isSubmitting ? 'Posting...' : 'Post'}
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto w-full flex flex-col relative pb-safe">
+                {/* User Info & Privacy */}
+                <div className="px-4 py-3 flex gap-3 pb-0 shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm border border-slate-200 object-cover">
+                    {user?.photoURL ? (
+                      <img src={user.photoURL} alt={profile?.fullName || ''} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      profile?.fullName ? profile.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : 'ME'
+                    )}
+                  </div>
+                  <div>
+                    <span className="block text-sm font-bold text-slate-900">{profile?.fullName || 'User'}</span>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <button className="flex items-center gap-1.5 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md text-[11px] font-bold">
+                        <Globe size={12} /> Public <ChevronDown size={12} />
+                      </button>
+                      <button className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors rounded-md text-[11px] font-bold">
+                        <Camera size={12} /> Off <ChevronDown size={12} />
+                      </button>
+                      <button className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors rounded-md text-[11px] font-bold">
+                        <Sparkles size={12} /> AI label off <ChevronDown size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Text Area */}
+                <div className="px-4 pt-4 flex-1 flex flex-col min-h-0">
+                  <textarea 
+                    value={newPostContent}
+                    onChange={(e) => setNewPostContent(e.target.value)}
+                    placeholder="What's on your mind?"
+                    className="flex-1 w-full border-none focus:ring-0 text-slate-800 bg-transparent p-0 text-xl md:text-2xl font-medium placeholder:text-slate-400 resize-none min-h-[120px]"
+                  />
+                  {newPostImage && (
+                    <div className="relative mt-2 inline-block mb-4 shrink-0 border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                      <img src={newPostImage} alt="Preview" className="w-full rounded-xl object-cover max-h-[300px]" />
+                      <button 
+                        onClick={() => { setNewPostImage(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                        className="absolute top-2 right-2 p-2 bg-slate-900/50 text-white hover:bg-rose-500 rounded-full transition-colors backdrop-blur-md"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Attachments list taking up bottom area */}
+                <div className="mt-auto border-t border-slate-100 bg-white shrink-0">
+                  <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleImageSelected} />
+                  
+                  {!showMoreActions ? (
+                    <div className="flex items-center justify-between px-4 py-3 border border-slate-200 rounded-xl m-4 shadow-sm">
+                      <span className="text-sm font-semibold text-slate-700">Add to your post</span>
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        <button onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-emerald-500 hover:text-emerald-600">
+                          <ImageIcon size={24} />
+                        </button>
+                        <button className="p-2 hover:bg-slate-100 rounded-full transition-colors text-blue-500 hover:text-blue-600 hidden sm:block">
+                          <UserPlus size={24} />
+                        </button>
+                        <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-amber-500 hover:text-amber-600 hidden sm:block">
+                          <Smile size={24} />
+                        </button>
+                        <button onClick={() => setShowMoreActions(true)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-600">
+                          <MoreHorizontal size={24} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col">
+                      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100 sticky top-0 bg-white z-10 shadow-sm">
+                        <span className="text-sm font-semibold text-slate-700">Add to your post</span>
+                        <button onClick={() => setShowMoreActions(false)} className="p-1 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
+                           <ChevronDown size={20} />
+                        </button>
+                      </div>
+                      <div className="divide-y divide-slate-50 overflow-y-auto max-h-[40vh] sm:max-h-none">
+                        <button onClick={() => { fileInputRef.current?.click(); setShowMoreActions(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                            <ImageIcon className="text-emerald-500 shrink-0" size={24} />
+                            <span className="text-sm font-semibold text-slate-700">Photo/video</span>
+                        </button>
+                        <button onClick={() => setShowMoreActions(false)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                            <UserPlus className="text-blue-500 shrink-0" size={24} />
+                            <span className="text-sm font-semibold text-slate-700">Tag people</span>
+                        </button>
+                        <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowMoreActions(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors relative">
+                            <Smile className="text-amber-500 shrink-0" size={24} />
+                            <span className="text-sm font-semibold text-slate-700">Feeling/activity</span>
+                        </button>
+                        <button onClick={() => setShowMoreActions(false)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                            <MapPin className="text-rose-500 shrink-0" size={24} />
+                            <span className="text-sm font-semibold text-slate-700">Check in</span>
+                        </button>
+                        <button onClick={() => setShowMoreActions(false)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                            <Video className="text-rose-500 shrink-0" size={24} />
+                            <span className="text-sm font-semibold text-slate-700">Live video</span>
+                        </button>
+                        <button onClick={() => setShowMoreActions(false)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                            <Palette className="text-emerald-400 shrink-0" size={24} />
+                            <span className="text-sm font-semibold text-slate-700">Background color</span>
+                        </button>
+                        <button onClick={() => setShowMoreActions(false)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                            <Camera className="text-blue-500 shrink-0" size={24} />
+                            <span className="text-sm font-semibold text-slate-700">Camera</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Emoji Picker absolute overlay */}
+              <AnimatePresence>
+                {showEmojiPicker && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 grid grid-cols-5 gap-2 z-[110] w-[300px]"
+                  >
+                    {EMOJIS.map(emoji => (
+                      <button 
+                        key={emoji}
+                        onClick={() => {
+                          setNewPostContent(prev => prev + emoji);
+                          setShowEmojiPicker(false);
+                        }}
+                        className="w-12 h-12 flex items-center justify-center text-3xl hover:bg-slate-50 rounded-lg transition-all"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                    <button 
+                      onClick={() => setShowEmojiPicker(false)}
+                      className="col-span-5 w-full mt-2 py-2 text-sm font-bold text-slate-500 hover:text-slate-700 bg-slate-50 rounded-xl transition-all"
+                    >
+                      Close
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -864,6 +1229,44 @@ function PostComments({ postId }: { postId: string }) {
             )}
           </AnimatePresence>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function FriendRequestItem({ request, onAccept, onReject }: { request: any, onAccept: () => void, onReject: () => void }) {
+  const [userData, setUserData] = useState<any>(null);
+
+  useEffect(() => {
+    getDoc(doc(db, 'users', request.initiatorId)).then(snap => {
+      if (snap.exists()) setUserData(snap.data());
+    });
+  }, [request.initiatorId]);
+
+  if (!userData) return null;
+
+  return (
+    <div className="flex justify-between items-center group">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 text-[10px] font-bold overflow-hidden">
+          {userData.photoUrl ? (
+            <img src={userData.photoUrl} alt={userData.fullName} className="w-full h-full object-cover" />
+          ) : (
+            userData.fullName.substring(0, 2).toUpperCase()
+          )}
+        </div>
+        <div>
+          <p className="text-xs font-bold text-slate-900 line-clamp-1">{userData.fullName}</p>
+          <p className="text-[10px] text-slate-400 font-medium">{userData.role || 'Member'}</p>
+        </div>
+      </div>
+      <div className="flex gap-1">
+        <button onClick={onAccept} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Accept">
+          <UserPlus size={16} />
+        </button>
+        <button onClick={onReject} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Reject">
+          <X size={16} />
+        </button>
       </div>
     </div>
   );

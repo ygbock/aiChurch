@@ -373,9 +373,11 @@ service cloud.firestore {
              data.commentsCount is number && data.commentsCount == 0 &&
              data.createdAt == request.time &&
              (!('authorRole' in data) || data.authorRole is string) &&
+             (!('authorDistrictId' in data) || data.authorDistrictId is string || data.authorDistrictId == null) &&
+             (!('authorBranchId' in data) || data.authorBranchId is string || data.authorBranchId == null) &&
              (!('authorInitials' in data) || data.authorInitials is string) &&
              (!('authorAvatar' in data) || (data.authorAvatar is string || data.authorAvatar == null)) &&
-             (!('image' in data) || data.image is string) &&
+             (!('image' in data) || data.image is string || data.image == null) &&
              (!('tags' in data) || data.tags is list) &&
              (!('privacy' in data) || data.privacy in ['public', 'district', 'branch', 'friends', 'only_me']) &&
              (!('commentPrivacy' in data) || data.commentPrivacy in ['global', 'district', 'branch', 'friends']) &&
