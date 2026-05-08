@@ -11,6 +11,10 @@
         "role": { "type": "string", "enum": ["superadmin", "admin", "district", "member"] },
         "districtId": { "type": "string", "description": "Required if role is district" },
         "branchId": { "type": "string", "description": "Required if role is admin or member" },
+        "maritalStatus": { "type": "string" },
+        "position": { "type": "string" },
+        "department": { "type": "string" },
+        "photoUrl": { "type": "string" },
         "availability": {
           "type": "object",
           "properties": {

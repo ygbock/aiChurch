@@ -25,6 +25,7 @@ interface UserProfile {
     events: boolean;
     news: boolean;
   };
+  visibility?: 'public' | 'district' | 'branch' | 'private';
 }
 
 interface FirebaseContextType {

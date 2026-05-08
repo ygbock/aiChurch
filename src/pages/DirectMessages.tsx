@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, orderBy, getDoc, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 import { 
@@ -21,7 +21,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 
 interface ChatMessage {
   id: string;
@@ -51,15 +51,81 @@ interface Chat {
   messages: ChatMessage[];
 }
 
+declare global {
+  interface Window {
+    userCache?: Record<string, any>;
+  }
+}
+
 export default function DirectMessages() {
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const { chatId } = useParams();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const toUserId = searchParams.get('to');
+  
+  const [activeChatId, setActiveChatId] = useState<string | null>(chatId || null);
   const [chats, setChats] = useState<Chat[]>([]);
+  const [messagesByChat, setMessagesByChat] = useState<Record<string, ChatMessage[]>>({});
   const [messageText, setMessageText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isInitializingChat, setIsInitializingChat] = useState(!!toUserId);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useFirebase();
+
+  useEffect(() => {
+    setActiveChatId(chatId || null);
+  }, [chatId]);
+
+  // Handle ?to= user resolving
+  useEffect(() => {
+    if (!user || !toUserId) return;
+    
+    let isMounted = true;
+    const initializeChatWithUser = async () => {
+      try {
+        // Find existing chat
+        const q = query(
+          collection(db, 'directMessageChats'),
+          where('participants', 'array-contains', user.uid)
+        );
+        const snap = await getDocs(q);
+        let foundChatId = null;
+        snap.forEach(doc => {
+          const data = doc.data();
+          if (data.participants.includes(toUserId) && data.participants.length === 2 && !data.isGroup) {
+            foundChatId = doc.id;
+          }
+        });
+
+        if (foundChatId) {
+          if (isMounted) {
+            navigate(`/direct-messages/${foundChatId}`, { replace: true });
+          }
+        } else {
+          // Create new
+          const newChat = await addDoc(collection(db, 'directMessageChats'), {
+              participants: [user.uid, toUserId],
+              lastMessage: '',
+              lastMessageTime: serverTimestamp(),
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+          });
+          if (isMounted) {
+            navigate(`/direct-messages/${newChat.id}`, { replace: true });
+          }
+        }
+      } catch (error) {
+        console.error("Failed to initialize chat:", error);
+      } finally {
+        if (isMounted) setIsInitializingChat(false);
+      }
+    };
+    
+    initializeChatWithUser();
+    
+    return () => { isMounted = false; }
+  }, [user, toUserId, navigate]);
 
   const activeChat = chats.find(c => c.id === activeChatId);
 
@@ -76,12 +142,57 @@ export default function DirectMessages() {
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
         try {
-            // Need to fetch other user profiles but for demo we will create placeholder users based on participants
-            const loadedChats = snapshot.docs.map(doc => {
-                const data = doc.data();
+            const newUsersToFetch = new Set<string>();
+            const currentChats = snapshot.docs.map(docSnapshot => {
+                const data = docSnapshot.data();
+                const otherParticipantId = data.participants.find((p: string) => p !== user.uid) || 'unknown';
+                if (otherParticipantId !== 'unknown' && !window.userCache?.[otherParticipantId]) {
+                    newUsersToFetch.add(otherParticipantId);
+                }
+                return { id: docSnapshot.id, data, otherParticipantId };
+            });
+
+            if (!window.userCache) {
+                 window.userCache = {};
+            }
+
+            if (newUsersToFetch.size > 0) {
+                 await Promise.all(Array.from(newUsersToFetch).map(async (uid) => {
+                     try {
+                         const userDoc = await getDoc(doc(db, 'users', uid));
+                         if (userDoc.exists()) {
+                             window.userCache[uid] = userDoc.data();
+                         }
+                     } catch (e) {
+                         console.error(e);
+                     }
+                 }));
+            }
+
+            const loadedChats = currentChats.map(({ id, data, otherParticipantId }) => {
                  const createdAt = data.createdAt ? data.createdAt.toDate() : new Date();
                  const updatedAt = data.updatedAt ? data.updatedAt.toDate() : createdAt;
-                 const otherParticipantId = data.participants.find((p: string) => p !== user.uid) || 'unknown';
+                 
+                 let otherUser = {
+                     id: otherParticipantId,
+                     name: 'Unknown User',
+                     role: 'Member',
+                     initials: '?',
+                     status: 'offline',
+                     avatar: undefined
+                 };
+                 
+                 if (otherParticipantId !== 'unknown' && window.userCache[otherParticipantId]) {
+                     const userData = window.userCache[otherParticipantId];
+                     otherUser = {
+                         id: otherParticipantId,
+                         name: userData.fullName || 'Unknown User',
+                         role: userData.role || 'Member',
+                         initials: userData.fullName ? userData.fullName.split(' ').map((n:string)=>n[0]).join('').substring(0,2).toUpperCase() : '?',
+                         status: 'online',
+                         avatar: userData.photoUrl
+                     };
+                 }
                 
                  let timeString = '';
                  const diffInMinutes = Math.floor((new Date().getTime() - updatedAt.getTime()) / 60000);
@@ -90,22 +201,29 @@ export default function DirectMessages() {
                  else timeString = 'Yesterday';
 
                 return {
-                    id: doc.id,
+                    id: id,
                     participants: data.participants,
                     lastMessage: data.lastMessage || 'Start a conversation',
                     lastMessageTime: data.lastMessageTime ? data.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }) : timeString,
                     unreadCount: 0,
-                    user: {
-                         id: otherParticipantId,
-                         name: 'Demo User',
-                         role: 'Member',
-                         initials: 'DU',
-                         status: 'online'
-                    },
-                    messages: []
-                } as Chat;
+                    user: otherUser,
+                    messages: [],
+                    _updatedAt: updatedAt.getTime()
+                } as Chat & { _updatedAt: number };
             });
-            setChats(loadedChats);
+            
+            // Sort chats by updatedAt
+            loadedChats.sort((a, b) => b._updatedAt - a._updatedAt);
+            
+            setChats(prev => {
+                return loadedChats.map(newChat => {
+                    const existingChat = prev.find(p => p.id === newChat.id);
+                    if (existingChat) {
+                        return { ...newChat, messages: existingChat.messages };
+                    }
+                    return newChat;
+                });
+            });
         } catch(error) {
             handleFirestoreError(error, OperationType.LIST, 'directMessageChats');
         }
@@ -138,11 +256,9 @@ export default function DirectMessages() {
                 } as ChatMessage;
             });
 
-            setChats(prev => prev.map(chat => {
-                if (chat.id === activeChatId) {
-                    return { ...chat, messages: fetchedMessages };
-                }
-                return chat;
+            setMessagesByChat(prev => ({
+                ...prev,
+                [activeChatId]: fetchedMessages
             }));
             
             // Mark non-me messages as read
@@ -261,14 +377,18 @@ export default function DirectMessages() {
           {chats.map(chat => (
             <button
               key={chat.id}
-              onClick={() => setActiveChatId(chat.id)}
+              onClick={() => navigate(`/direct-messages/${chat.id}`)}
               className={`w-full flex items-start gap-3 p-4 transition-all hover:bg-slate-50 text-left relative ${
                 activeChatId === chat.id ? 'bg-indigo-50/50 border-r-2 border-indigo-600' : ''
               }`}
             >
               <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold border border-slate-200 group-hover:scale-105 transition-transform">
-                  {chat.user.initials}
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold border border-slate-200 group-hover:scale-105 transition-transform overflow-hidden">
+                  {chat.user.avatar ? (
+                    <img src={chat.user.avatar} alt={chat.user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    chat.user.initials
+                  )}
                 </div>
                 <div className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${
                   chat.user.status === 'online' ? 'bg-emerald-500' : 
@@ -302,14 +422,18 @@ export default function DirectMessages() {
             <div className="h-16 lg:h-20 px-4 lg:px-8 border-b border-slate-100 flex justify-between items-center bg-white shrink-0 shadow-sm z-10">
               <div className="flex items-center gap-2 lg:gap-4">
                 <button 
-                  onClick={() => setActiveChatId(null)}
+                  onClick={() => navigate('/direct-messages')}
                   className="lg:hidden p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-colors -ml-2"
                 >
                   <ArrowLeft size={20} />
                 </button>
                 <div className="relative">
-                  <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-slate-100 flex items-center justify-center text-indigo-600 font-bold shadow-sm">
-                    {activeChat.user.initials}
+                  <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-slate-100 flex items-center justify-center text-indigo-600 font-bold shadow-sm overflow-hidden border border-slate-200">
+                    {activeChat.user.avatar ? (
+                      <img src={activeChat.user.avatar} alt={activeChat.user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (    
+                      activeChat.user.initials
+                    )}
                   </div>
                   <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 border-2 border-white rounded-full ${
                     activeChat.user.status === 'online' ? 'bg-emerald-500' : 
@@ -347,15 +471,19 @@ export default function DirectMessages() {
                 </span>
               </div>
 
-              {activeChat.messages.map((msg) => (
+              {(messagesByChat[activeChatId!] || []).map((msg) => (
                 <div 
                   key={msg.id} 
                   className={`flex ${msg.senderId === 'me' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`flex gap-3 max-w-[75%] ${msg.senderId === 'me' ? 'flex-row-reverse' : ''}`}>
                     {msg.senderId !== 'me' && (
-                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0">
-                        {activeChat.user.initials}
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0 overflow-hidden">
+                        {activeChat.user.avatar ? (
+                          <img src={activeChat.user.avatar} alt={activeChat.user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          activeChat.user.initials
+                        )}
                       </div>
                     )}
                     <div className="flex flex-col gap-1">
@@ -435,6 +563,17 @@ export default function DirectMessages() {
               </form>
             </div>
           </>
+        ) : activeChatId ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center h-full relative">
+            <button 
+              onClick={() => navigate('/direct-messages')}
+              className="lg:hidden absolute top-4 left-4 p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-slate-500 text-sm font-medium">Loading conversation...</p>
+          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">

@@ -506,7 +506,7 @@ export default function MemberPortal() {
             <h3 className="text-sm font-bold text-slate-900 mb-4">Quick Links</h3>
             <div className="grid grid-cols-2 gap-3">
               <QuickLink icon={<Users size={16} />} label="Directory" onClick={() => navigate('/directory')} />
-              <QuickLink icon={<MessageSquare size={16} />} label="Signals" onClick={() => navigate('/messages')} />
+              <QuickLink icon={<MessageSquare size={16} />} label="Signals" onClick={() => navigate('/direct-messages')} />
               <QuickLink icon={<Heart size={16} />} label="Give" />
               <QuickLink icon={<Clock size={16} />} label="History" />
               <QuickLink icon={<MapPin size={16} />} label="Branches" />

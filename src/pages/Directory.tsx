@@ -248,7 +248,7 @@ function DirectoryCard({ entry }: { entry: DirectoryEntry }) {
     try {
       // Check if chat already exists
       const q = query(
-        collection(db, 'chats'),
+        collection(db, 'directMessageChats'),
         where('participants', 'array-contains', user.uid)
       );
       
@@ -258,17 +258,17 @@ function DirectoryCard({ entry }: { entry: DirectoryEntry }) {
       );
 
       if (existingChat) {
-        navigate(`/messages/${existingChat.id}`);
+        navigate(`/direct-messages/${existingChat.id}`);
       } else {
         // Create new chat
-        const newChat = await addDoc(collection(db, 'chats'), {
+        const newChat = await addDoc(collection(db, 'directMessageChats'), {
           participants: [user.uid, entry.id],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           lastMessage: 'Conversation started',
-          lastMessageAt: serverTimestamp()
+          lastMessageTime: serverTimestamp()
         });
-        navigate(`/messages/${newChat.id}`);
+        navigate(`/direct-messages/${newChat.id}`);
       }
     } catch (error) {
       console.error("Connect error:", error);

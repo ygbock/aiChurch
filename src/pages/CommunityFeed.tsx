@@ -45,7 +45,8 @@ import {
   Palette,
   ChevronDown,
   ChevronLeft,
-  Globe
+  Globe,
+  AtSign
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -57,6 +58,8 @@ interface Post {
     role: string;
     avatar?: string;
     initials: string;
+    districtId?: string;
+    branchId?: string;
   };
   content: string;
   image?: string;
@@ -528,15 +531,23 @@ export default function CommunityFeed() {
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex gap-3 items-center">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 font-bold overflow-hidden shrink-0">
+                        <button 
+                          onClick={() => navigate(`/community-profile/${post.authorId}`)}
+                          className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 font-bold overflow-hidden shrink-0 hover:ring-2 hover:ring-indigo-600 hover:ring-offset-2 transition-all cursor-pointer"
+                        >
                           {post.author.avatar ? (
                             <img src={post.author.avatar} alt={post.author.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           ) : (
                             post.author.initials
                           )}
-                        </div>
+                        </button>
                         <div>
-                          <h4 className="text-sm font-bold text-slate-900">{post.author.name}</h4>
+                          <button 
+                            onClick={() => navigate(`/community-profile/${post.authorId}`)}
+                            className="text-sm font-bold text-slate-900 hover:text-indigo-600 transition-colors text-left"
+                          >
+                            {post.author.name}
+                          </button>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{post.author.role} • {post.time}</p>
                         </div>
                       </div>
@@ -931,15 +942,21 @@ export default function CommunityFeed() {
                   <div>
                     <span className="block text-sm font-bold text-slate-900">{profile?.fullName || 'User'}</span>
                     <div className="flex flex-wrap gap-2 mt-1">
-                      <button className="flex items-center gap-1.5 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md text-[11px] font-bold">
-                        <Globe size={12} /> Public <ChevronDown size={12} />
-                      </button>
-                      <button className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors rounded-md text-[11px] font-bold">
-                        <Camera size={12} /> Off <ChevronDown size={12} />
-                      </button>
-                      <button className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors rounded-md text-[11px] font-bold">
-                        <Sparkles size={12} /> AI label off <ChevronDown size={12} />
-                      </button>
+                      <div className="relative">
+                        <select 
+                          value={privacy}
+                          onChange={(e) => setPrivacy(e.target.value)}
+                          className="pl-6 pr-6 py-1 bg-indigo-50 text-indigo-700 rounded-md text-[11px] font-bold appearance-none border-none focus:ring-0 cursor-pointer"
+                        >
+                          <option value="public">Public</option>
+                          <option value="district">District</option>
+                          <option value="branch">Branch</option>
+                          <option value="friends">Friends Only</option>
+                          <option value="only_me">Only Me</option>
+                        </select>
+                        <Globe size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-indigo-700 pointer-events-none" />
+                        <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-700 pointer-events-none" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -976,6 +993,12 @@ export default function CommunityFeed() {
                         <button onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-emerald-500 hover:text-emerald-600">
                           <ImageIcon size={24} />
                         </button>
+                        <button onClick={() => setNewPostContent(prev => prev + '@')} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-blue-500 hover:text-blue-600 hidden sm:block">
+                          <AtSign size={24} />
+                        </button>
+                        <button onClick={() => setNewPostContent(prev => prev + '#')} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-indigo-500 hover:text-indigo-600 hidden sm:block">
+                          <Hash size={24} />
+                        </button>
                         <button className="p-2 hover:bg-slate-100 rounded-full transition-colors text-blue-500 hover:text-blue-600 hidden sm:block">
                           <UserPlus size={24} />
                         </button>
@@ -999,6 +1022,14 @@ export default function CommunityFeed() {
                         <button onClick={() => { fileInputRef.current?.click(); setShowMoreActions(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
                             <ImageIcon className="text-emerald-500 shrink-0" size={24} />
                             <span className="text-sm font-semibold text-slate-700">Photo/video</span>
+                        </button>
+                        <button onClick={() => { setNewPostContent(prev => prev + '@'); setShowMoreActions(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                            <AtSign className="text-blue-500 shrink-0" size={24} />
+                            <span className="text-sm font-semibold text-slate-700">Mention people</span>
+                        </button>
+                        <button onClick={() => { setNewPostContent(prev => prev + '#'); setShowMoreActions(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                            <Hash className="text-indigo-500 shrink-0" size={24} />
+                            <span className="text-sm font-semibold text-slate-700">Hashtag</span>
                         </button>
                         <button onClick={() => setShowMoreActions(false)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
                             <UserPlus className="text-blue-500 shrink-0" size={24} />
@@ -1096,6 +1127,7 @@ function PostComments({ postId }: { postId: string }) {
 
           return {
             id: doc.id,
+            authorId: data.authorId,
             author: { 
               name: data.authorName || 'Unknown', 
               initials: data.authorInitials || '?',
@@ -1273,6 +1305,7 @@ function FriendRequestItem({ request, onAccept, onReject }: { request: any, onAc
 }
 
 function CommentItem({ postId, comment, user, onReply }: any) {
+  const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
   const [likes, setLikes] = useState(comment.likes || 0);
   const [replies, setReplies] = useState<any[]>([]);
@@ -1296,6 +1329,7 @@ function CommentItem({ postId, comment, user, onReply }: any) {
 
         return {
           id: doc.id,
+          authorId: data.authorId,
           author: { name: data.authorName, initials: data.authorInitials, avatar: data.authorAvatar },
           content: data.content,
           time: timeString
@@ -1330,17 +1364,25 @@ function CommentItem({ postId, comment, user, onReply }: any) {
 
   return (
     <div className="flex gap-3">
-      <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold overflow-hidden shrink-0">
+      <button 
+        onClick={() => navigate(`/community-profile/${comment.authorId}`)}
+        className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold overflow-hidden shrink-0 hover:ring-2 hover:ring-indigo-600 transition-all cursor-pointer"
+      >
         {comment.author.avatar ? (
           <img src={comment.author.avatar} alt={comment.author.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
         ) : (
           comment.author.initials
         )}
-      </div>
+      </button>
       <div className="flex-1">
         <div className="bg-slate-50 rounded-2xl rounded-tl-none p-3 pb-3">
           <div className="flex items-baseline justify-between mb-1">
-            <span className="text-sm font-bold text-slate-900">{comment.author.name}</span>
+            <button 
+              onClick={() => navigate(`/community-profile/${comment.authorId}`)}
+              className="text-sm font-bold text-slate-900 hover:text-indigo-600 transition-colors"
+            >
+              {comment.author.name}
+            </button>
             <span className="text-[10px] font-bold text-slate-400">{comment.time}</span>
           </div>
           <p className="text-sm text-slate-700">{comment.content}</p>
@@ -1366,17 +1408,25 @@ function CommentItem({ postId, comment, user, onReply }: any) {
           <div className="mt-3 space-y-3 pl-3 sm:pl-4 border-l-2 border-slate-100">
             {replies.map(reply => (
               <div key={reply.id} className="flex gap-2.5">
-                <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold overflow-hidden shrink-0">
+                <button 
+                  onClick={() => navigate(`/community-profile/${reply.authorId}`)}
+                  className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold overflow-hidden shrink-0 hover:ring-2 hover:ring-indigo-600 transition-all cursor-pointer"
+                >
                   {reply.author.avatar ? (
                     <img src={reply.author.avatar} alt={reply.author.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
                     reply.author.initials
                   )}
-                </div>
+                </button>
                 <div className="flex-1">
                   <div className="bg-slate-50 rounded-2xl rounded-tl-none p-2.5 pb-2.5">
                     <div className="flex items-baseline justify-between mb-0.5">
-                      <span className="text-sm font-bold text-slate-900">{reply.author.name}</span>
+                      <button 
+                        onClick={() => navigate(`/community-profile/${reply.authorId}`)}
+                        className="text-sm font-bold text-slate-900 hover:text-indigo-600 transition-colors"
+                      >
+                        {reply.author.name}
+                      </button>
                       <span className="text-[10px] font-bold text-slate-400">{reply.time}</span>
                     </div>
                     <p className="text-sm text-slate-700">{reply.content}</p>

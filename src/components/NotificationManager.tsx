@@ -154,7 +154,7 @@ export default function NotificationManager() {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'modified') {
           const chat = change.doc.data();
-          const lastMsgAt = chat.lastMessageAt?.toDate();
+          const lastMsgAt = chat.lastMessageTime?.toDate();
           
           // Only notify if message is recent (within last 10 seconds) and not from current user
           if (lastMsgAt && (new Date().getTime() - lastMsgAt.getTime()) < 10000) {
@@ -173,7 +173,7 @@ export default function NotificationManager() {
                 icon: <MessageSquare size={16} />,
                 action: {
                   label: 'Reply',
-                  onClick: () => navigate(`/messages/${change.doc.id}`)
+                  onClick: () => navigate(`/direct-messages/${change.doc.id}`)
                 }
               });
               

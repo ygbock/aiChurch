@@ -22,6 +22,7 @@ import Settings from './pages/Settings';
 import BibleSchool from './pages/BibleSchool';
 import CommunicationHub from './pages/CommunicationHub';
 import CommunityFeed from './pages/CommunityFeed';
+import PublicUserProfile from './pages/PublicUserProfile';
 import MinistryChannels from './pages/MinistryChannels';
 import DirectMessages from './pages/DirectMessages';
 import CMS from './pages/CMS';
@@ -40,7 +41,6 @@ import DepartmentMemberProfile from './pages/DepartmentMemberProfile';
 import AdminRegistration from './pages/AdminRegistration';
 import ProgramDashboard from './pages/ProgramDashboard';
 import Directory from './pages/Directory';
-import Messages from './pages/Messages';
 import BaptismManagement from './pages/BaptismManagement';
 import BaptismInterviewPanel from './pages/BaptismInterviewPanel';
 import { FirebaseProvider } from './components/FirebaseProvider';
@@ -94,16 +94,16 @@ export default function App() {
             <Route path="baptism/interviews" element={<BaptismInterviewPanel />} />
             <Route path="communication" element={<CommunicationHub />} />
             <Route path="community-feed" element={<CommunityFeed />} />
+            <Route path="community-profile/:userId" element={<PublicUserProfile />} />
             <Route path="ministry-channels" element={<MinistryChannels />} />
             <Route path="direct-messages" element={<DirectMessages />} />
+            <Route path="direct-messages/:chatId" element={<DirectMessages />} />
             <Route path="cms" element={<CMS />} />
             <Route path="volunteers" element={<Volunteers />} />
             <Route path="rosters" element={<Rosters />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="transfers" element={<TransferManagement />} />
             <Route path="directory" element={<Directory />} />
-            <Route path="messages" element={<Messages />} />
-            <Route path="messages/:chatId" element={<Messages />} />
             <Route path="superadmin" element={<SuperadminDashboard />} />
             <Route path="system-alerts" element={<SystemAlerts />} />
             <Route path="member-portal" element={<MemberPortal />} />

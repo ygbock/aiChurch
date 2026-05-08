@@ -15,7 +15,6 @@ export const auth = getAuth(app);
 
 // Enable Firestore persistence for offline support
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 }, firebaseConfig.firestoreDatabaseId);
 
