@@ -1,13 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { doc, getDoc, updateDoc, deleteDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, increment, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, increment, setDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 import Modal from '../components/Modal';
 import { ShareModal } from '../components/ShareModal';
-import { Heart, MessageCircle, Share2, MoreHorizontal, Image as ImageIcon, Smile, Send, X } from 'lucide-react';
+import { Heart, MessageCircle, Share2, MoreHorizontal, Image as ImageIcon, Smile, Send, X, Bookmark } from 'lucide-react';
 import { toast } from 'sonner';
+import { ImageViewer } from './ImageViewer';
+
+const URL_OR_MENTION_REGEX = /(https?:\/\/[^\s]+|@[a-zA-Z0-9_.-]+)/g;
+
+function Linkify({ text }: { text: string }) {
+  const parts = text.split(URL_OR_MENTION_REGEX);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.match(/https?:\/\/[^\s]+/)) {
+          return (
+            <a 
+              key={i} 
+              href={part} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-indigo-600 hover:text-indigo-800 underline break-all"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {part}
+            </a>
+          );
+        } else if (part.match(/@[a-zA-Z0-9_.-]+/)) {
+          return (
+            <span 
+              key={i} 
+              className="text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); toast('Mention clicked! (Profile view coming soon)'); }}
+            >
+              {part}
+            </span>
+          );
+        }
+        return part;
+      })}
+    </>
+  );
+}
 
 export interface Post {
   id: string;
@@ -31,13 +69,85 @@ export interface Post {
   tags?: string[];
   privacy?: string;
   commentPrivacy?: string;
-  isPinned?: boolean;
+  pinnedBy?: string[];
   hiddenBy?: string[];
+  bookmarkedBy?: string[];
+  gifUrl?: string;
+  poll?: {
+    question: string;
+    options: {
+      id: string;
+      text: string;
+      voterIds: string[];
+    }[];
+  };
+  reports?: any[];
+}
+
+function ImageGrid({ images, onImageClick, compact }: { images: string[], onImageClick: (idx: number) => void, compact?: boolean }) {
+  if (!images || images.length === 0) return null;
+  const containerClass = `grid gap-1 rounded-xl overflow-hidden border border-slate-100 cursor-pointer bg-slate-100 ${compact ? 'max-h-48' : 'max-h-[600px]'} mt-3`;
+  
+  if (images.length === 1) {
+    return (
+      <div 
+        onClick={(e) => { e.stopPropagation(); onImageClick(0); }} 
+        className={`w-full rounded-xl overflow-hidden border border-slate-100 mt-3 flex items-center justify-center bg-black cursor-pointer ${compact ? 'max-h-48' : 'max-h-[600px]'}`}
+      >
+        <img src={images[0]} alt="Post content" className={`w-full object-contain ${compact ? 'max-h-48' : 'max-h-[600px]'}`} />
+      </div>
+    );
+  }
+  
+  if (images.length === 2) {
+    return (
+      <div className={`${containerClass} grid-cols-2`}>
+        {images.map((img, idx) => (
+          <div key={idx} onClick={(e) => { e.stopPropagation(); onImageClick(idx); }} className="aspect-square bg-slate-200">
+            <img src={img} className="w-full h-full object-cover" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (images.length === 3) {
+    return (
+      <div className={`${containerClass} grid-cols-2`}>
+        <div onClick={(e) => { e.stopPropagation(); onImageClick(0); }} className="row-span-2 bg-slate-200 h-full">
+          <img src={images[0]} className="w-full h-full object-cover" />
+        </div>
+        <div onClick={(e) => { e.stopPropagation(); onImageClick(1); }} className="aspect-square bg-slate-200">
+          <img src={images[1]} className="w-full h-full object-cover" />
+        </div>
+        <div onClick={(e) => { e.stopPropagation(); onImageClick(2); }} className="aspect-square bg-slate-200">
+          <img src={images[2]} className="w-full h-full object-cover" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${containerClass} grid-cols-2`}>
+      {images.slice(0, 4).map((img, idx) => (
+        <div key={idx} onClick={(e) => { e.stopPropagation(); onImageClick(idx); }} className="aspect-square bg-slate-200 relative">
+          <img src={img} className="w-full h-full object-cover" />
+          {images.length > 4 && idx === 3 && (
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white text-2xl font-bold">
+              +{images.length - 4}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function SharedPostEmbed({ sharedPostId }: { sharedPostId: string }) {
   const [post, setPost] = useState<Post | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -123,21 +233,22 @@ export function SharedPostEmbed({ sharedPostId }: { sharedPostId: string }) {
         </div>
       </div>
       <p className="text-slate-700 text-sm leading-relaxed max-w-full break-words whitespace-pre-wrap line-clamp-4">
-        {post.content}
+        <Linkify text={post.content} />
       </p>
-      {post.images && post.images.length > 0 ? (
-        <div className="mt-3 flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-          {post.images.map((img, idx) => (
-            <div key={idx} className="shrink-0 w-full snap-center rounded-lg overflow-hidden border border-slate-100 max-h-48 relative flex items-center justify-center bg-black">
-              <img src={img} alt="Shared post content" className="w-full h-full object-contain" />
-            </div>
-          ))}
-        </div>
-      ) : post.image ? (
-        <div className="mt-3 rounded-lg overflow-hidden border border-slate-100 max-h-48 relative flex items-center justify-center bg-black">
-          <img src={post.image} alt="Shared post content" className="w-full h-full object-contain" />
-        </div>
-      ) : null}
+      
+      <ImageGrid 
+        images={post.images && post.images.length > 0 ? post.images : (post.image ? [post.image] : [])} 
+        onImageClick={(idx) => { setViewerIndex(idx); setViewerOpen(true); }}
+        compact={true}
+      />
+
+      <ImageViewer 
+        images={post.images && post.images.length > 0 ? post.images : (post.image ? [post.image] : [])} 
+        currentIndex={viewerIndex} 
+        isOpen={viewerOpen} 
+        onClose={() => setViewerOpen(false)} 
+        onIndexChange={setViewerIndex} 
+      />
     </div>
   );
 }
@@ -155,20 +266,48 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
-export function PostCard({ post, onLike }: { post: Post, onLike?: (postId: string) => void }) {
+export function PostCard({ post, onLike, onTagClick }: { post: Post, onLike?: (postId: string) => void, onTagClick?: (tag: string) => void }) {
   const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 768px)');
   const { user } = useFirebase();
   const [activeMenu, setActiveMenu] = useState(false);
   const [activeComments, setActiveComments] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
   const [likes, setLikes] = useState(post.likes);
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
+  const [isBookmarked, setIsBookmarked] = useState<boolean>(post.bookmarkedBy?.includes(user?.uid || '') || false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [isReporting, setIsReporting] = useState(false);
 
   useEffect(() => {
     setLikes(post.likes);
     setIsLiked(post.isLiked || false);
-  }, [post.likes, post.isLiked]);
+    setIsBookmarked(post.bookmarkedBy?.includes(user?.uid || '') || false);
+  }, [post.likes, post.isLiked, post.bookmarkedBy, user?.uid]);
+
+  const handleBookmark = async () => {
+    if (!user) return;
+    const isCurrentlyBookmarked = isBookmarked;
+    setIsBookmarked(!isCurrentlyBookmarked);
+    
+    try {
+      const postRef = doc(db, 'communityPosts', post.id);
+      await updateDoc(postRef, {
+        bookmarkedBy: isCurrentlyBookmarked ? arrayRemove(user.uid) : arrayUnion(user.uid)
+      });
+      if (isCurrentlyBookmarked) {
+        toast.success("Post removed from saved");
+      } else {
+        toast.success("Post saved");
+      }
+    } catch (error) {
+      setIsBookmarked(isCurrentlyBookmarked);
+      handleFirestoreError(error, OperationType.UPDATE, 'communityPosts');
+    }
+  };
 
   const handleLikeLocal = async () => {
     if (onLike) {
@@ -247,7 +386,8 @@ export function PostCard({ post, onLike }: { post: Post, onLike?: (postId: strin
                   <PostMenuContent 
                     post={post} 
                     user={user} 
-                    onClose={() => setActiveMenu(false)} 
+                    onClose={() => setActiveMenu(false)}
+                    onReport={() => setIsReportModalOpen(true)}
                   />
                 </motion.div>
               )}
@@ -260,31 +400,96 @@ export function PostCard({ post, onLike }: { post: Post, onLike?: (postId: strin
             <PostMenuContent 
               post={post} 
               user={user} 
-              onClose={() => setActiveMenu(false)} 
+              onClose={() => setActiveMenu(false)}
+              onReport={() => setIsReportModalOpen(true)}
             />
           </div>
         </Modal>
 
         <p className="text-slate-700 text-sm leading-relaxed mb-4 break-words whitespace-pre-wrap">
-          {post.content}
+          <Linkify text={post.content} />
         </p>
 
-        {post.images && post.images.length > 0 ? (
-          <div className="mb-4 flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
-            {post.images.map((img, idx) => (
-              <div key={idx} className="shrink-0 w-full sm:w-[85%] snap-center rounded-xl border border-slate-100 overflow-hidden max-h-[600px] flex items-center justify-center bg-black">
-                <img src={img} alt="Post content" className="w-full h-full object-contain" />
-              </div>
-            ))}
+        <ImageGrid 
+          images={post.images && post.images.length > 0 ? post.images : (post.image ? [post.image] : [])} 
+          onImageClick={(idx) => { setViewerIndex(idx); setViewerOpen(true); }}
+        />
+
+        {post.gifUrl && (
+          <div className="mb-4 rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+            <img src={post.gifUrl} alt="GIF" className="w-full max-h-[400px] object-contain" referrerPolicy="no-referrer" />
           </div>
-        ) : post.image ? (
-          <div className="mb-4 rounded-xl overflow-hidden border border-slate-100 max-h-[600px] flex items-center justify-center bg-black">
-            <img src={post.image} alt="Post content" className="w-full h-full object-contain" />
+        )}
+
+        {post.poll && (
+          <div className="mb-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <h4 className="font-bold text-slate-800 mb-3">{post.poll.question}</h4>
+            <div className="space-y-2">
+              {post.poll.options.map((opt) => {
+                const totalVotes = post.poll!.options.reduce((sum, o) => sum + (o.voterIds?.length || 0), 0);
+                const hasVotedAny = user && post.poll!.options.some(o => o.voterIds?.includes(user.uid));
+                const isVoted = user && opt.voterIds?.includes(user.uid);
+                const percent = totalVotes > 0 ? Math.round(((opt.voterIds?.length || 0) / totalVotes) * 100) : 0;
+                return (
+                  <button
+                    key={opt.id}
+                    disabled={!user}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!user) return;
+                      // Determine if user already voted in this poll
+                      const userVotedOptId = post.poll!.options.find(o => o.voterIds?.includes(user.uid))?.id;
+                      if (userVotedOptId && userVotedOptId !== opt.id) {
+                         toast.error('You have already voted in this poll.');
+                         return;
+                      }
+                      
+                      try {
+                        const newOptions = post.poll!.options.map(o => {
+                          if (o.id === opt.id) {
+                            const newVoterIds = isVoted 
+                              ? (o.voterIds || []).filter(id => id !== user.uid)
+                              : [...(o.voterIds || []), user.uid];
+                            return { ...o, voterIds: newVoterIds };
+                          }
+                          return o;
+                        });
+                        
+                        await updateDoc(doc(db, 'communityPosts', post.id), {
+                          poll: {
+                            question: post.poll!.question,
+                            options: newOptions
+                          }
+                        });
+                      } catch (error) {
+                        toast.error('Failed to register vote.');
+                        handleFirestoreError(error, OperationType.UPDATE, 'communityPosts');
+                      }
+                    }}
+                    className={`relative w-full overflow-hidden flex items-center justify-between p-3 rounded-lg border ${isVoted ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-200 bg-white hover:border-slate-300'} transition-all`}
+                  >
+                    {hasVotedAny && (
+                      <div 
+                        className={`absolute left-0 top-0 bottom-0 ${isVoted ? 'bg-indigo-100' : 'bg-slate-100'} transition-all duration-500`} 
+                        style={{ width: `${percent}%` }}
+                      />
+                    )}
+                    <span className={`relative z-10 font-semibold ${isVoted ? 'text-indigo-900' : 'text-slate-700'}`}>{opt.text}</span>
+                    {hasVotedAny && (
+                      <span className="relative z-10 text-xs font-bold text-slate-500">{percent}%</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-xs text-slate-400 font-medium">
+               {post.poll!.options.reduce((sum, o) => sum + (o.voterIds?.length || 0), 0)} votes
+            </p>
           </div>
-        ) : null}
+        )}
 
         {post.sharedPostId && (
-          <div className="mb-4">
+          <div className="mb-4 relative">
             <SharedPostEmbed sharedPostId={post.sharedPostId} />
           </div>
         )}
@@ -292,12 +497,24 @@ export function PostCard({ post, onLike }: { post: Post, onLike?: (postId: strin
         {post.tags && (
           <div className="flex flex-wrap gap-2 mb-4">
             {post.tags.map(tag => (
-              <span key={tag} className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">
+              <span 
+                key={tag} 
+                onClick={(e) => { e.stopPropagation(); onTagClick?.(tag); }}
+                className={`text-[10px] font-bold ${onTagClick ? 'cursor-pointer hover:bg-indigo-100 transition-colors' : ''} text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full`}
+              >
                 #{tag}
               </span>
             ))}
           </div>
         )}
+
+        <ImageViewer 
+          images={post.images && post.images.length > 0 ? post.images : (post.image ? [post.image] : [])} 
+          currentIndex={viewerIndex} 
+          isOpen={viewerOpen} 
+          onClose={() => setViewerOpen(false)} 
+          onIndexChange={setViewerIndex} 
+        />
 
         <div className="flex items-center gap-6 pt-4 border-t border-slate-50">
           <button 
@@ -321,6 +538,13 @@ export function PostCard({ post, onLike }: { post: Post, onLike?: (postId: strin
             <Share2 size={18} />
             Share
           </button>
+          <button 
+            onClick={handleBookmark}
+            className={`flex items-center gap-2 text-xs font-bold transition-all ${isBookmarked ? 'text-amber-500' : 'text-slate-500 hover:text-amber-500'}`}
+          >
+            <Bookmark size={18} fill={isBookmarked ? "currentColor" : "none"} />
+            Save
+          </button>
         </div>
       </div>
       
@@ -337,31 +561,87 @@ export function PostCard({ post, onLike }: { post: Post, onLike?: (postId: strin
         onClose={() => setIsShareModalOpen(false)}
         post={post}
       />
+
+      <Modal
+        isOpen={isReportModalOpen}
+        onClose={() => {
+          setIsReportModalOpen(false);
+          setReportReason('');
+        }}
+        title="Report Post"
+      >
+        <div className="space-y-4 pt-4 text-left">
+          <p className="text-sm text-slate-600">Please provide a reason for reporting this post.</p>
+          <textarea
+            value={reportReason}
+            onChange={(e) => setReportReason(e.target.value)}
+            className="w-full h-32 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-100 focus:border-rose-500 transition-all resize-none text-sm"
+            placeholder="What's wrong with this post?"
+          />
+          <div className="flex gap-3 justify-end mt-6">
+            <button
+              onClick={() => {
+                setIsReportModalOpen(false);
+                setReportReason('');
+              }}
+              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              disabled={isReporting || !reportReason.trim()}
+              onClick={async () => {
+                if (!user || !reportReason.trim()) return;
+                setIsReporting(true);
+                try {
+                  const postRef = doc(db, 'communityPosts', post.id);
+                  await updateDoc(postRef, {
+                    reports: arrayUnion({ uid: user.uid, reason: reportReason.trim(), reportedAt: new Date().toISOString() })
+                  });
+                  toast.success('Post reported to moderators');
+                  setIsReportModalOpen(false);
+                  setReportReason('');
+                } catch (error) {
+                  toast.error('Failed to submit report');
+                  handleFirestoreError(error, OperationType.UPDATE, 'communityPosts');
+                } finally {
+                  setIsReporting(false);
+                }
+              }}
+              className="px-6 py-2 bg-rose-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-rose-700 disabled:opacity-50 transition-colors"
+            >
+              {isReporting ? 'Submitting...' : 'Submit Report'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </motion.article>
   );
 }
 
-function PostMenuContent({ post, user, onClose, onEditPost, onEditPrivacy, onEditCommentPrivacy }: any) {
+function PostMenuContent({ post, user, onClose, onEditPost, onEditPrivacy, onEditCommentPrivacy, onReport }: any) {
+  const isPinned = user && post.pinnedBy?.includes(user.uid);
   return (
     <div className="flex flex-col">
+      <button 
+        onClick={async () => {
+          onClose();
+          if (!user) return;
+          try {
+            await updateDoc(doc(db, 'communityPosts', post.id), {
+              pinnedBy: isPinned ? arrayRemove(user.uid) : arrayUnion(user.uid)
+            });
+            toast.success(isPinned ? 'Post unpinned' : 'Post pinned to top');
+          } catch(e) {
+            toast.error('Failed to pin post');
+          }
+        }}
+        className="w-full text-left px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100"
+      >
+        {isPinned ? 'Unpin Post' : 'Pin Post'}
+      </button>
       {user?.uid === post.authorId ? (
         <>
-          <button 
-            onClick={async () => {
-              onClose();
-              try {
-                await updateDoc(doc(db, 'communityPosts', post.id), {
-                  isPinned: !post.isPinned
-                });
-                toast.success(post.isPinned ? 'Post unpinned' : 'Post pinned to top');
-              } catch(e) {
-                toast.error('Failed to pin post');
-              }
-            }}
-            className="w-full text-left px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100"
-          >
-            {post.isPinned ? 'Unpin Post' : 'Pin Post'}
-          </button>
           <button 
             onClick={async () => {
               onClose();
@@ -408,7 +688,7 @@ function PostMenuContent({ post, user, onClose, onEditPost, onEditPrivacy, onEdi
           <button 
             onClick={() => {
               onClose();
-              toast.success('Post reported to moderators');
+              if (onReport) onReport();
             }}
             className="w-full text-left px-4 py-3 text-sm font-bold text-rose-600 hover:bg-rose-50 transition-colors"
           >

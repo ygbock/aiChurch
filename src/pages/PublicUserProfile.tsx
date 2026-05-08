@@ -20,6 +20,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 import { toast } from 'sonner';
 import { PostCard } from '../components/PostCard';
+import { ImageViewer } from '../components/ImageViewer';
 
 export default function PublicUserProfile() {
   const { userId } = useParams();
@@ -33,6 +34,12 @@ export default function PublicUserProfile() {
   const [recentPosts, setRecentPosts] = useState<any[]>([]);
   const [friendsList, setFriendsList] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'posts' | 'pictures' | 'friends'>('posts');
+
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const allImages = React.useMemo(() => {
+    return recentPosts.flatMap(post => post.images && post.images.length > 0 ? post.images : (post.image ? [post.image] : []));
+  }, [recentPosts]);
 
   useEffect(() => {
     if (!userId) return;
@@ -472,16 +479,13 @@ export default function PublicUserProfile() {
 
               {activeTab === 'pictures' && (
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                   {recentPosts.filter(p => !!p.image || (p.images && p.images.length > 0)).length > 0 ? (
+                   {allImages.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                         {recentPosts.filter(p => !!p.image || (p.images && p.images.length > 0)).flatMap(post => {
-                            const imgs = post.images && post.images.length > 0 ? post.images : (post.image ? [post.image] : []);
-                            return imgs.map((img, idx) => (
-                              <div key={`pic-${post.id}-${idx}`} className="aspect-square rounded-xl overflow-hidden shadow-sm border border-slate-100 bg-slate-50 group relative cursor-pointer" onClick={() => setActiveTab('posts')}>
-                                 <img src={img} alt="Post image" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                              </div>
-                            ));
-                         })}
+                         {allImages.map((img, idx) => (
+                           <div key={`pic-${idx}`} className="aspect-square rounded-xl overflow-hidden shadow-sm border border-slate-100 bg-slate-50 group relative cursor-pointer" onClick={() => { setViewerIndex(idx); setViewerOpen(true); }}>
+                              <img src={img} alt="Post image" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                           </div>
+                         ))}
                       </div>
                    ) : (
                       <div className="text-center py-8">
@@ -550,6 +554,14 @@ export default function PublicUserProfile() {
         </div>
 
       </div>
+      
+      <ImageViewer 
+        images={allImages}
+        currentIndex={viewerIndex}
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        onIndexChange={setViewerIndex}
+      />
     </div>
   );
 }

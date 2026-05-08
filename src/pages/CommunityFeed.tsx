@@ -48,7 +48,9 @@ import {
   ChevronDown,
   ChevronLeft,
   Globe,
-  AtSign
+  AtSign,
+  BarChart2,
+  Film
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -72,8 +74,21 @@ interface Post {
   tags?: string[];
   privacy?: string;
   commentPrivacy?: string;
-  isPinned?: boolean;
+  pinnedBy?: string[];
   hiddenBy?: string[];
+  bookmarkedBy?: string[];
+  sharedPostId?: string;
+  images?: string[];
+  gifUrl?: string;
+  poll?: {
+    question: string;
+    options: {
+      id: string;
+      text: string;
+      voterIds: string[];
+    }[];
+  };
+  reports?: any[];
 }
 
 export default function CommunityFeed() {
@@ -81,6 +96,7 @@ export default function CommunityFeed() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [ministryChannels, setMinistryChannels] = useState<{id: string, name: string, membersCount: number}[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [friendIds, setFriendIds] = useState<string[]>([]);
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
   const [newPostContent, setNewPostContent] = useState('');
@@ -88,6 +104,7 @@ export default function CommunityFeed() {
   const [commentPrivacy, setCommentPrivacy] = useState('global');
   const [showWidgets, setShowWidgets] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeFeedTab, setActiveFeedTab] = useState<'feed' | 'saved'>('feed');
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
   const [activeSharePost, setActiveSharePost] = useState<Post | null>(null);
   const [activeMenuPostId, setActiveMenuPostId] = useState<string | null>(null);
@@ -104,6 +121,12 @@ export default function CommunityFeed() {
   const [editingPostContent, setEditingPostContent] = useState('');
   const [privacyModalPost, setPrivacyModalPost] = useState<Post | null>(null);
   const [commentPrivacyModalPost, setCommentPrivacyModalPost] = useState<Post | null>(null);
+  
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState([{id: '1', text: ''}, {id: '2', text: ''}]);
+  const [showPollBuilder, setShowPollBuilder] = useState(false);
+  const [gifUrl, setGifUrl] = useState('');
+  const [showGifPicker, setShowGifPicker] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, profile } = useFirebase();
@@ -193,20 +216,26 @@ export default function CommunityFeed() {
             sharedPostId: data.sharedPostId || null,
             likes: data.likes || 0,
             commentsCount: data.commentsCount || 0,
+            bookmarkedBy: data.bookmarkedBy || [],
+            gifUrl: data.gifUrl,
+            poll: data.poll,
+            reports: data.reports || [],
             time: timeString,
             tags: data.tags,
             privacy: data.privacy || 'public',
             commentPrivacy: data.commentPrivacy || 'global',
-            isPinned: data.isPinned || false,
+            pinnedBy: data.pinnedBy || [],
             hiddenBy: data.hiddenBy || [],
             isLiked: false, 
           } as Post;
         }).filter(post => !post.hiddenBy?.includes(user!.uid));
         
-        // Sort by isPinned and then let createdAt handle rest
+        // Sort by pinnedBy for current user and then let createdAt handle rest
         fetchedPosts.sort((a, b) => {
-          if (a.isPinned && !b.isPinned) return -1;
-          if (!a.isPinned && b.isPinned) return 1;
+          const aPinned = a.pinnedBy?.includes(user?.uid || '');
+          const bPinned = b.pinnedBy?.includes(user?.uid || '');
+          if (aPinned && !bPinned) return -1;
+          if (!aPinned && bPinned) return 1;
           return 0; // Already sorted by date
         });
         
@@ -247,6 +276,10 @@ export default function CommunityFeed() {
 
   // Determine visibility of posts based on friendIds and privacy settings
   const visiblePosts = posts.filter(post => {
+    if (activeFeedTab === 'saved') {
+      return post.bookmarkedBy?.includes(user?.uid || '') || false;
+    }
+
     if (post.authorId === user?.uid) return true; // Always see my own posts
     
     switch (post.privacy) {
@@ -264,6 +297,9 @@ export default function CommunityFeed() {
         return true;
     }
   }).filter(post => {
+    if (selectedTag) {
+      if (!post.tags?.includes(selectedTag)) return false;
+    }
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return post.content.toLowerCase().includes(term) || 
@@ -374,7 +410,8 @@ export default function CommunityFeed() {
 
   const handlePostSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPostContent.trim() && newPostImages.length === 0) return;
+    const hasPoll = showPollBuilder && pollQuestion.trim() && pollOptions.some(o => o.text.trim());
+    if (!newPostContent.trim() && newPostImages.length === 0 && !gifUrl && !hasPoll) return;
     if (!user || !profile || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -382,7 +419,7 @@ export default function CommunityFeed() {
       const initials = profile.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
       const extractedTags = newPostContent.match(/#\w+/g)?.map(t => t.substring(1).toLowerCase()) || [];
       
-      await addDoc(collection(db, 'communityPosts'), {
+      const newPostData: any = {
         authorId: user.uid,
         authorName: profile.fullName,
         authorRole: profile.role || 'Member',
@@ -396,15 +433,34 @@ export default function CommunityFeed() {
         tags: extractedTags,
         likes: 0,
         commentsCount: 0,
+        bookmarkedBy: [],
         privacy,
         commentPrivacy,
-        isPinned: false,
+        pinnedBy: [],
         hiddenBy: [],
         createdAt: serverTimestamp()
-      });
+      };
+      
+      if (gifUrl) newPostData.gifUrl = gifUrl;
+      if (hasPoll) {
+        newPostData.poll = {
+          question: pollQuestion.trim(),
+          options: pollOptions.filter(o => o.text.trim()).map(o => ({
+            id: o.id,
+            text: o.text.trim(),
+            voterIds: []
+          }))
+        };
+      }
+
+      await addDoc(collection(db, 'communityPosts'), newPostData);
       
       setNewPostContent('');
       setNewPostImages([]);
+      setGifUrl('');
+      setShowPollBuilder(false);
+      setPollQuestion('');
+      setPollOptions([{id: '1', text: ''}, {id: '2', text: ''}]);
       setShowEmojiPicker(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       
@@ -537,6 +593,18 @@ export default function CommunityFeed() {
             </button>
           )}
         </div>
+        
+        {selectedTag && (
+          <div className="flex items-center gap-2 mb-6">
+            <span className="text-sm font-medium text-slate-600">Showing posts tagged in:</span>
+            <span className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full">
+              #{selectedTag}
+              <button onClick={() => setSelectedTag(null)} className="hover:text-indigo-900 focus:outline-none ml-1">
+                <X size={14} />
+              </button>
+            </span>
+          </div>
+        )}
 
         {/* Main Feed */}
         <div className="space-y-6">
@@ -560,11 +628,32 @@ export default function CommunityFeed() {
             </button>
           </div>
 
+          <div className="flex border-b border-slate-200 mb-6">
+            <button 
+              onClick={() => setActiveFeedTab('feed')}
+              className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 ${activeFeedTab === 'feed' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Feed
+            </button>
+            <button 
+              onClick={() => setActiveFeedTab('saved')}
+              className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 ${activeFeedTab === 'saved' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Saved Posts
+            </button>
+          </div>
+
           {/* Feed Posts */}
           <div className="space-y-6">
+            {visiblePosts.length === 0 && activeFeedTab === 'saved' && (
+              <div className="bg-white rounded-2xl border border-slate-200 py-12 text-center text-slate-500 shadow-sm">
+                 <p className="font-semibold mb-1">No saved posts yet</p>
+                 <p className="text-sm">Posts you save will appear here.</p>
+              </div>
+            )}
             <AnimatePresence>
               {visiblePosts.map((post) => (
-                <PostCard key={post.id} post={post} onLike={handleLike} />
+                <PostCard key={post.id} post={post} onLike={handleLike} onTagClick={setSelectedTag} />
               ))}
             </AnimatePresence>
             
@@ -644,8 +733,8 @@ export default function CommunityFeed() {
                   return <p className="text-xs font-medium text-slate-500">No trending topics yet</p>;
                 }
                 return trendingTags.map(([label, count]) => (
-                  <div key={label} className="group cursor-pointer" onClick={() => setSearchTerm(label)}>
-                    <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">#{label}</p>
+                  <div key={label} className="group cursor-pointer" onClick={() => setSelectedTag(label)}>
+                    <p className={`text-xs font-bold ${selectedTag === label ? 'text-indigo-600' : 'text-slate-900 group-hover:text-indigo-600'} transition-colors`}>#{label}</p>
                     <p className="text-[10px] text-slate-400 font-medium">{count} posts</p>
                   </div>
                 ));
@@ -844,11 +933,12 @@ export default function CommunityFeed() {
                 <button 
                   onClick={(e) => {
                     handlePostSubmit(e as any);
-                    if ((newPostContent.trim() || newPostImages.length > 0) && !isSubmitting) {
+                    const hasPoll = showPollBuilder && pollQuestion.trim() && pollOptions.some(o => o.text.trim());
+                    if ((newPostContent.trim() || newPostImages.length > 0 || gifUrl || hasPoll) && !isSubmitting) {
                       setShowComposer(false);
                     }
                   }}
-                  disabled={(!newPostContent.trim() && newPostImages.length === 0) || isSubmitting}
+                  disabled={(!newPostContent.trim() && newPostImages.length === 0 && !gifUrl && !(showPollBuilder && pollQuestion.trim() && pollOptions.some(o => o.text.trim()))) || isSubmitting}
                   className="px-4 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg disabled:opacity-50 disabled:bg-slate-200 disabled:text-slate-500 hover:bg-indigo-700 transition-colors"
                 >
                   {isSubmitting ? 'Posting...' : 'Post'}
@@ -910,6 +1000,94 @@ export default function CommunityFeed() {
                       ))}
                     </div>
                   )}
+
+                  {gifUrl && (
+                    <div className="relative mb-4 rounded-xl overflow-hidden shadow-sm inline-block max-h-[300px]">
+                      <img src={gifUrl} alt="GIF Preview" className="h-full object-contain" referrerPolicy="no-referrer" />
+                      <button 
+                        onClick={() => setGifUrl('')}
+                        className="absolute top-2 right-2 p-1.5 bg-slate-900/50 text-white hover:bg-rose-500 rounded-full transition-colors backdrop-blur-md"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  {showPollBuilder && (
+                    <div className="mb-4 bg-slate-50 border border-slate-200 p-4 rounded-xl relative">
+                      <button 
+                        onClick={() => setShowPollBuilder(false)}
+                        className="absolute top-2 right-2 p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                      <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><BarChart2 size={16} /> Create a Poll</h4>
+                      <input 
+                        type="text" 
+                        placeholder="Ask a question..."
+                        value={pollQuestion}
+                        onChange={e => setPollQuestion(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 mb-3"
+                      />
+                      <div className="space-y-2">
+                        {pollOptions.map((opt, idx) => (
+                          <div key={opt.id} className="flex items-center gap-2">
+                            <input 
+                              type="text" 
+                              placeholder={`Option ${idx + 1}`}
+                              value={opt.text}
+                              onChange={e => {
+                                const newOpts = [...pollOptions];
+                                newOpts[idx].text = e.target.value;
+                                setPollOptions(newOpts);
+                              }}
+                              className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500"
+                            />
+                            {pollOptions.length > 2 && (
+                              <button 
+                                onClick={() => setPollOptions(pollOptions.filter(o => o.id !== opt.id))}
+                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                              >
+                                <X size={16} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {pollOptions.length < 5 && (
+                        <button 
+                          onClick={() => setPollOptions([...pollOptions, { id: Date.now().toString(), text: '' }])}
+                          className="mt-3 text-sm font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          + Add Option
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {showGifPicker && (
+                    <div className="mb-4 bg-white border border-slate-200 p-2 rounded-xl shadow-lg relative h-64 overflow-y-auto w-full max-w-sm">
+                      <div className="flex items-center justify-between px-2 pb-2 border-b border-slate-50 mb-2 sticky top-0 bg-white z-10">
+                        <span className="text-sm font-bold text-slate-700">Select a GIF</span>
+                        <button onClick={() => setShowGifPicker(false)} className="text-slate-400 hover:text-rose-500"><X size={16}/></button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 p-1">
+                        {[
+                          'https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif',
+                          'https://media.giphy.com/media/3o7TKDk86TFSsdzyeI/giphy.gif',
+                          'https://media.giphy.com/media/l0HlOBZcl7mqLmsUg/giphy.gif',
+                          'https://media.giphy.com/media/26FPJGjhefSJuarhC/giphy.gif',
+                          'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif',
+                          'https://media.giphy.com/media/l41lFw057lAJQMwg0/giphy.gif'
+                        ].map((url, i) => (
+                          <div key={i} onClick={() => { setGifUrl(url); setShowGifPicker(false); setShowComposer(true); }} className="h-24 bg-slate-100 rounded cursor-pointer overflow-hidden relative group">
+                             <img src={url} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                             <div className="absolute inset-0 bg-indigo-600/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Attachments list taking up bottom area */}
@@ -934,6 +1112,12 @@ export default function CommunityFeed() {
                         </button>
                         <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-amber-500 hover:text-amber-600 hidden sm:block">
                           <Smile size={24} />
+                        </button>
+                        <button onClick={() => setShowPollBuilder(!showPollBuilder)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-purple-500 hover:text-purple-600 hidden sm:block">
+                          <BarChart2 size={24} />
+                        </button>
+                        <button onClick={() => setShowGifPicker(!showGifPicker)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-cyan-500 hover:text-cyan-600 hidden sm:block">
+                          <Film size={24} />
                         </button>
                         <button onClick={() => setShowMoreActions(true)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500 hover:text-slate-600">
                           <MoreHorizontal size={24} />
@@ -968,6 +1152,14 @@ export default function CommunityFeed() {
                         <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowMoreActions(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors relative">
                             <Smile className="text-amber-500 shrink-0" size={24} />
                             <span className="text-sm font-semibold text-slate-700">Feeling/activity</span>
+                        </button>
+                        <button onClick={() => { setShowPollBuilder(true); setShowMoreActions(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors relative">
+                            <BarChart2 className="text-purple-500 shrink-0" size={24} />
+                            <span className="text-sm font-semibold text-slate-700">Add a Poll</span>
+                        </button>
+                        <button onClick={() => { setShowGifPicker(true); setShowMoreActions(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors relative">
+                            <Film className="text-cyan-500 shrink-0" size={24} />
+                            <span className="text-sm font-semibold text-slate-700">Add a GIF</span>
                         </button>
                         <button onClick={() => setShowMoreActions(false)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
                             <MapPin className="text-rose-500 shrink-0" size={24} />

@@ -383,8 +383,12 @@ service cloud.firestore {
              (!('tags' in data) || data.tags is list) &&
              (!('privacy' in data) || data.privacy in ['public', 'district', 'branch', 'friends', 'only_me']) &&
              (!('commentPrivacy' in data) || data.commentPrivacy in ['global', 'district', 'branch', 'friends']) &&
-             (!('isPinned' in data) || data.isPinned is bool) &&
-             (!('hiddenBy' in data) || data.hiddenBy is list);
+             (!('bookmarkedBy' in data) || data.bookmarkedBy is list) &&
+             (!('pinnedBy' in data) || data.pinnedBy is list) &&
+             (!('hiddenBy' in data) || data.hiddenBy is list) &&
+             (!('poll' in data) || data.poll is map) &&
+             (!('gifUrl' in data) || data.gifUrl is string) &&
+             (!('reports' in data) || data.reports is list);
     }
 
     function isValidCommunityPostComment(data) {
@@ -396,6 +400,7 @@ service cloud.firestore {
              data.likes is number && data.likes == 0 &&
              data.repliesCount is number && data.repliesCount == 0 &&
              (!('authorAvatar' in data) || (data.authorAvatar is string || data.authorAvatar == null)) &&
+             (!('gifUrl' in data) || data.gifUrl is string) &&
              data.createdAt == request.time;
     }
 
@@ -406,6 +411,7 @@ service cloud.firestore {
              data.authorInitials is string && data.authorInitials.size() <= 10 &&
              data.content is string && data.content.size() <= 1000 &&
              (!('authorAvatar' in data) || (data.authorAvatar is string || data.authorAvatar == null)) &&
+             (!('gifUrl' in data) || data.gifUrl is string) &&
              data.createdAt == request.time;
     }
 
@@ -523,11 +529,14 @@ service cloud.firestore {
       allow update: if isSignedIn() && isVerified() && (
         (incoming().diff(existing()).affectedKeys().hasOnly(['likes'])) ||
         (incoming().diff(existing()).affectedKeys().hasOnly(['commentsCount'])) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['bookmarkedBy'])) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['poll'])) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['reports'])) ||
         (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content'])) ||
-        (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['isPinned'])) ||
+        (incoming().diff(existing()).affectedKeys().hasOnly(['pinnedBy'])) ||
         (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['privacy'])) ||
         (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['commentPrivacy'])) ||
-        (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'isPinned', 'privacy', 'commentPrivacy']))
+        (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'privacy', 'commentPrivacy']))
       );
       allow delete: if isSignedIn() && isVerified() && (existing().authorId == request.auth.uid || isSuperAdmin());
 
