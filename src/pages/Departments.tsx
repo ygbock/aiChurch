@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -19,33 +19,44 @@ import {
 } from 'lucide-react';
 import NewDepartment from './NewDepartment';
 import { useFirebase } from '../components/FirebaseProvider';
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
-interface DepartmentData {
+interface GlobalDepartment {
   id: string;
   name: string;
   category: string;
-  mission: string;
-  headName: string;
+  description: string;
   isVisible: boolean;
-  budgetLimit: number;
+}
+
+interface DepartmentMember {
+  id: string;
+  userId: string;
+  departmentId: string;
+  level: string;
+  targetId: string | null;
+  role: string;
+  fullName?: string;
 }
 
 export default function Departments() {
   const { profile } = useFirebase();
   const navigate = useNavigate();
   const [showNewForm, setShowNewForm] = useState(false);
-  const [departments, setDepartments] = useState<DepartmentData[]>([]);
+  const [departments, setDepartments] = useState<GlobalDepartment[]>([]);
+  const [memberships, setMemberships] = useState<DepartmentMember[]>([]);
 
+  const isSuperAdmin = profile?.role === 'superadmin';
+  const isDistrictLeader = profile?.role === 'admin' || profile?.role === 'district' || isSuperAdmin; // simple approximation
+
+  // Fetch all global departments
   useEffect(() => {
-    if (!profile?.districtId || !profile?.branchId) return;
-
-    const ref = collection(db, 'districts', profile.districtId, 'branches', profile.branchId, 'departments');
+    const ref = collection(db, 'departments');
     const unsubscribe = onSnapshot(ref, (snap) => {
-      const results: DepartmentData[] = [];
+      const results: GlobalDepartment[] = [];
       snap.forEach(doc => {
-        results.push({ id: doc.id, ...doc.data() } as DepartmentData);
+        results.push({ id: doc.id, ...doc.data() } as GlobalDepartment);
       });
       setDepartments(results);
     }, (error) => {
@@ -53,7 +64,43 @@ export default function Departments() {
     });
 
     return () => unsubscribe();
-  }, [profile]);
+  }, []);
+
+  // Fetch local memberships for the current context (Branch)
+  useEffect(() => {
+    if (!profile?.branchId) return;
+
+    const ref = collection(db, 'departmentMembers');
+    const q = query(ref, where('level', '==', 'branch'), where('targetId', '==', profile.branchId));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const results: DepartmentMember[] = [];
+      snap.forEach(doc => {
+        results.push({ id: doc.id, ...doc.data() } as DepartmentMember);
+      });
+      setMemberships(results);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'departmentMembers');
+    });
+
+    return () => unsubscribe();
+  }, [profile?.branchId]);
+
+  const visibleDepartments = useMemo(() => {
+    return departments.filter(d => isSuperAdmin ? true : d.isVisible !== false);
+  }, [departments, isSuperAdmin]);
+
+  const deptStats = useMemo(() => {
+    const stats: Record<string, { membersCount: number, headName: string }> = {};
+    visibleDepartments.forEach(d => {
+      const deptMembers = memberships.filter(m => m.departmentId === d.id);
+      const head = deptMembers.find(m => m.role === 'Head');
+      stats[d.id] = {
+        membersCount: deptMembers.length,
+        headName: head?.fullName || 'Not Assigned'
+      };
+    });
+    return stats;
+  }, [visibleDepartments, memberships]);
 
   if (showNewForm) {
     return (
@@ -81,36 +128,38 @@ export default function Departments() {
           <h2 className="text-2xl font-bold text-slate-900">Departments</h2>
           <p className="text-slate-500 text-sm">Manage church operational units, staffing, and departmental goals.</p>
         </div>
-        <button 
-          onClick={() => setShowNewForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-        >
-          <Plus size={18} />
-          New Department
-        </button>
+        {isSuperAdmin && (
+          <button 
+            onClick={() => setShowNewForm(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+          >
+            <Plus size={18} />
+            New Department
+          </button>
+        )}
       </div>
 
       {/* Department Stats */}
       <div className="grid grid-cols-3 gap-4 sm:gap-6">
-        <StatCard label="Total Departments" value={departments.length.toString()} icon={<Building2 className="text-blue-600" size={20} />} trend="Active units" />
-        <StatCard label="Total Staff" value="--" icon={<Users className="text-emerald-600" size={20} />} trend="Assigned workers" />
-        <StatCard label="Total Budget" value={`$${departments.reduce((acc, curr) => acc + (curr.budgetLimit || 0), 0) || '0'}`} icon={<Banknote className="text-purple-600" size={20} />} trend="Allocated funds" />
+        <StatCard label="Total Departments" value={visibleDepartments.length.toString()} icon={<Building2 className="text-blue-600" size={20} />} trend="Active units" />
+        <StatCard label="Total Staff" value={memberships.length.toString()} icon={<Users className="text-emerald-600" size={20} />} trend="Assigned workers" />
+        <StatCard label="Total Budget" value={`$0`} icon={<Banknote className="text-purple-600" size={20} />} trend="Allocated funds" />
       </div>
 
       {/* Departments Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {departments.length === 0 ? (
+        {visibleDepartments.length === 0 ? (
           <div className="col-span-3 py-16 text-center text-slate-500">
             No departments defined yet.
           </div>
         ) : (
-          departments.map(dept => (
+          visibleDepartments.map(dept => (
             <DepartmentCard 
               key={dept.id}
               title={dept.name} 
               category={dept.category} 
-              members={0} 
-              head={dept.headName || 'Not Assigned'} 
+              members={deptStats[dept.id]?.membersCount || 0} 
+              head={deptStats[dept.id]?.headName || 'Not Assigned'} 
               onDashboardClick={() => navigate(`/departments/${dept.id}`)}
               icon={
                 dept.category === 'Worship' ? <Music className="text-blue-600" /> :

@@ -414,10 +414,12 @@ export default function DistrictDashboard() {
           branchData,
         );
       } else {
-        await addDoc(collection(db, "districts", districtId, "branches"), {
+        const branchRef = await addDoc(collection(db, "districts", districtId, "branches"), {
           ...branchData,
           createdAt: serverTimestamp(),
         });
+        const { createDefaultChannels } = await import('../lib/channels');
+        await createDefaultChannels('branch', branchRef.id);
       }
 
       setIsBranchModalOpen(false);

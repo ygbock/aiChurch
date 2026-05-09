@@ -271,11 +271,6 @@ service cloud.firestore {
           allow write: if isBranchAdmin(districtId, branchId) && isVerified();
         }
 
-        match /departments/{deptId} {
-          allow read: if isSignedIn();
-          allow write: if isBranchAdmin(districtId, branchId) && isVerified();
-        }
-
         match /events/{eventId} {
           allow read, list: if isSignedIn();
           allow create, update: if isBranchAdmin(districtId, branchId) && isVerified() && isValidEvent(incoming());
@@ -420,7 +415,15 @@ service cloud.firestore {
              data.name is string && data.name.size() <= 100 &&
              data.description is string && data.description.size() <= 500 &&
              data.createdAt == request.time &&
-             (!('membersCount' in data) || data.membersCount is number);
+             (!('membersCount' in data) || data.membersCount is number) &&
+             (!('type' in data) || data.type in ['ministry', 'department', 'general', 'announcement', 'prayer']) &&
+             (!('level' in data) || data.level in ['global', 'district', 'branch']) &&
+             (!('targetId' in data) || data.targetId is string || data.targetId == null) &&
+             (!('autoEnroll' in data) || data.autoEnroll is bool) &&
+             (!('gender' in data) || data.gender is string || data.gender == null) &&
+             (!('minAge' in data) || data.minAge is number || data.minAge == null) &&
+             (!('maxAge' in data) || data.maxAge is number || data.maxAge == null) &&
+             (!('memberIds' in data) || data.memberIds is list);
     }
 
     function isValidChannelMessage(data) {
@@ -430,7 +433,12 @@ service cloud.firestore {
              data.authorInitials is string && data.authorInitials.size() <= 10 &&
              data.content is string && data.content.size() <= 4000 &&
              data.createdAt == request.time &&
-             (!('authorRole' in data) || data.authorRole is string);
+             (!('authorRole' in data) || data.authorRole is string) &&
+             (!('authorAvatar' in data) || (data.authorAvatar is string || data.authorAvatar == null)) &&
+             (!('reactions' in data) || data.reactions is map) &&
+             (!('deletedBy' in data) || data.deletedBy is list) &&
+             (!('isEdited' in data) || data.isEdited is bool) &&
+             (!('replyTo' in data) || data.replyTo is map);
     }
 
     function isValidDirectMessageChat(data) {
@@ -508,17 +516,90 @@ service cloud.firestore {
       // No updates needed typically, but we will prevent defaults
     }
 
+    function isValidDepartment(data) {
+      return data.keys().hasAll(['name', 'category', 'description', 'createdAt']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.category is string && data.category.size() <= 100 &&
+             data.description is string && data.description.size() <= 500 &&
+             data.createdAt == request.time &&
+             (!('isVisible' in data) || data.isVisible is bool);
+    }
+
+    function isValidDepartmentMember(data) {
+      return data.keys().hasAll(['userId', 'departmentId', 'level', 'role', 'createdAt']) &&
+             data.userId is string &&
+             data.departmentId is string &&
+             data.level in ['global', 'district', 'branch'] &&
+             data.role in ['Head', 'Assistant', 'Member', 'member'] &&
+             data.createdAt == request.time &&
+             (!('targetId' in data) || data.targetId is string || data.targetId == null) &&
+             (!('fullName' in data) || data.fullName is string) &&
+             (!('optOutDistrict' in data) || data.optOutDistrict is bool) &&
+             (!('optOutGlobal' in data) || data.optOutGlobal is bool);
+    }
+
+    function isValidMinistryChannelMember(data) {
+      return data.keys().hasAll(['userId', 'joinedAt']) &&
+             data.userId is string &&
+             data.joinedAt == request.time &&
+             (!('lastActive' in data) || data.lastActive is timestamp) &&
+             (!('fullName' in data) || data.fullName is string) &&
+             (!('initials' in data) || data.initials is string) &&
+             (!('role' in data) || data.role is string);
+    }
+
+    match /departments/{deptId} {
+      allow read, list: if isSignedIn();
+      allow create, update: if isSignedIn() && isVerified() && hasUserRole('superadmin') && isValidDepartment(incoming());
+      allow delete: if false; // Only soft delete or not delete
+    }
+
+    match /departmentMembers/{membershipId} {
+      allow read, list: if isSignedIn();
+      allow create: if isSignedIn() && isVerified() && (
+        hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor')
+      ) && isValidDepartmentMember(incoming());
+      allow update: if isSignedIn() && isVerified() && (
+        hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor') || request.auth.uid == existing().userId
+      ) && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'optOutDistrict', 'optOutGlobal']);
+      allow delete: if isSignedIn() && isVerified() && (
+        hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor')
+      );
+    }
+
     match /ministryChannels/{channelId} {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && isVerified() && isValidMinistryChannel(incoming());
-      // For demo we allow people to update membersCount 
+      // Admin upates
       allow update: if isSignedIn() && isVerified() && (
-        incoming().diff(existing()).affectedKeys().hasOnly(['membersCount'])
+        incoming().diff(existing()).affectedKeys().hasOnly(['membersCount', 'memberIds']) ||
+        (
+          (hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor')) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'type', 'level'])
+        )
       );
+      allow delete: if isSignedIn() && isVerified() && (
+        hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor')
+      );
+      
+      match /members/{memberId} {
+        allow read, list: if isSignedIn();
+        allow create: if isSignedIn() && isVerified() && (memberId == request.auth.uid || hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor')) && isValidMinistryChannelMember(incoming());
+        allow update: if isSignedIn() && isVerified() && memberId == request.auth.uid && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['lastActive'])
+        );
+        allow delete: if isSignedIn() && isVerified() && (memberId == request.auth.uid || hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor'));
+      }
+
       
       match /messages/{messageId} {
         allow read, list: if isSignedIn();
         allow create: if isSignedIn() && isVerified() && isValidChannelMessage(incoming());
+        allow update: if isSignedIn() && isVerified() && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['reactions']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['deletedBy']) ||
+          (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'isEdited']))
+        );
         allow delete: if isSignedIn() && isVerified() && (existing().authorId == request.auth.uid || isSuperAdmin());
       }
     }

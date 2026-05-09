@@ -229,7 +229,9 @@ export default function AdminDistricts() {
           membersCount: 0,
           growth: '0%'
         };
-        await addDoc(collection(db, 'districts'), districtData);
+        const districtRef = await addDoc(collection(db, 'districts'), districtData);
+        const { createDefaultChannels } = await import('../lib/channels');
+        await createDefaultChannels('district', districtRef.id);
       }
       
       setIsDistrictModalOpen(false);

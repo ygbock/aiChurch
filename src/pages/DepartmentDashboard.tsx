@@ -47,8 +47,8 @@ import {
   Medal,
   Camera
 } from 'lucide-react';
-import { doc, getDoc, collection, getDocs, query, where, addDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { doc, getDoc, collection, getDocs, query, where, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
 import FloatingActionMenu from '../components/FloatingActionMenu';
 import { getScheduledEvents } from '../lib/churchSchedule';
@@ -96,8 +96,9 @@ const COLORS = ['#2563eb', '#64748b', '#f1f5f9'];
 export default function DepartmentDashboard() {
   const { departmentId } = useParams();
   const navigate = useNavigate();
-  const { profile } = useFirebase();
+  const { user, profile } = useFirebase();
   const [department, setDepartment] = useState<any>(null);
+  const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Overview');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -121,13 +122,26 @@ export default function DepartmentDashboard() {
   useEffect(() => {
     if (!profile?.districtId || !profile?.branchId || !departmentId) return;
 
-    const fetchDept = async () => {
+    const fetchDeptAndMembers = async () => {
       try {
-        const deptRef = doc(db, 'districts', profile.districtId, 'branches', profile.branchId, 'departments', departmentId);
+        const deptRef = doc(db, 'departments', departmentId);
         const deptSnap = await getDoc(deptRef);
         if (deptSnap.exists()) {
           setDepartment({ id: deptSnap.id, ...deptSnap.data() });
+        } else {
+          console.error("Department not found globally");
         }
+
+        const membersRef = collection(db, 'departmentMembers');
+        const memberQuery = query(
+          membersRef,
+          where('departmentId', '==', departmentId),
+          where('targetId', '==', profile.branchId),
+          where('level', '==', 'branch')
+        );
+        const memberSnap = await getDocs(memberQuery);
+        setMembers(memberSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
       } catch (err) {
         console.error("Failed to fetch department:", err);
       } finally {
@@ -135,8 +149,18 @@ export default function DepartmentDashboard() {
       }
     };
 
-    fetchDept();
+    fetchDeptAndMembers();
   }, [departmentId, profile]);
+
+  const handleToggleOptOut = async (memberId: string, field: 'optOutDistrict' | 'optOutGlobal', value: boolean) => {
+    try {
+      const memberRef = doc(db, 'departmentMembers', memberId);
+      await updateDoc(memberRef, { [field]: value });
+    } catch (err) {
+      console.error("Failed to update opt-out status", err);
+      handleFirestoreError(err, OperationType.UPDATE, 'departmentMembers');
+    }
+  };
 
   if (loading) {
     return (
@@ -196,8 +220,8 @@ export default function DepartmentDashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-6">
         {isUshering ? (
           <>
-            <StatBox icon={<Users size={18} className="text-slate-400" />} label="TOTAL USHERS" value="0" />
-            <StatBox icon={<UserCheck size={18} className="text-slate-400" />} label="ACTIVE" value="0" />
+            <StatBox icon={<Users size={18} className="text-slate-400" />} label="TOTAL USHERS" value={members.length.toString()} />
+            <StatBox icon={<UserCheck size={18} className="text-slate-400" />} label="ACTIVE" value={members.length.toString()} />
             <StatBox icon={<Calendar size={18} className="text-slate-400" />} label="SERVICES" value="0" />
             <StatBox icon={<Zap size={18} className="text-slate-400" />} label="COMPLETED" value="2" />
             <StatBox icon={<TrendingUp size={18} className="text-blue-600" />} label="GROWTH" value="+15%" />
@@ -205,8 +229,8 @@ export default function DepartmentDashboard() {
           </>
         ) : isChoir ? (
           <>
-            <StatBox icon={<Users size={18} className="text-slate-400" />} label="TOTAL MEMBERS" value="0" />
-            <StatBox icon={<Activity size={18} className="text-slate-400" />} label="ACTIVE SINGERS" value="0" />
+            <StatBox icon={<Users size={18} className="text-slate-400" />} label="TOTAL MEMBERS" value={members.length.toString()} />
+            <StatBox icon={<Activity size={18} className="text-slate-400" />} label="ACTIVE SINGERS" value={members.length.toString()} />
             <StatBox icon={<Calendar size={18} className="text-slate-400" />} label="EVENTS" value="2" />
             <StatBox icon={<TrendingUp size={18} className="text-blue-600" />} label="ACTIVITIES" value="2" />
             <StatBox icon={<TrendingUp size={18} className="text-blue-600" />} label="GROWTH" value="+8%" />
@@ -214,7 +238,7 @@ export default function DepartmentDashboard() {
           </>
         ) : isTechnical ? (
           <>
-            <StatBox icon={<Users size={18} className="text-slate-400" />} label="TEAM" value="0" />
+            <StatBox icon={<Users size={18} className="text-slate-400" />} label="TEAM" value={members.length.toString()} />
             <StatBox icon={<Monitor size={18} className="text-slate-400" />} label="EQUIPMENT" value="3" />
             <StatBox icon={<AlertCircle size={18} className="text-slate-400" />} label="TICKETS" value="0" />
             <StatBox icon={<Activity size={18} className="text-emerald-500" />} label="UPTIME" value="99.2%" />
@@ -223,8 +247,8 @@ export default function DepartmentDashboard() {
           </>
         ) : (
           <>
-            <StatBox icon={<Users size={18} className="text-slate-400" />} label="MEMBERS" value="0" />
-            <StatBox icon={<Megaphone size={18} className="text-slate-400" />} label="ACTIVE" value="0" />
+            <StatBox icon={<Users size={18} className="text-slate-400" />} label="MEMBERS" value={members.length.toString()} />
+            <StatBox icon={<Megaphone size={18} className="text-slate-400" />} label="ACTIVE" value={members.length.toString()} />
             <StatBox icon={<Calendar size={18} className="text-slate-400" />} label="EVENTS" value="0" />
             <StatBox icon={<Activity size={18} className="text-slate-400" />} label="OUTREACHES" value="0" />
             <StatBox icon={<TrendingUp size={18} className="text-blue-600" />} label="GROWTH" value="+18%" />
@@ -618,25 +642,29 @@ export default function DepartmentDashboard() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { id: "mem-1", name: "John Smith", initial: "JS", dept: isChoir ? 'Tenor' : (isUshering ? 'Main Entrance' : (isTechnical ? 'Audio' : 'Main Area')), role: "Lead", status: "Active" },
-              { id: "mem-2", name: "Sarah Johnson", initial: "SJ", dept: isChoir ? 'Soprano' : (isUshering ? 'Sanctuary' : (isTechnical ? 'Support' : 'Outreach')), role: "Member", status: "Active" },
-              { id: "mem-3", name: "Michael Brown", initial: "MB", dept: isChoir ? 'Bass' : (isUshering ? 'Parking' : (isTechnical ? 'IT' : 'North Side')), role: "Member", status: "Active" }
-            ].map(member => (
+            {members.length > 0 ? members.map(member => (
               <MemberCard 
                 key={member.id}
                 id={member.id} 
-                name={member.name} 
-                initial={member.initial}
-                dept={member.dept} 
-                role={member.role} 
-                status={member.status} 
+                name={member.fullName || 'Unknown User'} 
+                initial={(member.fullName || 'U')[0]}
+                dept={isChoir ? 'Singer' : (isUshering ? 'Usher' : (isTechnical ? 'Tech' : 'Member'))} 
+                role={member.role || 'member'} 
+                status="Active" 
                 isChoir={isChoir}
                 isUshering={isUshering}
                 isTechnical={isTechnical}
                 onView={() => navigate(`/departments/${departmentId}/members/${member.id}`)}
+                memberData={member}
+                onToggleOptOut={handleToggleOptOut}
+                currentUserId={user?.uid}
+                isLeader={['superadmin', 'admin', 'district', 'branch_admin'].includes(profile?.role || '')}
               />
-            ))}
+            )) : (
+              <div className="col-span-1 md:col-span-2 lg:col-span-3 py-12 text-center text-slate-400 italic bg-white rounded-xl border border-slate-100">
+                No members found in this department.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1365,7 +1393,10 @@ export default function DepartmentDashboard() {
   );
 }
 
-function MemberCard({ id, name, initial, dept, role, status, isChoir, isUshering, isTechnical, onView }: any) {
+function MemberCard({ id, name, initial, dept, role, status, isChoir, isUshering, isTechnical, onView, memberData, onToggleOptOut, currentUserId, isLeader }: any) {
+  const isSelf = currentUserId === memberData?.userId;
+  const canEdit = isSelf || isLeader;
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 hover:border-blue-200 transition-colors group flex flex-col h-full shadow-sm">
       <div className="flex justify-between items-start mb-4">
@@ -1384,13 +1415,40 @@ function MemberCard({ id, name, initial, dept, role, status, isChoir, isUshering
       </div>
       
       <div className="grid grid-cols-2 gap-3 mb-5 mt-auto">
-        <div className="bg-slate-50 p-2.5 rounded-lg">
-          <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">{isChoir ? 'Voice Part' : (isUshering ? 'Station' : (isTechnical ? 'Specialization' : 'Area'))}</p>
-          <p className="text-xs font-semibold text-slate-700 truncate">{dept}</p>
-        </div>
-        <div className="bg-slate-50 p-2.5 rounded-lg">
-           <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">{isChoir ? 'Soloist' : (isUshering ? 'Experience' : (isTechnical ? 'Certif.' : 'Events'))}</p>
-           <p className="text-xs font-semibold text-blue-600">Pro</p>
+        <div className="bg-slate-50 p-2.5 rounded-lg col-span-2">
+          <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Availability</p>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center justify-between text-xs font-medium text-slate-700">
+              District Events
+              {canEdit ? (
+                <input 
+                  type="checkbox" 
+                  checked={!memberData?.optOutDistrict} 
+                  onChange={(e) => onToggleOptOut(id, 'optOutDistrict', !e.target.checked)}
+                  className="rounded text-blue-600 focus:ring-blue-500"
+                />
+              ) : (
+                <span className={memberData?.optOutDistrict ? "text-rose-500" : "text-emerald-500"}>
+                  {memberData?.optOutDistrict ? "Opted Out" : "Available"}
+                </span>
+              )}
+            </label>
+            <label className="flex items-center justify-between text-xs font-medium text-slate-700">
+              Global Events
+              {canEdit ? (
+                <input 
+                  type="checkbox" 
+                  checked={!memberData?.optOutGlobal} 
+                  onChange={(e) => onToggleOptOut(id, 'optOutGlobal', !e.target.checked)}
+                  className="rounded text-blue-600 focus:ring-blue-500"
+                />
+              ) : (
+                <span className={memberData?.optOutGlobal ? "text-rose-500" : "text-emerald-500"}>
+                  {memberData?.optOutGlobal ? "Opted Out" : "Available"}
+                </span>
+              )}
+            </label>
+          </div>
         </div>
       </div>
       
@@ -1826,14 +1884,53 @@ function AddMemberForm({ department, onClose }: { department: any, onClose: () =
       return;
     }
 
-    if (formMode === 'search' && selectedMember && !selectedMember.isBaptised) {
-      alert("This member has not been baptized yet. Baptism is required for departmental membership.");
-      return;
+    if (formMode === 'search') {
+      if (!selectedMember) {
+        alert("Please select a member first.");
+        return;
+      }
+      if (!selectedMember.isBaptised) {
+        alert("This member has not been baptized yet. Baptism is required for departmental membership.");
+        return;
+      }
     }
 
-    // Logic to add member to department
-    alert("Member added to " + department.name + " successfully!");
-    onClose();
+    setLoading(true);
+    try {
+      let targetUserId = "";
+      let targetUserName = "";
+      if (formMode === 'search') {
+        targetUserId = selectedMember.id;
+        targetUserName = selectedMember.fullName;
+      } else {
+        // Here we would typically create a new member doc first or ensure they exist. 
+        // For simplicity in this demo, let's say "create" just means they might not have an app account yet.
+        alert("Creating members inline is restricted. Please select existing.");
+        setLoading(false);
+        return;
+      }
+
+      await addDoc(collection(db, 'departmentMembers'), {
+        userId: targetUserId,
+        departmentId: department.id,
+        level: 'branch', // currently scoped to branch
+        targetId: profile?.branchId,
+        role: 'member',
+        createdAt: serverTimestamp(),
+        fullName: targetUserName,
+        optOutDistrict: false,
+        optOutGlobal: false
+      });
+
+      alert("Member added to " + department.name + " successfully!");
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to add member.");
+      handleFirestoreError(err, OperationType.CREATE, 'departmentMembers');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
