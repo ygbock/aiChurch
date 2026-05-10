@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 import Modal from '../components/Modal';
+import PDFPreview from '../components/PDFPreview';
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString();
 import { 
   Hash, 
   Send, 
@@ -45,7 +54,11 @@ import {
   BellOff,
   Eraser,
   Flag,
-  LogOut
+  LogOut,
+  Music,
+  BarChart2,
+  Calendar,
+  MapPin
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -77,6 +90,7 @@ interface Message {
     name: string;
     type: string;
     size: string;
+    url: string;
   };
 }
 
@@ -129,6 +143,46 @@ export default function MinistryChannels() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeMembers, setActiveMembers] = useState<ChannelMember[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [pendingAttachment, setPendingAttachment] = useState<{name: string, type: string, size: string, url: string, source: string} | null>(null);
+
+  const handleShareLocation = () => {
+    setShowAttachmentMenu(false);
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+
+    toast.loading('Getting location...', { id: 'location' });
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        toast.success('Location attached', { id: 'location' });
+        setPendingAttachment({
+          name: 'My Location',
+          type: 'location/gps',
+          size: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+          url: `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`,
+          source: 'location'
+        });
+      },
+      (error) => {
+        console.error(error);
+        toast.error('Failed to get location. Provide permissions.', { id: 'location' });
+      }
+    );
+  };
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -158,6 +212,7 @@ export default function MinistryChannels() {
   const [channelSearchQuery, setChannelSearchQuery] = useState('');
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('');
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [emojiDrawerMessageId, setEmojiDrawerMessageId] = useState<string | null>(null);
   
   // Note: we can parse initial from localStorage. We'll useEffect for it later or parse immediately.
@@ -182,7 +237,7 @@ export default function MinistryChannels() {
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [selectedProfileData, setSelectedProfileData] = useState<any>(null);
   const [isFriend, setIsFriend] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<{url: string, type: string, name: string} | null>(null);
   
   const [isBranchExpanded, setIsBranchExpanded] = useState(true);
   const [isDistrictExpanded, setIsDistrictExpanded] = useState(true);
@@ -362,7 +417,8 @@ export default function MinistryChannels() {
               replyTo: data.replyTo,
               deletedBy: data.deletedBy || [],
               rawReactions,
-              reactions
+              reactions,
+              attachment: data.attachment
             };
           }) as Message[];
           setMessages(fetchedMessages);
@@ -508,14 +564,100 @@ export default function MinistryChannels() {
     }
   }, [messages]);
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, source: string = 'document') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (readerEvent) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+          const base64str = dataUrl.split(',')[1];
+          const decoded = atob(base64str);
+          
+          setPendingAttachment({
+            name: file.name,
+            type: 'image/jpeg',
+            size: (decoded.length / 1024).toFixed(1) + ' KB',
+            url: dataUrl,
+            source
+          });
+          setShowAttachmentMenu(false);
+          
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          if (imageInputRef.current) imageInputRef.current.value = '';
+          if (cameraInputRef.current) cameraInputRef.current.value = '';
+          if (audioInputRef.current) audioInputRef.current.value = '';
+        };
+        img.src = readerEvent.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+    
+    // Check max size for non-images (approx 700KB to stay well under 1MB Firestore limit)
+    if (file.size > 700 * 1024) {
+      toast.error('File too large. Max size for documents/audio is 700KB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (imageInputRef.current) imageInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (audioInputRef.current) audioInputRef.current.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (readerEvent) => {
+      setPendingAttachment({
+        name: file.name,
+        type: file.type,
+        size: (file.size / 1024).toFixed(1) + ' KB',
+        url: readerEvent.target?.result as string,
+        source
+      });
+      setShowAttachmentMenu(false);
+    };
+    reader.readAsDataURL(file);
+    
+    // Reset inputs
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (imageInputRef.current) imageInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (audioInputRef.current) audioInputRef.current.value = '';
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || !profile || !activeChannelId || isSubmitting) return;
+    if ((!newMessage.trim() && !pendingAttachment) || !user || !profile || !activeChannelId || isSubmitting) return;
 
     setIsSubmitting(true);
     try {
       const messagesRef = collection(db, 'ministryChannels', activeChannelId, 'messages');
-      const initials = profile.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
+      const initials = profile.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
 
       if (editingMessageId) {
         const msgRef = doc(db, 'ministryChannels', activeChannelId, 'messages', editingMessageId);
@@ -543,9 +685,19 @@ export default function MinistryChannels() {
             };
         }
 
+        if (pendingAttachment) {
+            messageData.attachment = {
+                name: pendingAttachment.name,
+                type: pendingAttachment.type,
+                size: pendingAttachment.size,
+                url: pendingAttachment.url
+            };
+        }
+
         await addDoc(messagesRef, messageData);
       }
       setNewMessage('');
+      setPendingAttachment(null);
       setReplyingToMessage(null);
     } catch (error: any) {
       toast.error(`Failed to send message: ${error?.message || error}`);
@@ -1235,14 +1387,77 @@ export default function MinistryChannels() {
                         </button>
                       </div>
                       {msg.replyTo && (
-                        <div className={`mb-1.5 pl-2 border-l-2 rounded-sm p-1.5 text-xs ${isMe ? 'border-indigo-300 bg-indigo-700/50' : 'border-slate-300 bg-slate-50'}`}>
-                          <p className={`text-[10px] font-bold mb-0.5 ${isMe ? 'text-indigo-200' : 'text-slate-500'}`}>{msg.replyTo.authorName}</p>
-                          <p className={`truncate ${isMe ? 'text-indigo-50' : 'text-slate-600'}`}>{msg.replyTo.content}</p>
+                        <div className={`mb-1.5 pl-2 border-l-2 rounded-sm p-1.5 text-xs ${isMe ? 'border-indigo-300 bg-indigo-700/50 flex-row-reverse' : 'border-slate-300 bg-slate-50'}`}>
+                          <p className={`text-[10px] font-bold mb-0.5 ${isMe ? 'text-indigo-200 flex flex-row-reverse' : 'text-slate-500'}`}>{msg.replyTo.authorName}</p>
+                          <p className={`truncate ${isMe ? 'text-indigo-50 flex flex-row-reverse' : 'text-slate-600'}`}>{msg.replyTo.content}</p>
                         </div>
                       )}
-                      <p className={`text-[14px] leading-relaxed mb-1 ${isMe ? 'text-white' : 'text-slate-800'}`}>
-                        {msg.content}
-                      </p>
+
+                      {/* Attachment Inside Bubble */}
+                      {msg.attachment && (
+                        msg.attachment.type.startsWith('image/') ? (
+                          <div className={`mt-1 mb-2 rounded-xl border ${isMe ? 'border-indigo-400/30' : 'border-slate-200'} bg-black/5 overflow-hidden max-w-[280px] shadow-sm cursor-pointer hover:opacity-90 transition-opacity flex`} onClick={() => setPreviewFile(msg.attachment ? {url: msg.attachment.url, type: msg.attachment.type, name: msg.attachment.name} : null)}>
+                            <img src={msg.attachment.url} alt={msg.attachment.name} className="w-full h-auto object-cover max-h-[300px]" />
+                          </div>
+                        ) : msg.attachment.type.startsWith('audio/') ? (
+                          <div className={`mt-1 mb-2 rounded-xl border ${isMe ? 'border-indigo-400/30 bg-indigo-500/20' : 'border-slate-200 bg-slate-50'} p-3 shadow-sm max-w-[280px] flex flex-col`}>
+                            <audio controls src={msg.attachment.url} className="w-full h-10 max-w-[240px]" />
+                            <p className={`text-[10px] font-medium mt-1 truncate ${isMe ? 'text-indigo-100' : 'text-slate-500'}`}>{msg.attachment.name}</p>
+                          </div>
+                        ) : msg.attachment.type === 'location/gps' ? (
+                          <a href={msg.attachment.url} target="_blank" rel="noopener noreferrer" className={`mt-1 mb-2 flex items-center gap-3 p-3 rounded-xl border ${isMe ? 'border-indigo-400/30 bg-indigo-500/20' : 'border-slate-200 bg-white'} max-w-sm hover:opacity-90 transition-all group/file ${isMe ? 'flex-row-reverse' : ''}`}>
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isMe ? 'bg-indigo-400/30 text-indigo-100' : 'bg-teal-50 text-teal-600'}`}>
+                              <MapPin size={20} />
+                            </div>
+                            <div className={`flex-1 min-w-0 flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                              <p className={`text-xs font-bold truncate ${isMe ? 'text-white' : 'text-slate-900'}`}>Shared Location</p>
+                              <p className={`text-[10px] font-medium truncate ${isMe ? 'text-indigo-200' : 'text-slate-500'}`}>{msg.attachment.size}</p>
+                            </div>
+                            <div className={`shrink-0 transition-colors ${isMe ? 'text-indigo-300 group-hover/file:text-white' : 'text-slate-300 group-hover/file:text-teal-600'}`}>
+                              <span className="text-[10px] font-bold tracking-widest uppercase relative -top-[2px]">Open</span>
+                            </div>
+                          </a>
+                        ) : msg.attachment.type === 'application/pdf' ? (
+                          <div onClick={() => setPreviewFile(msg.attachment ? {url: msg.attachment.url, type: msg.attachment.type, name: msg.attachment.name} : null)} className={`mt-1 mb-2 rounded-xl border overflow-hidden max-w-[280px] cursor-pointer group/doc shadow-sm flex flex-col ${isMe ? 'border-indigo-400/30 bg-indigo-500/20' : 'border-slate-200 bg-slate-50'}`}>
+                            <div className="h-40 overflow-hidden bg-white/90 relative pointer-events-none flex items-start justify-center">
+                              <Document 
+                                 file={msg.attachment.url} 
+                                 loading={<div className="h-40 w-full flex items-center justify-center bg-transparent"><div className={`w-6 h-6 border-2 border-t-transparent rounded-full animate-spin ${isMe ? 'border-indigo-200' : 'border-slate-400'}`}></div></div>}
+                              >
+                                 <Page pageNumber={1} width={280} renderTextLayer={false} renderAnnotationLayer={false} className="shadow-none !bg-transparent" />
+                              </Document>
+                              <div className={`absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t ${isMe ? 'from-indigo-600' : 'from-white'} to-transparent opacity-50`} />
+                            </div>
+                            <div className={`p-3 relative z-10 border-t ${isMe ? 'bg-indigo-500/40 border-indigo-400/30 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'} mt-[-2px] flex flex-col items-start`}>
+                              <div className="flex flex-col gap-1 w-full text-left">
+                                  <p className="text-sm font-medium truncate">{msg.attachment.name}</p>
+                                  <div className={`text-[11px] flex items-center gap-1.5 ${isMe ? 'text-indigo-100' : 'text-slate-500'}`}>
+                                    <span>PDF</span>
+                                    <span className="w-1 h-1 rounded-full bg-current opacity-50" />
+                                    <span>{msg.attachment?.size || 'Unknown size'}</span>
+                                  </div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div onClick={() => window.open(msg.attachment?.url || '', '_blank')} className={`mt-1 mb-2 flex items-center gap-3 p-3 rounded-xl border ${isMe ? 'border-indigo-400/30 bg-indigo-500/20' : 'border-slate-200 bg-white'} max-w-sm hover:opacity-90 transition-all cursor-pointer group/file ${isMe ? 'flex-row-reverse' : ''}`}>
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isMe ? 'bg-indigo-400/30 text-indigo-100' : 'bg-indigo-50 text-indigo-600'}`}>
+                              <FileText size={20} />
+                            </div>
+                            <div className={`flex-1 min-w-0 flex flex-col ${isMe ? 'items-end' : 'text-left'}`}>
+                              <p className={`text-xs font-bold truncate ${isMe ? 'text-white' : 'text-slate-900'}`}>{msg.attachment.name}</p>
+                              <p className={`text-[10px] font-medium ${isMe ? 'text-indigo-200' : 'text-slate-500'}`}>{msg.attachment.size}</p>
+                            </div>
+                            <Download size={16} className={`shrink-0 transition-colors ${isMe ? 'text-indigo-300 group-hover/file:text-white' : 'text-slate-300 group-hover/file:text-indigo-600'}`} />
+                          </div>
+                        )
+                      )}
+
+                      {msg.content && (
+                        <p className={`text-[14px] leading-relaxed mb-1 ${isMe ? 'text-white text-right' : 'text-slate-800 text-left'}`}>
+                          {msg.content}
+                        </p>
+                      )}
                       
                       <div className={`flex items-center gap-1.5 ${isMe ? 'justify-start' : 'justify-end'}`}>
                         {msg.isEdited && <span className={`text-[8px] font-bold uppercase tracking-widest ${isMe ? 'text-indigo-300' : 'text-slate-300'}`}>Edited</span>}
@@ -1278,20 +1493,7 @@ export default function MinistryChannels() {
                       </div>
                     </div>
 
-                    {msg.attachment && (
-                      <div className={`mt-3 flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white max-w-sm hover:border-indigo-200 transition-all cursor-pointer group/file ${isMe ? 'flex-row-reverse' : ''}`}>
-                      <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                        <FileText size={20} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">{msg.attachment.name}</p>
-                        <p className="text-[10px] text-slate-500 font-medium">{msg.attachment.type} • {msg.attachment.size}</p>
-                      </div>
-                      <Download size={16} className="text-slate-300 group-hover/file:text-indigo-600 transition-colors" />
-                    </div>
-                  )}
-
-                  {msg.reactions && msg.reactions.length > 0 && (
+                    {msg.reactions && msg.reactions.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
                       {msg.reactions.map((r, i) => (
                         <button 
@@ -1339,10 +1541,84 @@ export default function MinistryChannels() {
           )}
           <form 
             onSubmit={handleSendMessage}
-            className="flex items-end gap-2 w-full max-w-full"
+            className="flex items-end gap-2 w-full max-w-full relative"
           >
+            {/* Attachment Menu Popover */}
+            <AnimatePresence>
+              {showAttachmentMenu && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute bottom-full right-12 mb-2 w-72 bg-white rounded-3xl shadow-xl border border-slate-100 p-4 z-50 origin-bottom-right"
+                >
+                  <div className="grid grid-cols-4 gap-y-4 gap-x-2">
+                    <button type="button" onClick={() => { fileInputRef.current?.click(); }} className="flex flex-col items-center gap-1 group">
+                       <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                         <FileText size={20} />
+                       </div>
+                       <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Document</span>
+                    </button>
+                    <button type="button" onClick={() => { cameraInputRef.current?.click(); }} className="flex flex-col items-center gap-1 group">
+                       <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-100 transition-colors">
+                         <Camera size={20} />
+                       </div>
+                       <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Camera</span>
+                    </button>
+                    <button type="button" onClick={() => { imageInputRef.current?.click(); }} className="flex flex-col items-center gap-1 group">
+                       <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                         <ImageIcon size={20} />
+                       </div>
+                       <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Gallery</span>
+                    </button>
+                    <button type="button" onClick={() => { audioInputRef.current?.click(); }} className="flex flex-col items-center gap-1 group">
+                       <div className="w-12 h-12 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
+                         <Music size={20} />
+                       </div>
+                       <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Audio</span>
+                    </button>
+                    <button type="button" onClick={() => { toast.info('Quick replies coming soon!'); setShowAttachmentMenu(false); }} className="flex flex-col items-center gap-1 group">
+                       <div className="w-12 h-12 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center group-hover:bg-sky-100 transition-colors">
+                         <Zap size={20} />
+                       </div>
+                       <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Quick Reply</span>
+                    </button>
+                    <button type="button" onClick={() => { toast.info('Polls coming soon!'); setShowAttachmentMenu(false); }} className="flex flex-col items-center gap-1 group">
+                       <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                         <BarChart2 size={20} />
+                       </div>
+                       <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Poll</span>
+                    </button>
+                    <button type="button" onClick={() => { toast.info('Events coming soon!'); setShowAttachmentMenu(false); }} className="flex flex-col items-center gap-1 group">
+                       <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                         <Calendar size={20} />
+                       </div>
+                       <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Event</span>
+                    </button>
+                    <button type="button" onClick={handleShareLocation} className="flex flex-col items-center gap-1 group">
+                       <div className="w-12 h-12 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center group-hover:bg-teal-100 transition-colors">
+                         <MapPin size={20} />
+                       </div>
+                       <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Location</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Hidden Intputs */}
+            <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'document')} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.zip" />
+            <input type="file" ref={imageInputRef} onChange={(e) => handleFileUpload(e, 'gallery')} className="hidden" accept="image/*" />
+            <input type="file" ref={cameraInputRef} onChange={(e) => handleFileUpload(e, 'camera')} className="hidden" accept="image/*" capture="environment" />
+            <input type="file" ref={audioInputRef} onChange={(e) => handleFileUpload(e, 'audio')} className="hidden" accept="audio/*" />
+
             <div className={`flex bg-white items-center gap-1 flex-1 border ${editingMessageId || replyingToMessage ? 'border-indigo-400 ring-2 ring-indigo-500/20' : 'border-slate-200'} shadow-sm rounded-3xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all`}>
-              <button type="button" className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0">
+              <button 
+                type="button" 
+                onClick={() => setEmojiDrawerMessageId('new')}
+                className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0" 
+                title="Add Emoji"
+              >
                 <Smile size={24} />
               </button>
               <textarea 
@@ -1356,7 +1632,7 @@ export default function MinistryChannels() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey && window.innerWidth >= 1024) {
                     e.preventDefault();
-                    if (newMessage.trim()) {
+                    if (newMessage.trim() || pendingAttachment) {
                       handleSendMessage(e as any);
                     }
                   }
@@ -1366,16 +1642,26 @@ export default function MinistryChannels() {
                 rows={1}
                 style={{ minHeight: '24px' }}
               />
-              <button type="button" className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0">
+              <button 
+                type="button" 
+                onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+                className={`p-1.5 transition-colors shrink-0 ${showAttachmentMenu ? 'text-indigo-600 bg-indigo-50 rounded-full' : 'text-slate-400 hover:text-indigo-600'}`} 
+                title="Attach file"
+              >
                 <Paperclip size={20} className="transform -rotate-45" />
               </button>
-              {!newMessage.trim() && (
-                <button type="button" className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0 mr-1">
+              {!(newMessage.trim() || pendingAttachment) && (
+                <button 
+                  type="button" 
+                  onClick={() => toast.info('Camera access coming soon!')}
+                  className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0 mr-1"
+                  title="Take photo"
+                >
                   <Camera size={24} />
                 </button>
               )}
             </div>
-            {newMessage.trim() ? (
+            {(newMessage.trim() || pendingAttachment) ? (
               <button 
                 type="submit"
                 className="w-12 h-12 shrink-0 bg-[#00a884] text-white rounded-full flex items-center justify-center hover:bg-[#008f6f] active:scale-95 transition-all shadow-sm"
@@ -1564,7 +1850,11 @@ export default function MinistryChannels() {
                          <button
                            key={emoji}
                            onClick={() => {
-                             handleReaction(emojiDrawerMessageId, emoji);
+                             if (emojiDrawerMessageId === 'new') {
+                               setNewMessage(prev => prev + emoji);
+                             } else if (emojiDrawerMessageId) {
+                               handleReaction(emojiDrawerMessageId, emoji);
+                             }
                              setEmojiDrawerMessageId(null);
                            }}
                            className="text-2xl hover:scale-125 transition-transform p-1 hover:bg-slate-100 rounded-lg"
@@ -2165,20 +2455,126 @@ export default function MinistryChannels() {
       </Modal>
 
       <Modal
-        isOpen={!!previewImage}
-        onClose={() => setPreviewImage(null)}
-        title="Image Preview"
+        isOpen={!!previewFile}
+        onClose={() => setPreviewFile(null)}
+        title={previewFile?.name || "Preview"}
+        fullScreenOnMobile={false}
       >
-        <div className="flex items-center justify-center p-2">
-          {previewImage && (
-            <img 
-              src={previewImage} 
-              alt="Preview" 
-              className="max-w-full max-h-[70vh] rounded-2xl shadow-2xl object-contain bg-slate-900" 
-            />
+        <div className="flex items-center justify-center p-2 h-full">
+          {previewFile && (
+            previewFile.type.startsWith('image/') ? (
+              <img 
+                src={previewFile.url} 
+                alt="Preview" 
+                className="max-w-full max-h-[70vh] rounded-2xl shadow-2xl object-contain bg-slate-900" 
+              />
+            ) : previewFile.type === 'application/pdf' ? (
+                <div className="w-full h-full min-h-[60vh]">
+                    <PDFPreview url={previewFile.url} />
+                </div>
+            ) : (
+                <div className="text-center text-indigo-600 flex flex-col items-center gap-3 py-10 w-full">
+                   <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center">
+                       <FileText size={40} />
+                   </div>
+                   <div>
+                       <p className="font-bold text-slate-800 break-words px-4">{previewFile.name}</p>
+                       <p className="text-xs text-slate-400 mt-2">Cannot preview this file type directly.</p>
+                       <a href={previewFile.url} download={previewFile.name} className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                          <Download size={16} /> Download File
+                       </a>
+                   </div>
+                </div>
+            )
           )}
         </div>
       </Modal>
+
+      {/* WhatsApp Style Attachment Send Preview */}
+      <AnimatePresence>
+        {pendingAttachment && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed inset-0 z-[100] bg-[#0b141a] flex flex-col items-center"
+          >
+            {/* Header */}
+            <div className="flex w-full items-center gap-4 p-4 text-white bg-[#0b141a] max-w-4xl">
+              <button 
+                onClick={() => {
+                  setPendingAttachment(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                  if (imageInputRef.current) imageInputRef.current.value = '';
+                  if (cameraInputRef.current) cameraInputRef.current.value = '';
+                  if (audioInputRef.current) audioInputRef.current.value = '';
+                }}
+                className="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors"
+              >
+                <ArrowLeft size={24} />
+              </button>
+              <h2 className="text-lg font-medium truncate flex-1">{pendingAttachment.name}</h2>
+            </div>
+            
+            {/* Preview Area */}
+            <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-0 bg-[#0b141a] w-full max-w-4xl relative">
+                {pendingAttachment.type.startsWith('image/') ? (
+                    <img src={pendingAttachment.url} alt="Preview" className="max-w-full max-h-full object-contain" />
+                ) : pendingAttachment.type === 'location/gps' ? (
+                    <div className="text-center text-teal-400 flex flex-col items-center gap-4">
+                        <div className="w-24 h-24 rounded-full bg-teal-400/20 flex items-center justify-center">
+                            <MapPin size={48} />
+                        </div>
+                        <p className="text-white text-lg font-medium">{pendingAttachment.name}</p>
+                    </div>
+                ) : pendingAttachment.type.startsWith('audio/') ? (
+                    <div className="text-center text-orange-400 flex flex-col items-center gap-6 w-full max-w-md">
+                        <div className="w-24 h-24 rounded-full bg-orange-400/20 flex items-center justify-center">
+                            <Music size={48} />
+                        </div>
+                        <audio controls src={pendingAttachment.url} className="w-full" />
+                    </div>
+                ) : pendingAttachment.type === 'application/pdf' ? (
+                    <div className="w-full h-full bg-[#0b141a] rounded-lg overflow-hidden flex flex-col items-center justify-center">
+                        <PDFPreview url={pendingAttachment.url} />
+                    </div>
+                ) : (
+                    <div className="text-center text-indigo-400 flex flex-col items-center gap-6 w-full max-w-md">
+                        <div className="w-24 h-24 rounded-full bg-indigo-400/20 flex items-center justify-center">
+                            <FileText size={48} />
+                        </div>
+                        <p className="text-white text-lg font-medium truncate w-full px-4">{pendingAttachment.name}</p>
+                        <p className="text-slate-400">{pendingAttachment.size}</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Footer with Input and Send Button */}
+            <div className="p-4 bg-[#0b141a] w-full max-w-4xl">
+               <form onSubmit={handleSendMessage} className="flex gap-3 w-full">
+                 <div className="flex-1 bg-[#2a2f32] rounded-3xl min-h-[50px] flex items-center px-4 self-end">
+                   <input 
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Add a caption..."
+                      className="flex-1 bg-transparent border-none py-3 text-white placeholder:text-slate-400 focus:ring-0 outline-none w-full"
+                      autoFocus
+                    />
+                 </div>
+                 <button 
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-[50px] h-[50px] rounded-full bg-[#00a884] hover:bg-[#008f6f] text-white flex items-center justify-center shrink-0 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors self-end"
+                  >
+                    {isSubmitting ? <Loader2 size={24} className="animate-spin" /> : <Send size={24} className="ml-1" />}
+                 </button>
+               </form>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

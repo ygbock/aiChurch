@@ -7,9 +7,10 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  fullScreenOnMobile?: boolean;
 }
 
-export default function Modal({ isOpen, onClose, title, children }: ModalProps) {
+export default function Modal({ isOpen, onClose, title, children, fullScreenOnMobile = false }: ModalProps) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -25,9 +26,9 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden"
+            className={`relative bg-white shadow-2xl overflow-hidden ${fullScreenOnMobile ? 'w-full h-full sm:h-auto sm:max-w-4xl sm:rounded-2xl rounded-none flex flex-col' : 'w-full max-w-4xl rounded-2xl'}`}
           >
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+            <div className={`px-6 py-4 border-b border-slate-100 flex justify-between items-center ${fullScreenOnMobile ? 'shrink-0' : ''}`}>
               <h3 className="font-bold text-lg text-slate-900">{title}</h3>
               <button
                 onClick={onClose}
@@ -36,7 +37,7 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
                 <X size={20} />
               </button>
             </div>
-            <div className="p-4 sm:p-6 overflow-y-auto max-h-[calc(100vh-6rem)] sm:max-h-[calc(100vh-10rem)]">
+            <div className={`p-4 sm:p-6 overflow-y-auto ${fullScreenOnMobile ? 'flex-1 h-full sm:max-h-[calc(100vh-10rem)]' : 'max-h-[calc(100vh-6rem)] sm:max-h-[calc(100vh-10rem)]'}`}>
               {children}
             </div>
           </motion.div>

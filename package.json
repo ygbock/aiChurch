@@ -40,6 +40,7 @@
     "react-dropzone": "^15.0.0",
     "react-easy-crop": "^5.5.7",
     "react-hook-form": "^7.73.1",
+    "react-pdf": "^10.4.1",
     "react-router-dom": "^7.14.1",
     "react-zxing": "^2.1.0",
     "recharts": "^3.8.1",

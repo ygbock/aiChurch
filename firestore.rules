@@ -438,7 +438,8 @@ service cloud.firestore {
              (!('reactions' in data) || data.reactions is map) &&
              (!('deletedBy' in data) || data.deletedBy is list) &&
              (!('isEdited' in data) || data.isEdited is bool) &&
-             (!('replyTo' in data) || data.replyTo is map);
+             (!('replyTo' in data) || data.replyTo is map) &&
+             (!('attachment' in data) || data.attachment is map);
     }
 
     function isValidDirectMessageChat(data) {
