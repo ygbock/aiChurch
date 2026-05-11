@@ -28,6 +28,7 @@
     "express": "^4.21.2",
     "firebase": "^11.0.1",
     "html5-qrcode": "^2.3.8",
+    "idb-keyval": "^6.2.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.546.0",

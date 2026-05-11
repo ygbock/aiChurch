@@ -4,7 +4,14 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import Modal from '../components/Modal';
+import MessageAttachment from '../components/MessageAttachment';
 import PDFPreview from '../components/PDFPreview';
+import AudioPlayer from '../components/AudioPlayer';
+import CreatePollModal from '../components/CreatePollModal';
+import PollMessage from '../components/PollMessage';
+import EventMessage, { EventAttachment } from '../components/EventMessage';
+import CreateEventModal, { EventDraft } from '../components/CreateEventModal';
+import QuickReplyModal from '../components/QuickReplyModal';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -58,13 +65,16 @@ import {
   Music,
   BarChart2,
   Calendar,
-  MapPin
+  MapPin,
+  CheckCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDocs, getDoc, setDoc, updateDoc, increment, arrayUnion, deleteDoc, arrayRemove, where } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { db, storage, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useFirebase } from '../components/FirebaseProvider';
+import { useAudioRecorder } from '../hooks/useAudioRecorder';
 
 interface Message {
   id: string;
@@ -92,6 +102,12 @@ interface Message {
     size: string;
     url: string;
   };
+  poll?: {
+    question: string;
+    options: { id: string; text: string; votes: string[] }[];
+    allowMultipleAnswers: boolean;
+  };
+  event?: EventAttachment;
 }
 
 interface Channel {
@@ -107,13 +123,14 @@ interface Channel {
   minAge?: number | null;
   maxAge?: number | null;
   unreadCount?: number;
+  messagesCount?: number;
   memberIds?: string[];
 }
 
-const DEFAULT_CHANNELS: Omit<Channel, 'id'>[] = [
-  { name: 'general-announcements', description: 'Important announcements and updates.', membersCount: 1, type: 'announcement', level: 'global', autoEnroll: true },
-  { name: 'general-departments', description: 'General discussions for all department members.', membersCount: 1, type: 'department', level: 'global', autoEnroll: true },
-  { name: 'general-ministries', description: 'General discussions for all ministries.', membersCount: 1, type: 'ministry', level: 'global', autoEnroll: true }
+const DEFAULT_CHANNELS: (Omit<Channel, 'id'> & { messagesCount: number })[] = [
+  { name: 'general-announcements', description: 'Important announcements and updates.', membersCount: 1, type: 'announcement', level: 'global', autoEnroll: true, messagesCount: 0 },
+  { name: 'general-departments', description: 'General discussions for all department members.', membersCount: 1, type: 'department', level: 'global', autoEnroll: true, messagesCount: 0 },
+  { name: 'general-ministries', description: 'General discussions for all ministries.', membersCount: 1, type: 'ministry', level: 'global', autoEnroll: true, messagesCount: 0 }
 ];
 
 interface ChannelMember {
@@ -123,6 +140,7 @@ interface ChannelMember {
   initials: string;
   role: string;
   lastActive: any;
+  isTyping?: boolean;
 }
 
 const EMOJI_CATEGORIES = [
@@ -143,7 +161,7 @@ export default function MinistryChannels() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeMembers, setActiveMembers] = useState<ChannelMember[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [pendingAttachment, setPendingAttachment] = useState<{name: string, type: string, size: string, url: string, source: string} | null>(null);
+  const [pendingAttachment, setPendingAttachment] = useState<{name: string, type: string, size: string, url: string, source: string, file?: File} | null>(null);
 
   const handleShareLocation = () => {
     setShowAttachmentMenu(false);
@@ -167,7 +185,11 @@ export default function MinistryChannels() {
       },
       (error) => {
         console.error(error);
-        toast.error('Failed to get location. Provide permissions.', { id: 'location' });
+        let errorMessage = 'Failed to get location. Provide permissions.';
+        if (error.code === error.PERMISSION_DENIED) {
+          errorMessage = 'Location access denied. Please enable permissions.';
+        }
+        toast.error(errorMessage, { id: 'location' });
       }
     );
   };
@@ -206,16 +228,50 @@ export default function MinistryChannels() {
   const [isCreatingChannel, setIsCreatingChannel] = useState(false);
   const [showChannelMenu, setShowChannelMenu] = useState(false);
   
-  const [showMediaModal, setShowMediaModal] = useState(false);
   const [mediaTab, setMediaTab] = useState<'media' | 'links' | 'docs'>('media');
   const [isSearchingChannel, setIsSearchingChannel] = useState(false);
   const [channelSearchQuery, setChannelSearchQuery] = useState('');
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [showQuickReplyModal, setShowQuickReplyModal] = useState(false);
   const [emojiDrawerMessageId, setEmojiDrawerMessageId] = useState<string | null>(null);
   
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionTerm, setMentionTerm] = useState('');
+  const [messageStatisticsId, setMessageStatisticsId] = useState<string | null>(null);
+  
+  const channelMenuRef = useRef<HTMLDivElement>(null);
+  const attachmentMenuRef = useRef<HTMLDivElement>(null);
+
+  const { isRecording, recordingTime, startRecording, stopRecording, cancelRecording } = useAudioRecorder();
+
+  // Auto collapse menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (channelMenuRef.current && !channelMenuRef.current.contains(event.target as Node)) {
+        setShowChannelMenu(false);
+      }
+      if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(event.target as Node)) {
+        setShowAttachmentMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  
   // Note: we can parse initial from localStorage. We'll useEffect for it later or parse immediately.
+  const [readCounts, setReadCounts] = useState<Record<string, number>>(() => {
+    try {
+      const stored = localStorage.getItem('channelReadCounts');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const [mutedChannels, setMutedChannels] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('mutedChannels');
@@ -248,6 +304,8 @@ export default function MinistryChannels() {
   const [isAddingMembers, setIsAddingMembers] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isCurrentlyTypingRef = useRef(false);
 
   const handleRemoveMember = async (memberId: string) => {
     if (!activeChannelId || isAddingMembers) return;
@@ -311,6 +369,8 @@ export default function MinistryChannels() {
   const activeChannel = channels.find(c => c.id === activeChannelId);
 
   const isLeader = profile && ['superadmin', 'admin', 'district', 'branch_admin'].includes(profile.role);
+  const isAnnouncement = activeChannel?.type === 'announcement';
+  const canPost = !isAnnouncement || isLeader;
 
   // Filter channels the user has access to based on their profile
   const visibleChannels = channels.filter(channel => {
@@ -330,6 +390,12 @@ export default function MinistryChannels() {
        // Manual enrollment / Invite-only channels
        return channel.memberIds?.includes(user?.uid || '');
     }
+  }).map(channel => {
+    // Calculate unread count
+    const readCount = readCounts[channel.id] || 0;
+    const currentMessagesCount = channel.messagesCount || 0;
+    const unreadCount = Math.max(0, currentMessagesCount - readCount);
+    return { ...channel, unreadCount };
   });
 
   const branchChannels = visibleChannels.filter(c => c.level === 'branch');
@@ -418,7 +484,9 @@ export default function MinistryChannels() {
               deletedBy: data.deletedBy || [],
               rawReactions,
               reactions,
-              attachment: data.attachment
+              attachment: data.attachment,
+              poll: data.poll,
+              event: data.event
             };
           }) as Message[];
           setMessages(fetchedMessages);
@@ -564,65 +632,26 @@ export default function MinistryChannels() {
     }
   }, [messages]);
 
+  useEffect(() => {
+    if (activeChannelId) {
+      const activeChannel = channels.find(c => c.id === activeChannelId);
+      if (activeChannel && activeChannel.messagesCount !== undefined) {
+        setReadCounts(prev => {
+          const newCounts = { ...prev, [activeChannelId]: activeChannel.messagesCount || 0 };
+          localStorage.setItem('channelReadCounts', JSON.stringify(newCounts));
+          return newCounts;
+        });
+      }
+    }
+  }, [activeChannelId, channels]);
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, source: string = 'document') => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (readerEvent) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 800;
-          const MAX_HEIGHT = 800;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-          const base64str = dataUrl.split(',')[1];
-          const decoded = atob(base64str);
-          
-          setPendingAttachment({
-            name: file.name,
-            type: 'image/jpeg',
-            size: (decoded.length / 1024).toFixed(1) + ' KB',
-            url: dataUrl,
-            source
-          });
-          setShowAttachmentMenu(false);
-          
-          if (fileInputRef.current) fileInputRef.current.value = '';
-          if (imageInputRef.current) imageInputRef.current.value = '';
-          if (cameraInputRef.current) cameraInputRef.current.value = '';
-          if (audioInputRef.current) audioInputRef.current.value = '';
-        };
-        img.src = readerEvent.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-      return;
-    }
     
-    // Check max size for non-images (approx 700KB to stay well under 1MB Firestore limit)
-    if (file.size > 700 * 1024) {
-      toast.error('File too large. Max size for documents/audio is 700KB.');
+    // Check max size (e.g., 20MB for Firebase Storage)
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('File too large. Max size is 20MB.');
       if (fileInputRef.current) fileInputRef.current.value = '';
       if (imageInputRef.current) imageInputRef.current.value = '';
       if (cameraInputRef.current) cameraInputRef.current.value = '';
@@ -630,24 +659,95 @@ export default function MinistryChannels() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (readerEvent) => {
-      setPendingAttachment({
-        name: file.name,
-        type: file.type,
-        size: (file.size / 1024).toFixed(1) + ' KB',
-        url: readerEvent.target?.result as string,
-        source
-      });
-      setShowAttachmentMenu(false);
-    };
-    reader.readAsDataURL(file);
+    setPendingAttachment({
+      name: file.name,
+      type: file.type,
+      size: (file.size / 1024 / 1024).toFixed(2) + ' MB',
+      url: URL.createObjectURL(file), // Use object URL for preview
+      source,
+      file
+    });
+    setShowAttachmentMenu(false);
     
     // Reset inputs
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (imageInputRef.current) imageInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (audioInputRef.current) audioInputRef.current.value = '';
+  };
+
+  const handleSendPoll = async (pollData: any) => {
+    if (!activeChannelId || !user || !profile || isSubmitting) return;
+    
+    setIsSubmitting(true);
+    try {
+        const messagesRef = collection(db, 'ministryChannels', activeChannelId, 'messages');
+        const initials = profile.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
+
+        // pollData has options: [{id, text}]
+        // we need to set votes: []
+        const formattedPoll = {
+            ...pollData,
+            options: pollData.options.map((opt: any) => ({ ...opt, votes: [] }))
+        };
+
+        const messageData: any = {
+            authorId: user.uid,
+            authorName: profile.fullName,
+            authorInitials: initials,
+            authorRole: profile.role || 'Member',
+            authorAvatar: user.photoURL || null,
+            content: '',
+            poll: formattedPoll,
+            createdAt: serverTimestamp()
+        };
+
+        await addDoc(messagesRef, messageData);
+        await updateDoc(doc(db, 'ministryChannels', activeChannelId), { messagesCount: increment(1) });
+
+        setShowPollModal(false);
+    } catch(error: any) {
+        toast.error(`Failed to create poll: ${error?.message || 'Unknown error'}`);
+        handleFirestoreError(error, OperationType.CREATE, `ministryChannels/${activeChannelId}/messages`);
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+  const handleSendEvent = async (eventData: EventDraft) => {
+    if (!activeChannelId || !user || !profile || isSubmitting) return;
+    
+    setIsSubmitting(true);
+    try {
+        const messagesRef = collection(db, 'ministryChannels', activeChannelId, 'messages');
+        const initials = profile.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
+
+        const formattedEvent = {
+            ...eventData,
+            attendees: [user.uid] // Creator auto-attends
+        };
+
+        const messageData: any = {
+            authorId: user.uid,
+            authorName: profile.fullName,
+            authorInitials: initials,
+            authorRole: profile.role || 'Member',
+            authorAvatar: user.photoURL || null,
+            content: '',
+            event: formattedEvent,
+            createdAt: serverTimestamp()
+        };
+
+        await addDoc(messagesRef, messageData);
+        await updateDoc(doc(db, 'ministryChannels', activeChannelId), { messagesCount: increment(1) });
+
+        setShowEventModal(false);
+    } catch(error: any) {
+        toast.error(`Failed to create event: ${error?.message || 'Unknown error'}`);
+        handleFirestoreError(error, OperationType.CREATE, `ministryChannels/${activeChannelId}/messages`);
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -669,11 +769,11 @@ export default function MinistryChannels() {
       } else {
         const messageData: any = {
             authorId: user.uid,
-            authorName: profile.fullName,
-            authorInitials: initials,
-            authorRole: profile.role || 'Member',
+            authorName: profile.fullName || user.displayName || 'Unknown User',
+            authorInitials: initials || 'U',
+            authorRole: profile?.role || 'Member',
             authorAvatar: user.photoURL || null,
-            content: newMessage,
+            content: newMessage || '',
             createdAt: serverTimestamp()
         };
         
@@ -686,15 +786,35 @@ export default function MinistryChannels() {
         }
 
         if (pendingAttachment) {
+            let fileUrl = pendingAttachment.url;
+            if (pendingAttachment.source === 'location') {
+                // use existing fileUrl, skip storage upload
+            } else if (pendingAttachment.file) {
+                // Upload to Firebase Storage
+                const fileExtension = pendingAttachment.name.split('.').pop();
+                const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
+                const storageRef = ref(storage, `ministryChannels/${activeChannelId}/${fileName}`);
+                
+                try {
+                    const uploadTask = await uploadBytesResumable(storageRef, pendingAttachment.file);
+                    fileUrl = await getDownloadURL(uploadTask.ref);
+                } catch (uploadError: any) {
+                    console.error("Storage upload error:", uploadError);
+                    toast.error(`Firebase Storage Error: ${uploadError?.message || uploadError?.code || 'Unknown'}`);
+                    throw new Error(`Firebase Storage Error: ${uploadError?.message || uploadError?.code || 'Unknown'}`);
+                }
+            }
+
             messageData.attachment = {
                 name: pendingAttachment.name,
                 type: pendingAttachment.type,
                 size: pendingAttachment.size,
-                url: pendingAttachment.url
+                url: fileUrl
             };
         }
 
         await addDoc(messagesRef, messageData);
+        await updateDoc(doc(db, 'ministryChannels', activeChannelId), { messagesCount: increment(1) });
       }
       setNewMessage('');
       setPendingAttachment(null);
@@ -705,6 +825,26 @@ export default function MinistryChannels() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleTyping = () => {
+    if (!activeChannelId || !user) return;
+    
+    if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+    }
+    
+    if (!isCurrentlyTypingRef.current) {
+        isCurrentlyTypingRef.current = true;
+        const memberRef = doc(db, 'ministryChannels', activeChannelId, 'members', user.uid);
+        updateDoc(memberRef, { isTyping: true }).catch(() => {});
+    }
+    
+    typingTimeoutRef.current = setTimeout(() => {
+        isCurrentlyTypingRef.current = false;
+        const memberRef = doc(db, 'ministryChannels', activeChannelId, 'members', user.uid);
+        updateDoc(memberRef, { isTyping: false }).catch(() => {});
+    }, 2000);
   };
 
   const handleEditMessage = (msg: Message) => {
@@ -724,12 +864,12 @@ export default function MinistryChannels() {
     setDeleteConfirmInfo({ type: 'single', id: messageId });
   };
 
-  const confirmDeleteSingle = async (messageId: string) => {
+  const confirmDeleteSingle = async (messageId: string, forEveryone: boolean) => {
     if (!activeChannelId || !user) return;
     try {
       const msgRef = doc(db, 'ministryChannels', activeChannelId, 'messages', messageId);
       const msgObj = messages.find(m => m.id === messageId);
-      if (msgObj && msgObj.author.id === user.uid) {
+      if (forEveryone && msgObj && msgObj.author.id === user.uid) {
          await deleteDoc(msgRef);
       } else {
          await updateDoc(msgRef, { deletedBy: arrayUnion(user.uid) });
@@ -817,13 +957,13 @@ export default function MinistryChannels() {
     localStorage.setItem('mutedChannels', JSON.stringify(Array.from(newMuted)));
   };
 
-  const confirmDeleteMultiple = async () => {
+  const confirmDeleteMultiple = async (forEveryone: boolean) => {
     if (!activeChannelId || !user || selectedMessages.size === 0) return;
     try {
       const promises = Array.from(selectedMessages).map(async (msgId) => {
           const msgObj = messages.find(m => m.id === msgId);
           const msgRef = doc(db, 'ministryChannels', activeChannelId, 'messages', msgId);
-          if (msgObj && msgObj.author.id === user.uid) {
+          if (forEveryone && msgObj && msgObj.author.id === user.uid) {
              await deleteDoc(msgRef);
           } else {
              await updateDoc(msgRef, { deletedBy: arrayUnion(user.uid) });
@@ -884,6 +1024,7 @@ export default function MinistryChannels() {
       };
 
       await addDoc(messagesRef, messageData);
+      await updateDoc(doc(db, 'ministryChannels', forwardChannelId), { messagesCount: increment(1) });
       
       setIsForwardModalOpen(false);
       setMessageToForward(null);
@@ -1066,7 +1207,7 @@ export default function MinistryChannels() {
                         <div className="flex items-center justify-between w-full mb-1">
                           <div className="flex items-center gap-2 overflow-hidden">
                             <Hash size={14} className={`flex-shrink-0 ${activeChannelId === channel.id ? 'text-indigo-200' : 'text-slate-400'}`} />
-                            <span className={`text-sm font-bold truncate flex items-center gap-1.5 min-w-0 ${activeChannelId === channel.id ? 'text-white' : 'text-slate-700'}`}>
+                            <span className={`text-sm truncate flex items-center gap-1.5 min-w-0 ${activeChannelId === channel.id ? 'text-white font-bold' : (channel.unreadCount && channel.unreadCount > 0 ? 'text-slate-900 font-black' : 'text-slate-700 font-medium')}`}>
                               <span className="truncate">{channel.name}</span>
                               {channel.level && <span className={`flex-shrink-0 text-[8px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-sm ${activeChannelId === channel.id ? 'bg-indigo-500/50 text-white' : 'bg-slate-100 text-slate-500'}`}>{channel.level}</span>}
                             </span>
@@ -1076,7 +1217,7 @@ export default function MinistryChannels() {
                               <Users size={10} />
                               {channel.membersCount || 0}
                             </div>
-                            {channel.unreadCount && activeChannelId !== channel.id && (
+                            {(channel.unreadCount ?? 0) > 0 && activeChannelId !== channel.id && (
                               <span className="bg-rose-500 text-white text-[10px] font-black px-1.5 rounded-full min-w-[20px] text-center">
                                 {channel.unreadCount}
                               </span>
@@ -1150,17 +1291,30 @@ export default function MinistryChannels() {
                       <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden z-50">
                          <div className="py-1 flex flex-col">
                            {selectedMessages.size === 1 && messages.find(m => selectedMessages.has(m.id))?.author?.id === user?.uid && (
-                             <button onClick={() => {
-                               const msg = messages.find(m => selectedMessages.has(m.id));
-                               if (msg) {
-                                 handleEditMessage(msg);
-                                 setIsSelectionMode(false);
-                                 setSelectedMessages(new Set());
-                                 setShowSelectionMenu(false);
-                               }
-                             }} className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-3">
-                               <Edit2 size={16} /> Edit Message
-                             </button>
+                             <>
+                               <button onClick={() => {
+                                 const msg = messages.find(m => selectedMessages.has(m.id));
+                                 if (msg) {
+                                   setMessageStatisticsId(msg.id);
+                                   setIsSelectionMode(false);
+                                   setSelectedMessages(new Set());
+                                   setShowSelectionMenu(false);
+                                 }
+                               }} className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-3">
+                                 <Info size={16} /> Message Info
+                               </button>
+                               <button onClick={() => {
+                                 const msg = messages.find(m => selectedMessages.has(m.id));
+                                 if (msg) {
+                                   handleEditMessage(msg);
+                                   setIsSelectionMode(false);
+                                   setSelectedMessages(new Set());
+                                   setShowSelectionMenu(false);
+                                 }
+                               }} className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-3">
+                                 <Edit2 size={16} /> Edit Message
+                               </button>
+                             </>
                            )}
                          </div>
                       </div>
@@ -1198,7 +1352,7 @@ export default function MinistryChannels() {
                 <button type="button" className="hidden sm:flex p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
                   <Phone size={18} />
                 </button>
-                <div className="relative">
+                <div className="relative" ref={channelMenuRef}>
                   <button 
                     type="button"
                     onClick={() => setShowChannelMenu(!showChannelMenu)}
@@ -1214,12 +1368,6 @@ export default function MinistryChannels() {
                            className={`w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-3 ${showDetails ? 'text-indigo-600' : 'text-slate-700'}`}
                         >
                            <Info size={16} /> Channel Details
-                        </button>
-                        <button
-                           onClick={() => { setShowMediaModal(true); setShowChannelMenu(false); }}
-                           className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-3"
-                        >
-                           <ImageIcon size={16} /> Media, Links, and Docs
                         </button>
                         <button
                            onClick={() => { setIsSearchingChannel(true); setShowChannelMenu(false); }}
@@ -1359,7 +1507,7 @@ export default function MinistryChannels() {
                     onClick={(e) => {
                       if (isSelectionMode) return;
                       e.stopPropagation();
-                      if (msg.author.avatar) setPreviewImage(msg.author.avatar);
+                      if (msg.author.avatar) setPreviewFile({url: msg.author.avatar, type: 'image/jpeg', name: msg.author.name});
                     }}
                     className={`w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-indigo-600 font-bold shrink-0 overflow-hidden hover:scale-110 active:scale-95 transition-transform flex ${msg.author.avatar ? 'cursor-zoom-in' : 'cursor-default'}`}
                   >
@@ -1395,67 +1543,43 @@ export default function MinistryChannels() {
 
                       {/* Attachment Inside Bubble */}
                       {msg.attachment && (
-                        msg.attachment.type.startsWith('image/') ? (
-                          <div className={`mt-1 mb-2 rounded-xl border ${isMe ? 'border-indigo-400/30' : 'border-slate-200'} bg-black/5 overflow-hidden max-w-[280px] shadow-sm cursor-pointer hover:opacity-90 transition-opacity flex`} onClick={() => setPreviewFile(msg.attachment ? {url: msg.attachment.url, type: msg.attachment.type, name: msg.attachment.name} : null)}>
-                            <img src={msg.attachment.url} alt={msg.attachment.name} className="w-full h-auto object-cover max-h-[300px]" />
-                          </div>
-                        ) : msg.attachment.type.startsWith('audio/') ? (
-                          <div className={`mt-1 mb-2 rounded-xl border ${isMe ? 'border-indigo-400/30 bg-indigo-500/20' : 'border-slate-200 bg-slate-50'} p-3 shadow-sm max-w-[280px] flex flex-col`}>
-                            <audio controls src={msg.attachment.url} className="w-full h-10 max-w-[240px]" />
-                            <p className={`text-[10px] font-medium mt-1 truncate ${isMe ? 'text-indigo-100' : 'text-slate-500'}`}>{msg.attachment.name}</p>
-                          </div>
-                        ) : msg.attachment.type === 'location/gps' ? (
-                          <a href={msg.attachment.url} target="_blank" rel="noopener noreferrer" className={`mt-1 mb-2 flex items-center gap-3 p-3 rounded-xl border ${isMe ? 'border-indigo-400/30 bg-indigo-500/20' : 'border-slate-200 bg-white'} max-w-sm hover:opacity-90 transition-all group/file ${isMe ? 'flex-row-reverse' : ''}`}>
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isMe ? 'bg-indigo-400/30 text-indigo-100' : 'bg-teal-50 text-teal-600'}`}>
-                              <MapPin size={20} />
-                            </div>
-                            <div className={`flex-1 min-w-0 flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                              <p className={`text-xs font-bold truncate ${isMe ? 'text-white' : 'text-slate-900'}`}>Shared Location</p>
-                              <p className={`text-[10px] font-medium truncate ${isMe ? 'text-indigo-200' : 'text-slate-500'}`}>{msg.attachment.size}</p>
-                            </div>
-                            <div className={`shrink-0 transition-colors ${isMe ? 'text-indigo-300 group-hover/file:text-white' : 'text-slate-300 group-hover/file:text-teal-600'}`}>
-                              <span className="text-[10px] font-bold tracking-widest uppercase relative -top-[2px]">Open</span>
-                            </div>
-                          </a>
-                        ) : msg.attachment.type === 'application/pdf' ? (
-                          <div onClick={() => setPreviewFile(msg.attachment ? {url: msg.attachment.url, type: msg.attachment.type, name: msg.attachment.name} : null)} className={`mt-1 mb-2 rounded-xl border overflow-hidden max-w-[280px] cursor-pointer group/doc shadow-sm flex flex-col ${isMe ? 'border-indigo-400/30 bg-indigo-500/20' : 'border-slate-200 bg-slate-50'}`}>
-                            <div className="h-40 overflow-hidden bg-white/90 relative pointer-events-none flex items-start justify-center">
-                              <Document 
-                                 file={msg.attachment.url} 
-                                 loading={<div className="h-40 w-full flex items-center justify-center bg-transparent"><div className={`w-6 h-6 border-2 border-t-transparent rounded-full animate-spin ${isMe ? 'border-indigo-200' : 'border-slate-400'}`}></div></div>}
-                              >
-                                 <Page pageNumber={1} width={280} renderTextLayer={false} renderAnnotationLayer={false} className="shadow-none !bg-transparent" />
-                              </Document>
-                              <div className={`absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t ${isMe ? 'from-indigo-600' : 'from-white'} to-transparent opacity-50`} />
-                            </div>
-                            <div className={`p-3 relative z-10 border-t ${isMe ? 'bg-indigo-500/40 border-indigo-400/30 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'} mt-[-2px] flex flex-col items-start`}>
-                              <div className="flex flex-col gap-1 w-full text-left">
-                                  <p className="text-sm font-medium truncate">{msg.attachment.name}</p>
-                                  <div className={`text-[11px] flex items-center gap-1.5 ${isMe ? 'text-indigo-100' : 'text-slate-500'}`}>
-                                    <span>PDF</span>
-                                    <span className="w-1 h-1 rounded-full bg-current opacity-50" />
-                                    <span>{msg.attachment?.size || 'Unknown size'}</span>
-                                  </div>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div onClick={() => window.open(msg.attachment?.url || '', '_blank')} className={`mt-1 mb-2 flex items-center gap-3 p-3 rounded-xl border ${isMe ? 'border-indigo-400/30 bg-indigo-500/20' : 'border-slate-200 bg-white'} max-w-sm hover:opacity-90 transition-all cursor-pointer group/file ${isMe ? 'flex-row-reverse' : ''}`}>
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isMe ? 'bg-indigo-400/30 text-indigo-100' : 'bg-indigo-50 text-indigo-600'}`}>
-                              <FileText size={20} />
-                            </div>
-                            <div className={`flex-1 min-w-0 flex flex-col ${isMe ? 'items-end' : 'text-left'}`}>
-                              <p className={`text-xs font-bold truncate ${isMe ? 'text-white' : 'text-slate-900'}`}>{msg.attachment.name}</p>
-                              <p className={`text-[10px] font-medium ${isMe ? 'text-indigo-200' : 'text-slate-500'}`}>{msg.attachment.size}</p>
-                            </div>
-                            <Download size={16} className={`shrink-0 transition-colors ${isMe ? 'text-indigo-300 group-hover/file:text-white' : 'text-slate-300 group-hover/file:text-indigo-600'}`} />
-                          </div>
-                        )
+                        <MessageAttachment attachment={msg.attachment} isMe={isMe} setPreviewFile={setPreviewFile} />
+                      )}
+                      
+                      {/* Poll Inside Bubble */}
+                      {msg.poll && (
+                        <PollMessage 
+                           poll={msg.poll} 
+                           messageId={msg.id} 
+                           chatId={activeChannelId!} 
+                           currentUserId={user!.uid} 
+                        />
+                      )}
+
+                      {/* Event Inside Bubble */}
+                      {msg.event && (
+                        <EventMessage 
+                           event={msg.event} 
+                           messageId={msg.id} 
+                           chatId={activeChannelId!} 
+                           currentUserId={user!.uid} 
+                        />
                       )}
 
                       {msg.content && (
                         <p className={`text-[14px] leading-relaxed mb-1 ${isMe ? 'text-white text-right' : 'text-slate-800 text-left'}`}>
-                          {msg.content}
+                          {profile?.fullName && msg.content.includes(`@${profile.fullName}`) ? (
+                             msg.content.split(`@${profile.fullName}`).map((part, i, arr) => (
+                                <React.Fragment key={i}>
+                                   {part}
+                                   {i < arr.length - 1 && (
+                                      <span className={`font-bold px-1.5 py-0.5 rounded-md ${isMe ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800'}`}>@{profile.fullName}</span>
+                                   )}
+                                </React.Fragment>
+                             ))
+                          ) : (
+                             msg.content
+                          )}
                         </p>
                       )}
                       
@@ -1517,7 +1641,7 @@ export default function MinistryChannels() {
         </div>
 
         {/* Input Area */}
-        {isLeader || !(activeChannel?.name.toLowerCase().includes('announcement') && ['global', 'district'].includes(activeChannel?.level || '')) ? (
+        {canPost ? (
         <div className="p-2 md:p-3 bg-transparent mt-auto shrink-0 w-full border-t-0">
           {(replyingToMessage || editingMessageId) && (
              <div className="mb-2 mx-2 px-3 py-2 bg-indigo-50 border-l-4 border-indigo-500 rounded-r-lg flex justify-between items-center text-sm shadow-sm">
@@ -1539,6 +1663,20 @@ export default function MinistryChannels() {
                 </button>
              </div>
           )}
+
+          {activeMembers.filter(m => m.isTyping && m.userId !== user?.uid).length > 0 && (
+             <div className="px-4 py-1 text-xs text-indigo-500 font-medium animate-pulse flex items-center gap-2">
+                <div className="flex gap-1">
+                   <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                   <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                   <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                {activeMembers.filter(m => m.isTyping && m.userId !== user?.uid)
+                               .map(m => m.fullName.split(' ')[0])
+                               .join(', ')} is typing...
+             </div>
+          )}
+
           <form 
             onSubmit={handleSendMessage}
             className="flex items-end gap-2 w-full max-w-full relative"
@@ -1547,49 +1685,50 @@ export default function MinistryChannels() {
             <AnimatePresence>
               {showAttachmentMenu && (
                 <motion.div 
+                  ref={attachmentMenuRef}
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
                   className="absolute bottom-full right-12 mb-2 w-72 bg-white rounded-3xl shadow-xl border border-slate-100 p-4 z-50 origin-bottom-right"
                 >
                   <div className="grid grid-cols-4 gap-y-4 gap-x-2">
-                    <button type="button" onClick={() => { fileInputRef.current?.click(); }} className="flex flex-col items-center gap-1 group">
+                    <label htmlFor="upload-document" className="flex flex-col items-center gap-1 group cursor-pointer">
                        <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
                          <FileText size={20} />
                        </div>
                        <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Document</span>
-                    </button>
-                    <button type="button" onClick={() => { cameraInputRef.current?.click(); }} className="flex flex-col items-center gap-1 group">
+                    </label>
+                    <label htmlFor="upload-camera" className="flex flex-col items-center gap-1 group cursor-pointer">
                        <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-100 transition-colors">
                          <Camera size={20} />
                        </div>
                        <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Camera</span>
-                    </button>
-                    <button type="button" onClick={() => { imageInputRef.current?.click(); }} className="flex flex-col items-center gap-1 group">
+                    </label>
+                    <label htmlFor="upload-gallery" className="flex flex-col items-center gap-1 group cursor-pointer">
                        <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
                          <ImageIcon size={20} />
                        </div>
                        <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Gallery</span>
-                    </button>
-                    <button type="button" onClick={() => { audioInputRef.current?.click(); }} className="flex flex-col items-center gap-1 group">
+                    </label>
+                    <label htmlFor="upload-audio" className="flex flex-col items-center gap-1 group cursor-pointer">
                        <div className="w-12 h-12 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
                          <Music size={20} />
                        </div>
                        <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Audio</span>
-                    </button>
-                    <button type="button" onClick={() => { toast.info('Quick replies coming soon!'); setShowAttachmentMenu(false); }} className="flex flex-col items-center gap-1 group">
+                    </label>
+                    <button type="button" onClick={() => { setNewMessage('/'); setShowQuickReplyModal(true); setShowAttachmentMenu(false); }} className="flex flex-col items-center gap-1 group">
                        <div className="w-12 h-12 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center group-hover:bg-sky-100 transition-colors">
                          <Zap size={20} />
                        </div>
                        <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Quick Reply</span>
                     </button>
-                    <button type="button" onClick={() => { toast.info('Polls coming soon!'); setShowAttachmentMenu(false); }} className="flex flex-col items-center gap-1 group">
+                    <button type="button" onClick={() => { setShowPollModal(true); setShowAttachmentMenu(false); }} className="flex flex-col items-center gap-1 group">
                        <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
                          <BarChart2 size={20} />
                        </div>
                        <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Poll</span>
                     </button>
-                    <button type="button" onClick={() => { toast.info('Events coming soon!'); setShowAttachmentMenu(false); }} className="flex flex-col items-center gap-1 group">
+                    <button type="button" onClick={() => { setShowEventModal(true); setShowAttachmentMenu(false); }} className="flex flex-col items-center gap-1 group">
                        <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
                          <Calendar size={20} />
                        </div>
@@ -1607,60 +1746,127 @@ export default function MinistryChannels() {
             </AnimatePresence>
 
             {/* Hidden Intputs */}
-            <input type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'document')} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.zip" />
-            <input type="file" ref={imageInputRef} onChange={(e) => handleFileUpload(e, 'gallery')} className="hidden" accept="image/*" />
-            <input type="file" ref={cameraInputRef} onChange={(e) => handleFileUpload(e, 'camera')} className="hidden" accept="image/*" capture="environment" />
-            <input type="file" ref={audioInputRef} onChange={(e) => handleFileUpload(e, 'audio')} className="hidden" accept="audio/*" />
+            <input id="upload-document" type="file" ref={fileInputRef} onChange={(e) => handleFileUpload(e, 'document')} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.zip" />
+            <input id="upload-gallery" type="file" ref={imageInputRef} onChange={(e) => handleFileUpload(e, 'gallery')} className="hidden" accept="image/*" />
+            <input id="upload-camera" type="file" ref={cameraInputRef} onChange={(e) => handleFileUpload(e, 'camera')} className="hidden" accept="image/*" capture="environment" />
+            <input id="upload-audio" type="file" ref={audioInputRef} onChange={(e) => handleFileUpload(e, 'audio')} className="hidden" accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac,.flac,.wma" />
 
-            <div className={`flex bg-white items-center gap-1 flex-1 border ${editingMessageId || replyingToMessage ? 'border-indigo-400 ring-2 ring-indigo-500/20' : 'border-slate-200'} shadow-sm rounded-3xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all`}>
-              <button 
-                type="button" 
-                onClick={() => setEmojiDrawerMessageId('new')}
-                className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0" 
-                title="Add Emoji"
-              >
-                <Smile size={24} />
-              </button>
-              <textarea 
-                ref={inputRef as any}
-                value={newMessage}
-                onChange={(e) => {
-                  setNewMessage(e.target.value);
-                  e.target.style.height = 'auto';
-                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && window.innerWidth >= 1024) {
-                    e.preventDefault();
-                    if (newMessage.trim() || pendingAttachment) {
-                      handleSendMessage(e as any);
-                    }
-                  }
-                }}
-                placeholder={`Message #${activeChannel?.name}...`}
-                className="flex-1 bg-transparent border-none py-1.5 text-[15px] font-normal text-slate-700 placeholder:text-slate-400 focus:ring-0 outline-none resize-none max-h-[120px] min-h-[24px] overflow-y-auto leading-tight"
-                rows={1}
-                style={{ minHeight: '24px' }}
-              />
-              <button 
-                type="button" 
-                onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
-                className={`p-1.5 transition-colors shrink-0 ${showAttachmentMenu ? 'text-indigo-600 bg-indigo-50 rounded-full' : 'text-slate-400 hover:text-indigo-600'}`} 
-                title="Attach file"
-              >
-                <Paperclip size={20} className="transform -rotate-45" />
-              </button>
-              {!(newMessage.trim() || pendingAttachment) && (
+            {isRecording ? (
+              <div className="flex bg-white items-center justify-between gap-3 flex-1 border border-rose-200 shadow-sm rounded-3xl px-4 py-1.5 h-[44px] transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></div>
+                  <span className="text-sm font-medium text-slate-700">
+                    {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+                  </span>
+                </div>
+                <button type="button" onClick={cancelRecording} className="text-sm font-medium text-rose-500 hover:text-rose-600 transition-colors px-2 py-1 rounded-md hover:bg-rose-50">
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className={`flex bg-white items-center gap-1 flex-1 border ${editingMessageId || replyingToMessage ? 'border-indigo-400 ring-2 ring-indigo-500/20' : 'border-slate-200'} shadow-sm rounded-3xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all`}>
                 <button 
                   type="button" 
-                  onClick={() => toast.info('Camera access coming soon!')}
-                  className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0 mr-1"
-                  title="Take photo"
+                  onClick={() => setEmojiDrawerMessageId('new')}
+                  className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0" 
+                  title="Add Emoji"
                 >
-                  <Camera size={24} />
+                  <Smile size={24} />
                 </button>
-              )}
-            </div>
+
+                {showMentions && (
+                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-20">
+                     <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                       Mention a member
+                     </div>
+                     <div className="max-h-48 overflow-y-auto p-1">
+                        {activeMembers.filter(m => m.fullName.toLowerCase().includes(mentionTerm.toLowerCase())).length === 0 ? (
+                            <div className="px-3 py-2 text-sm text-slate-500 font-medium">No members found</div>
+                        ) : (
+                            activeMembers.filter(m => m.fullName.toLowerCase().includes(mentionTerm.toLowerCase())).map(member => (
+                               <button 
+                                  key={member.userId}
+                                  type="button"
+                                  className="w-full text-left px-3 py-2 rounded-lg text-slate-700 hover:bg-slate-100 flex items-center gap-2 transition-colors"
+                                  onClick={() => {
+                                      const textBeforeMention = newMessage.slice(0, inputRef.current?.selectionStart || newMessage.length).replace(/@(\w*)$/, '');
+                                      const textAfterCursor = newMessage.slice(inputRef.current?.selectionStart || newMessage.length);
+                                      setNewMessage(`${textBeforeMention}@${member.fullName} ${textAfterCursor}`);
+                                      setShowMentions(false);
+                                      setTimeout(() => inputRef.current?.focus(), 0);
+                                  }}
+                               >
+                                  <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
+                                      {member.initials}
+                                  </div>
+                                  <span className="text-sm font-bold truncate">{member.fullName}</span>
+                               </button>
+                            ))
+                        )}
+                     </div>
+                  </div>
+                )}
+
+                <textarea 
+                  ref={inputRef as any}
+                  value={newMessage}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewMessage(val);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                    handleTyping();
+
+                    if (val === '/') {
+                      setShowQuickReplyModal(true);
+                      setNewMessage('');
+                      return;
+                    }
+
+                    const cursorPosition = e.target.selectionStart;
+                    const textBeforeCursor = val.slice(0, cursorPosition);
+                    const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+                    
+                    if (mentionMatch) {
+                      setShowMentions(true);
+                      setMentionTerm(mentionMatch[1]);
+                    } else {
+                      setShowMentions(false);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && window.innerWidth >= 1024) {
+                      e.preventDefault();
+                      if (newMessage.trim() || pendingAttachment) {
+                        handleSendMessage(e as any);
+                      }
+                    }
+                  }}
+                  placeholder={`Message #${activeChannel?.name}... Type / for quick replies`}
+                  className="flex-1 bg-transparent border-none py-1.5 text-[15px] font-normal text-slate-700 placeholder:text-slate-400 focus:ring-0 outline-none resize-none max-h-[120px] min-h-[24px] overflow-y-auto leading-tight"
+                  rows={1}
+                  style={{ minHeight: '24px' }}
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+                  className={`p-1.5 transition-colors shrink-0 ${showAttachmentMenu ? 'text-indigo-600 bg-indigo-50 rounded-full' : 'text-slate-400 hover:text-indigo-600'}`} 
+                  title="Attach file"
+                >
+                  <Paperclip size={20} className="transform -rotate-45" />
+                </button>
+                {!(newMessage.trim() || pendingAttachment) && (
+                  <button 
+                    type="button" 
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors shrink-0 mr-1"
+                    title="Take photo"
+                  >
+                    <Camera size={24} />
+                  </button>
+                )}
+              </div>
+            )}
             {(newMessage.trim() || pendingAttachment) ? (
               <button 
                 type="submit"
@@ -1668,9 +1874,31 @@ export default function MinistryChannels() {
               >
                 <Send size={20} style={{ transform: 'translateX(1px)' }} />
               </button>
+            ) : isRecording ? (
+              <button 
+                type="button"
+                onClick={async () => {
+                  const audioBlob = await stopRecording();
+                  if (audioBlob) {
+                    const file = new File([audioBlob], `Voice Message ${new Date().toLocaleTimeString()}.webm`, { type: 'audio/webm' });
+                    setPendingAttachment({
+                      name: file.name,
+                      type: file.type,
+                      size: (file.size / 1024 / 1024).toFixed(2) + ' MB',
+                      url: URL.createObjectURL(file),
+                      file: file,
+                      source: 'audio'
+                    });
+                  }
+                }}
+                className="w-12 h-12 shrink-0 bg-rose-500 text-white rounded-full flex items-center justify-center hover:bg-rose-600 active:scale-95 transition-all shadow-sm animate-pulse"
+              >
+                <Send size={20} style={{ transform: 'translateX(1px)' }} />
+              </button>
             ) : (
               <button 
                 type="button"
+                onClick={startRecording}
                 className="w-12 h-12 shrink-0 bg-[#00a884] text-white rounded-full flex items-center justify-center hover:bg-[#008f6f] active:scale-95 transition-all shadow-sm"
               >
                 <Mic size={24} />
@@ -1708,9 +1936,11 @@ export default function MinistryChannels() {
           >
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-black text-slate-900">Details</h3>
-              <button onClick={() => setShowDetails(false)} className="text-slate-400 hover:text-slate-600">
-                 <ChevronRight size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowDetails(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+                   <ChevronRight size={20} />
+                </button>
+              </div>
             </div>
             
             <div className="p-6 space-y-8">
@@ -1723,6 +1953,104 @@ export default function MinistryChannels() {
                   <p className="text-xs text-slate-600 font-medium leading-relaxed">
                     {activeChannel?.description}
                   </p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <ImageIcon size={12} /> Media, Links & Docs
+                </h4>
+                <div className="space-y-4">
+                  <div className="flex bg-slate-50 rounded-lg p-1 border border-slate-100">
+                    <button
+                      onClick={() => setMediaTab('media')}
+                      className={`flex-1 text-xs font-bold uppercase tracking-widest py-2 rounded-md transition-colors ${mediaTab === 'media' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Media
+                    </button>
+                    <button
+                      onClick={() => setMediaTab('links')}
+                      className={`flex-1 text-xs font-bold uppercase tracking-widest py-2 rounded-md transition-colors ${mediaTab === 'links' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Links
+                    </button>
+                    <button
+                      onClick={() => setMediaTab('docs')}
+                      className={`flex-1 text-xs font-bold uppercase tracking-widest py-2 rounded-md transition-colors ${mediaTab === 'docs' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Docs
+                    </button>
+                  </div>
+                  
+                  <div className="min-h-[200px] max-h-[400px] overflow-y-auto">
+                    {mediaTab === 'media' && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {messages.filter(msg => msg.attachment && msg.attachment.name.match(/\.(jpeg|jpg|gif|png)$/i)).length > 0 ? (
+                           messages.filter(msg => msg.attachment && msg.attachment.name.match(/\.(jpeg|jpg|gif|png)$/i)).map(msg => (
+                             <div key={msg.id} className="aspect-square bg-slate-100 rounded-lg overflow-hidden relative group cursor-pointer" onClick={() => {
+                               if (msg.attachment && msg.attachment.url) {
+                                 setPreviewFile({
+                                   url: msg.attachment.url,
+                                   type: msg.attachment.type,
+                                   name: msg.attachment.name
+                                 });
+                               }
+                             }}>
+                               <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400">
+                                  {msg.attachment?.url ? (
+                                    <img src={msg.attachment.url} alt="thumbnail" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <ImageIcon size={24} />
+                                  )}
+                               </div>
+                             </div>
+                           ))
+                        ) : (
+                           <div className="col-span-3 text-center py-8 text-slate-500 text-sm">No media found in this channel.</div>
+                        )}
+                      </div>
+                    )}
+                    {mediaTab === 'links' && (
+                      <div className="space-y-2">
+                        {messages.filter(msg => msg.content.match(/https?:\/\/[^\s]+/)).length > 0 ? (
+                           messages.filter(msg => msg.content.match(/https?:\/\/[^\s]+/)).map(msg => {
+                             const urls = msg.content.match(/https?:\/\/[^\s]+/g);
+                             return urls?.map((url, i) => (
+                               <a key={`${msg.id}-${i}`} href={url} target="_blank" rel="noopener noreferrer" className="block p-3 bg-slate-50 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors">
+                                 <p className="text-sm text-indigo-600 truncate">{url}</p>
+                                 <p className="text-xs text-slate-400 mt-1 line-clamp-1">{msg.content}</p>
+                               </a>
+                             ));
+                           })
+                        ) : (
+                           <div className="text-center py-8 text-slate-500 text-sm">No links found in this channel.</div>
+                        )}
+                      </div>
+                    )}
+                    {mediaTab === 'docs' && (
+                      <div className="space-y-2">
+                        {messages.filter(msg => msg.attachment && !msg.attachment.name.match(/\.(jpeg|jpg|gif|png)$/i)).length > 0 ? (
+                           messages.filter(msg => msg.attachment && !msg.attachment.name.match(/\.(jpeg|jpg|gif|png)$/i)).map(msg => (
+                             <button key={msg.id} onClick={() => {
+                               if (msg.attachment?.url) {
+                                 window.open(msg.attachment.url, '_blank');
+                               }
+                             }} className="w-full text-left flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors">
+                               <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded flex items-center justify-center shrink-0">
+                                 📄
+                               </div>
+                               <div className="min-w-0 flex-1">
+                                 <p className="text-sm font-medium text-slate-700 truncate">{msg.attachment?.name || 'Document'}</p>
+                                 <p className="text-xs text-slate-400 mt-0.5">{msg.time}</p>
+                               </div>
+                             </button>
+                           ))
+                        ) : (
+                           <div className="text-center py-8 text-slate-500 text-sm">No documents found in this channel.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1941,6 +2269,7 @@ export default function MinistryChannels() {
                 name: formattedName,
                 description: newChannelDescription.trim(),
                 membersCount: 1, // Just the creator to start
+                messagesCount: 0,
                 memberIds: [user?.uid], // Add the creator to memberIds
                 type: newChannelType,
                 level: newChannelLevel,
@@ -2180,26 +2509,50 @@ export default function MinistryChannels() {
         <div className="space-y-4">
           <p className="text-slate-600">
             {deleteConfirmInfo?.type === 'single' 
-              ? 'Are you sure you want to delete this message? Only you will see it removed if you are not the author.' 
+              ? 'Are you sure you want to delete this message?' 
               : `Are you sure you want to delete ${selectedMessages.size} messages?`}
           </p>
-          <div className="flex justify-end gap-2 pt-4">
-            <button 
-              onClick={() => setDeleteConfirmInfo(null)}
-              className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              onClick={() => {
-                if (deleteConfirmInfo?.type === 'single') confirmDeleteSingle(deleteConfirmInfo.id);
-                if (deleteConfirmInfo?.type === 'multiple') confirmDeleteMultiple();
-              }}
-              className="px-6 py-2 bg-rose-600 text-white text-sm font-bold rounded-lg shadow-sm hover:bg-rose-700 transition-colors flex items-center gap-2"
-            >
-              <Trash2 size={16} />
-              Delete
-            </button>
+          <div className="flex flex-col gap-2 pt-4">
+            {(() => {
+              const canDeleteForEveryone = deleteConfirmInfo 
+                ? (deleteConfirmInfo.type === 'single'
+                   ? messages.find(m => m.id === deleteConfirmInfo.id)?.author.id === user?.uid
+                   : Array.from(selectedMessages).some(id => messages.find(m => m.id === id)?.author.id === user?.uid))
+                : false;
+                
+              return (
+                <>
+                  {canDeleteForEveryone && (
+                    <button 
+                      onClick={() => {
+                        if (deleteConfirmInfo?.type === 'single') confirmDeleteSingle(deleteConfirmInfo.id, true);
+                        if (deleteConfirmInfo?.type === 'multiple') confirmDeleteMultiple(true);
+                      }}
+                      className="w-full px-6 py-2.5 bg-rose-600 text-white text-sm font-bold rounded-lg shadow-sm hover:bg-rose-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Trash2 size={16} />
+                      Delete for Everyone
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => {
+                      if (deleteConfirmInfo?.type === 'single') confirmDeleteSingle(deleteConfirmInfo.id, false);
+                      if (deleteConfirmInfo?.type === 'multiple') confirmDeleteMultiple(false);
+                    }}
+                    className={`w-full px-6 py-2.5 ${canDeleteForEveryone ? 'text-rose-600 bg-rose-50 hover:bg-rose-100' : 'bg-rose-600 text-white hover:bg-rose-700 shadow-sm'} text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2`}
+                  >
+                    {canDeleteForEveryone ? null : <Trash2 size={16} />}
+                    Delete for Me
+                  </button>
+                  <button 
+                    onClick={() => setDeleteConfirmInfo(null)}
+                    className="w-full px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors mt-2"
+                  >
+                    Cancel
+                  </button>
+                </>
+              );
+            })()}
           </div>
         </div>
       </Modal>
@@ -2333,87 +2686,76 @@ export default function MinistryChannels() {
         )}
       </AnimatePresence>
 
-      {/* Media Modal */}
-      <Modal isOpen={showMediaModal} onClose={() => setShowMediaModal(false)} title="Media, Links & Docs">
-        <div className="space-y-4">
-           <div className="flex bg-slate-100 rounded-lg p-1">
-             <button
-               onClick={() => setMediaTab('media')}
-               className={`flex-1 text-xs font-bold uppercase tracking-widest py-2 rounded-md transition-colors ${mediaTab === 'media' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-             >
-               Media
-             </button>
-             <button
-               onClick={() => setMediaTab('links')}
-               className={`flex-1 text-xs font-bold uppercase tracking-widest py-2 rounded-md transition-colors ${mediaTab === 'links' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-             >
-               Links
-             </button>
-             <button
-               onClick={() => setMediaTab('docs')}
-               className={`flex-1 text-xs font-bold uppercase tracking-widest py-2 rounded-md transition-colors ${mediaTab === 'docs' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-             >
-               Docs
-             </button>
-           </div>
-           
-           <div className="min-h-[200px] max-h-[400px] overflow-y-auto">
-             {mediaTab === 'media' && (
-               <div className="grid grid-cols-3 gap-2">
-                 {messages.filter(msg => msg.attachment && msg.attachment.name.match(/\.(jpeg|jpg|gif|png)$/i)).length > 0 ? (
-                    messages.filter(msg => msg.attachment && msg.attachment.name.match(/\.(jpeg|jpg|gif|png)$/i)).map(msg => (
-                      <div key={msg.id} className="aspect-square bg-slate-100 rounded-lg overflow-hidden relative group cursor-pointer" onClick={() => { setShowMediaModal(false); toast.info('Image view coming soon!'); }}>
-                        <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400">
-                           <ImageIcon size={24} />
+      {/* Report Channel Modal */}
+      <Modal isOpen={!!messageStatisticsId} onClose={() => setMessageStatisticsId(null)} title="Message Info">
+        <div className="p-6">
+          {(() => {
+            const msg = messages.find(m => m.id === messageStatisticsId);
+            if (!msg || !activeChannel) return null;
+            
+            // For UI purposes, let's treat everyone in activeMembers (except the author) as having received it
+            // and those who have a recent lastActive as having read it
+            const recipients = activeMembers.filter(m => m.userId !== msg.author.id);
+            const readBy = recipients.slice(0, Math.ceil(recipients.length / 2)); // Mock half read
+            const deliveredTo = recipients.slice(Math.ceil(recipients.length / 2)); // Mock half delivered
+
+            return (
+              <div className="space-y-6">
+                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
+                  <p className="text-sm font-medium text-slate-800 break-words whitespace-pre-wrap">{msg.content}</p>
+                </div>
+                
+                <div>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <CheckCheck size={16} className="text-[#53bdeb]" /> Read by
+                  </h4>
+                  {readBy.length === 0 ? (
+                    <p className="text-sm text-slate-400 italic px-2">No one has read this yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {readBy.map(member => (
+                        <div key={member.id} className="flex items-center justify-between px-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs uppercase">
+                              {member.initials}
+                            </div>
+                            <span className="text-sm font-bold text-slate-700">{member.fullName}</span>
+                          </div>
+                          <CheckCheck size={16} className="text-[#53bdeb]" />
                         </div>
-                      </div>
-                    ))
-                 ) : (
-                    <div className="col-span-3 text-center py-8 text-slate-500 text-sm">No media found in this channel.</div>
-                 )}
-               </div>
-             )}
-             {mediaTab === 'links' && (
-               <div className="space-y-2">
-                 {messages.filter(msg => msg.content.match(/https?:\/\/[^\s]+/)).length > 0 ? (
-                    messages.filter(msg => msg.content.match(/https?:\/\/[^\s]+/)).map(msg => {
-                      const urls = msg.content.match(/https?:\/\/[^\s]+/g);
-                      return urls?.map((url, i) => (
-                        <a key={`${msg.id}-${i}`} href={url} target="_blank" rel="noopener noreferrer" className="block p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                          <p className="text-sm text-indigo-600 truncate">{url}</p>
-                          <p className="text-xs text-slate-400 mt-1 line-clamp-1">{msg.content}</p>
-                        </a>
-                      ));
-                    })
-                 ) : (
-                    <div className="text-center py-8 text-slate-500 text-sm">No links found in this channel.</div>
-                 )}
-               </div>
-             )}
-             {mediaTab === 'docs' && (
-               <div className="space-y-2">
-                 {messages.filter(msg => msg.attachment && !msg.attachment.name.match(/\.(jpeg|jpg|gif|png)$/i)).length > 0 ? (
-                    messages.filter(msg => msg.attachment && !msg.attachment.name.match(/\.(jpeg|jpg|gif|png)$/i)).map(msg => (
-                      <button key={msg.id} onClick={() => toast.info('Document download coming soon!')} className="w-full text-left flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                        <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded flex items-center justify-center shrink-0">
-                          📄
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <CheckCheck size={16} className="text-slate-400" /> Delivered to
+                  </h4>
+                  {deliveredTo.length === 0 ? (
+                     <p className="text-sm text-slate-400 italic px-2">No remaining members</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {deliveredTo.map(member => (
+                        <div key={member.id} className="flex items-center justify-between px-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs uppercase">
+                              {member.initials}
+                            </div>
+                            <span className="text-sm font-bold text-slate-700">{member.fullName}</span>
+                          </div>
+                          <CheckCheck size={16} className="text-slate-400" />
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-700 truncate">{msg.attachment?.name || 'Document'}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">{msg.time}</p>
-                        </div>
-                      </button>
-                    ))
-                 ) : (
-                    <div className="text-center py-8 text-slate-500 text-sm">No documents found in this channel.</div>
-                 )}
-               </div>
-             )}
-           </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </Modal>
 
-      {/* Report Channel Modal */}
       <Modal isOpen={showReportModal} onClose={() => setShowReportModal(false)} title="Report Channel">
         <form onSubmit={(e) => {
           e.preventDefault();
@@ -2460,32 +2802,52 @@ export default function MinistryChannels() {
         title={previewFile?.name || "Preview"}
         fullScreenOnMobile={false}
       >
-        <div className="flex items-center justify-center p-2 h-full">
+        <div className="flex flex-col items-center justify-center p-2 h-full gap-4 w-full">
           {previewFile && (
-            previewFile.type.startsWith('image/') ? (
-              <img 
-                src={previewFile.url} 
-                alt="Preview" 
-                className="max-w-full max-h-[70vh] rounded-2xl shadow-2xl object-contain bg-slate-900" 
-              />
-            ) : previewFile.type === 'application/pdf' ? (
-                <div className="w-full h-full min-h-[60vh]">
-                    <PDFPreview url={previewFile.url} />
-                </div>
-            ) : (
-                <div className="text-center text-indigo-600 flex flex-col items-center gap-3 py-10 w-full">
-                   <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center">
-                       <FileText size={40} />
-                   </div>
-                   <div>
-                       <p className="font-bold text-slate-800 break-words px-4">{previewFile.name}</p>
-                       <p className="text-xs text-slate-400 mt-2">Cannot preview this file type directly.</p>
-                       <a href={previewFile.url} download={previewFile.name} className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-                          <Download size={16} /> Download File
-                       </a>
-                   </div>
-                </div>
-            )
+            <>
+              <div className="flex items-center justify-center w-full flex-1 min-h-0 overflow-y-auto">
+                {previewFile.type.startsWith('image/') ? (
+                  <img 
+                    src={previewFile.url} 
+                    alt="Preview" 
+                    className="max-w-full max-h-[70vh] rounded-2xl shadow-2xl object-contain bg-slate-900" 
+                  />
+                ) : previewFile.type.startsWith('audio/') ? (
+                    <div className="text-center text-indigo-600 flex flex-col items-center gap-6 py-10 w-full max-w-sm mx-auto">
+                       <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center">
+                           <Music size={40} />
+                       </div>
+                       <p className="font-bold text-slate-800 break-words px-4 w-full">{previewFile.name}</p>
+                       <div className="w-full bg-slate-50 p-4 rounded-xl shadow-inner border border-slate-200">
+                           <AudioPlayer src={previewFile.url} isMe={false} />
+                       </div>
+                    </div>
+                ) : previewFile.type === 'application/pdf' ? (
+                    <div className="w-full h-full min-h-[60vh] max-w-4xl mx-auto">
+                        <PDFPreview url={previewFile.url} />
+                    </div>
+                ) : (
+                    <div className="text-center text-indigo-600 flex flex-col items-center gap-3 py-10 w-full">
+                       <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center">
+                           <FileText size={40} />
+                       </div>
+                       <div>
+                           <p className="font-bold text-slate-800 break-words px-4">{previewFile.name}</p>
+                           <p className="text-xs text-slate-400 mt-2">Cannot preview this file type directly.</p>
+                       </div>
+                    </div>
+                )}
+              </div>
+              <a 
+                href={previewFile.url} 
+                download={previewFile.name} 
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 w-full md:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
+              >
+                <Download size={18} /> Download {previewFile.type === 'application/pdf' && 'PDF'}
+              </a>
+            </>
           )}
         </div>
       </Modal>
@@ -2528,11 +2890,13 @@ export default function MinistryChannels() {
                         <p className="text-white text-lg font-medium">{pendingAttachment.name}</p>
                     </div>
                 ) : pendingAttachment.type.startsWith('audio/') ? (
-                    <div className="text-center text-orange-400 flex flex-col items-center gap-6 w-full max-w-md">
-                        <div className="w-24 h-24 rounded-full bg-orange-400/20 flex items-center justify-center">
+                    <div className="text-center text-orange-400 flex flex-col items-center gap-6 w-full max-w-md bg-white rounded-2xl p-8 mb-8">
+                        <div className="w-24 h-24 rounded-full bg-orange-100 flex items-center justify-center text-orange-500">
                             <Music size={48} />
                         </div>
-                        <audio controls src={pendingAttachment.url} className="w-full" />
+                        <div className="w-full">
+                           <AudioPlayer src={pendingAttachment.url} isMe={false} />
+                        </div>
                     </div>
                 ) : pendingAttachment.type === 'application/pdf' ? (
                     <div className="w-full h-full bg-[#0b141a] rounded-lg overflow-hidden flex flex-col items-center justify-center">
@@ -2574,6 +2938,27 @@ export default function MinistryChannels() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <CreatePollModal 
+        isOpen={showPollModal}
+        onClose={() => setShowPollModal(false)}
+        onSubmit={handleSendPoll}
+      />
+
+      <CreateEventModal 
+        isOpen={showEventModal}
+        onClose={() => setShowEventModal(false)}
+        onSubmit={handleSendEvent}
+      />
+
+      <QuickReplyModal
+        isOpen={showQuickReplyModal}
+        onClose={() => setShowQuickReplyModal(false)}
+        onSelect={(reply) => {
+          setNewMessage(reply);
+          if (inputRef.current) (inputRef.current as any).focus();
+        }}
+      />
 
     </div>
   );

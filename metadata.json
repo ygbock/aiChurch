@@ -1,6 +1,6 @@
 {
   "name": "Faith Healing Bible Church",
   "description": "A comprehensive church management platform featuring real-time analytics, leadership provisioning, communication hubs, and volunteer roster scheduling for ministries.",
-  "requestFramePermissions": ["camera"],
+  "requestFramePermissions": ["camera", "geolocation", "microphone"],
   "majorCapabilities": []
 }

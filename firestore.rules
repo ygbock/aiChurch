@@ -416,6 +416,7 @@ service cloud.firestore {
              data.description is string && data.description.size() <= 500 &&
              data.createdAt == request.time &&
              (!('membersCount' in data) || data.membersCount is number) &&
+             (!('messagesCount' in data) || data.messagesCount is number) &&
              (!('type' in data) || data.type in ['ministry', 'department', 'general', 'announcement', 'prayer']) &&
              (!('level' in data) || data.level in ['global', 'district', 'branch']) &&
              (!('targetId' in data) || data.targetId is string || data.targetId == null) &&
@@ -439,7 +440,9 @@ service cloud.firestore {
              (!('deletedBy' in data) || data.deletedBy is list) &&
              (!('isEdited' in data) || data.isEdited is bool) &&
              (!('replyTo' in data) || data.replyTo is map) &&
-             (!('attachment' in data) || data.attachment is map);
+             (!('attachment' in data) || data.attachment is map) &&
+             (!('event' in data) || data.event is map) &&
+             (!('poll' in data) || data.poll is map);
     }
 
     function isValidDirectMessageChat(data) {
@@ -458,6 +461,13 @@ service cloud.firestore {
              data.text is string && data.text.size() <= 4000 &&
              data.status in ['sent', 'delivered', 'read'] &&
              (!('sharedPostId' in data) || data.sharedPostId is string || data.sharedPostId == null) &&
+             (!('poll' in data) || data.poll is map) &&
+             (!('attachment' in data) || data.attachment is map) &&
+             (!('event' in data) || data.event is map) &&
+             (!('replyTo' in data) || data.replyTo is map) &&
+             (!('isEdited' in data) || data.isEdited is bool) &&
+             (!('reactions' in data) || data.reactions is map) &&
+             (!('deletedBy' in data) || data.deletedBy is list) &&
              data.createdAt == request.time;
     }
 
@@ -491,9 +501,15 @@ service cloud.firestore {
         allow read, list: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/directMessageChats/$(chatId)).data.participants;
         allow create: if isSignedIn() && isVerified() && request.auth.uid in get(/databases/$(database)/documents/directMessageChats/$(chatId)).data.participants && isValidDirectMessage(incoming());
         allow update: if isSignedIn() && isVerified() && request.auth.uid in get(/databases/$(database)/documents/directMessageChats/$(chatId)).data.participants && (
-           incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
-           existing().senderId != request.auth.uid // Cannot update own message status
+           (incoming().diff(existing()).affectedKeys().hasOnly(['status']) && existing().senderId != request.auth.uid) ||
+           (incoming().diff(existing()).affectedKeys().hasOnly(['poll'])) ||
+           (incoming().diff(existing()).affectedKeys().hasOnly(['event'])) ||
+           (incoming().diff(existing()).affectedKeys().hasOnly(['deletedBy'])) ||
+           (incoming().diff(existing()).affectedKeys().hasOnly(['reactions'])) ||
+           (existing().senderId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['text', 'isEdited'])) ||
+           (existing().senderId == request.auth.uid)
         );
+        allow delete: if isSignedIn() && isVerified() && existing().senderId == request.auth.uid;
       }
     }
 
@@ -573,10 +589,10 @@ service cloud.firestore {
       allow create: if isSignedIn() && isVerified() && isValidMinistryChannel(incoming());
       // Admin upates
       allow update: if isSignedIn() && isVerified() && (
-        incoming().diff(existing()).affectedKeys().hasOnly(['membersCount', 'memberIds']) ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['membersCount', 'memberIds', 'messagesCount']) ||
         (
           (hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor')) &&
-          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'type', 'level'])
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'type', 'level', 'messagesCount'])
         )
       );
       allow delete: if isSignedIn() && isVerified() && (
@@ -587,19 +603,26 @@ service cloud.firestore {
         allow read, list: if isSignedIn();
         allow create: if isSignedIn() && isVerified() && (memberId == request.auth.uid || hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor')) && isValidMinistryChannelMember(incoming());
         allow update: if isSignedIn() && isVerified() && memberId == request.auth.uid && (
-          incoming().diff(existing()).affectedKeys().hasOnly(['lastActive'])
+          incoming().diff(existing()).affectedKeys().hasOnly(['lastActive', 'isTyping'])
         );
         allow delete: if isSignedIn() && isVerified() && (memberId == request.auth.uid || hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor'));
       }
 
       
       match /messages/{messageId} {
+        allow get, list: if isSignedIn();
         allow read, list: if isSignedIn();
         allow create: if isSignedIn() && isVerified() && isValidChannelMessage(incoming());
         allow update: if isSignedIn() && isVerified() && (
           incoming().diff(existing()).affectedKeys().hasOnly(['reactions']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['poll']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['event']) ||
           incoming().diff(existing()).affectedKeys().hasOnly(['deletedBy']) ||
-          (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'isEdited']))
+          (existing().authorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'isEdited'])) ||
+          // allow any update by the author as a fallback for now
+          (existing().authorId == request.auth.uid) ||
+          // allow any update if it only affects event 
+          incoming().diff(existing()).affectedKeys().hasOnly(['event'])
         );
         allow delete: if isSignedIn() && isVerified() && (existing().authorId == request.auth.uid || isSuperAdmin());
       }
