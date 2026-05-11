@@ -66,7 +66,9 @@ import {
   BarChart2,
   Calendar,
   MapPin,
-  CheckCheck
+  CheckCheck,
+  Heart,
+  HandHeart
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -108,6 +110,13 @@ interface Message {
     allowMultipleAnswers: boolean;
   };
   event?: EventAttachment;
+  isPrayerRequest?: boolean;
+  prayedBy?: string[];
+  isPinned?: boolean;
+  threadId?: string;
+  threadReplyCount?: number;
+  threadLastReply?: string;
+  timestampMs?: number;
 }
 
 interface Channel {
@@ -116,6 +125,7 @@ interface Channel {
   description: string;
   membersCount: number;
   type?: 'ministry' | 'department' | 'general' | 'announcement' | 'prayer';
+  isAnnouncementMode?: boolean;
   level?: 'global' | 'district' | 'branch';
   targetId?: string | null;
   autoEnroll?: boolean;
@@ -125,6 +135,8 @@ interface Channel {
   unreadCount?: number;
   messagesCount?: number;
   memberIds?: string[];
+  slowModeCooldown?: number;
+  mutedUsers?: Record<string, number>;
 }
 
 const DEFAULT_CHANNELS: (Omit<Channel, 'id'> & { messagesCount: number })[] = [
@@ -155,13 +167,17 @@ const EMOJI_CATEGORIES = [
   { name: 'Flags', emojis: ['🏳️','🏴','🏁','🚩','🏳️‍🌈','🏳️‍⚧️','🏴‍☠️','🇦🇫','🇦🇽','🇦🇱','🇩🇿','🇦🇸','🇦🇩','🇦🇴','🇦🇮','🇦🇶','🇦🇬','🇦🇷','🇦🇲','🇦🇼','🇦🇺','🇦🇹','🇦🇿','🇧🇸','🇧🇭','🇧🇩','🇧🇧','🇧🇾','🇧🇪','🇧🇿','🇧🇯','🇧🇲','🇧🇹','🇧🇴','🇧🇦','🇧🇼','🇧🇷','🇮🇴','🇻🇬','🇧🇳','🇧🇬','🇧🇫','🇧🇮','🇰🇭','🇨🇲','🇨🇦','🇮🇨','🇨🇻','🇧🇶','🇰🇾','🇨🇫','🇹🇩','🇨🇱','🇨🇳','🇨🇽','🇨🇨','🇨🇴','🇰🇲','🇨🇬','🇨🇩','🇨🇰','🇨🇷','🇨🇮','🇭🇷','🇨🇺','🇨🇼','🇨🇾','🇨🇿','🇩🇰','🇩🇯','🇩🇲','🇩🇴','🇪🇨','🇪🇬','🇸🇻','🇬🇶','🇪🇷','🇪🇪','🇪🇹','🇪🇺','🇫🇰','🇫🇴','🇫🇯','🇫🇮','🇫🇷','🇬🇫','🇵🇫','🇹🇫','🇬🇦','🇬🇲','🇬🇪','🇩🇪','🇬🇭','🇬🇮','🇬🇷','🇬🇱','🇬🇩','🇬🇵','🇬🇺','🇬🇹','🇬🇬','🇬🇳','🇬🇼','🇬🇾','🇭🇹','🇭🇳','🇭🇰','🇭🇺','🇮🇸','🇮🇳','🇮🇩','🇮🇷','🇮🇶','🇮🇪','🇮🇲','🇮🇱','🇮🇹','🇯🇲','🇯🇵','🎌','🇯🇪','🇯🇴','🇰🇿','🇰🇪','🇰🇮','🇽🇰','🇰🇼','🇰🇬','🇱🇦','🇱🇻','🇱🇧','🇱🇸','🇱🇷','🇱🇾','🇱🇮','🇱🇹','🇱🇺','🇲🇴','🇲🇰','🇲🇬','🇲🇼','🇲🇾','🇲🇻','🇲🇱','🇲🇹','🇲🇭','🇲🇶','🇲🇷','🇲🇺','🇾🇹','🇲🇽','🇫🇲','🇲🇩','🇲🇨','🇲🇳','🇲🇪','🇲🇸','🇲🇦','🇲🇿','🇲🇲','🇳🇦','🇳🇷','🇳🇵','🇳🇱','🇳🇨','🇳🇿','🇳🇮','🇳🇪','🇳🇬','🇳🇺','🇳🇫','🇰🇵','🇲🇵','🇳🇴','🇴🇲','🇵🇰','🇵🇼','🇵🇸','🇵🇦','🇵🇬','🇵🇾','🇵🇪','🇵🇭','🇵🇳','🇵🇱','🇵🇹','🇵🇷','🇶🇦','🇷🇪','🇷🇴','🇷🇺','🇷🇼','🇼🇸','🇸🇲','🇸🇹','🇸🇦','🇸🇳','🇷🇸','🇸🇨','🇸🇱','🇸🇬','🇸🇽','🇸🇰','🇸🇮','🇬🇸','🇸🇧','🇸🇴','🇿🇦','🇰🇷','🇸🇸','🇪🇸','🇱🇰','🇧🇱','🇸🇭','🇰🇳','🇱🇨','🇵🇲','🇻🇨','🇸🇩','🇸🇷','🇸🇿','🇸🇪','🇨🇭','🇸🇾','🇹🇼','🇹🇯','🇹🇿','🇹🇭','🇹🇱','🇹🇬','🇹🇰','🇹🇴','🇹🇹','🇹🇳','🇹🇷','🇹🇲','🇹🇨','🇹🇻','🇻🇮','🇺🇬','🇺🇦','🇦🇪','🇬🇧','🏴󠁧󠁢󠁥󠁮󠁧󠁿','🏴󠁧󠁢󠁳󠁣󠁴󠁿','🏴󠁧󠁢󠁷󠁬󠁳󠁿','🇺🇸','🇺🇾','🇺🇿','🇻🇺','🇻🇦','🇻🇪','🇻🇳','🇼🇫','🇪🇭','🇾🇪','🇿🇲','🇿🇼'] }
 ];
 
+import { FormattedMessageText, ScriptureModal } from '../components/ScriptureText';
+
 export default function MinistryChannels() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeMembers, setActiveMembers] = useState<ChannelMember[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [isPrayerRequest, setIsPrayerRequest] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<{name: string, type: string, size: string, url: string, source: string, file?: File} | null>(null);
+  const [viewScripture, setViewScripture] = useState<string | null>(null);
 
   const handleShareLocation = () => {
     setShowAttachmentMenu(false);
@@ -210,6 +226,7 @@ export default function MinistryChannels() {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
+  const [activeThreadMessage, setActiveThreadMessage] = useState<Message | null>(null);
   const [isForwardModalOpen, setIsForwardModalOpen] = useState(false);
   const [messageToForward, setMessageToForward] = useState<Message | null>(null);
   const [forwardChannelId, setForwardChannelId] = useState('');
@@ -272,14 +289,31 @@ export default function MinistryChannels() {
     }
   });
 
-  const [mutedChannels, setMutedChannels] = useState<Set<string>>(() => {
+  const [mutedChannels, setMutedChannels] = useState<Record<string, number | true>>(() => {
     try {
       const stored = localStorage.getItem('mutedChannels');
-      return stored ? new Set(JSON.parse(stored)) : new Set();
+      const parsed = stored ? JSON.parse(stored) : {};
+      if (Array.isArray(parsed)) {
+        const newRecord: Record<string, true> = {};
+        parsed.forEach((p: string) => newRecord[p] = true);
+        return newRecord;
+      }
+      return parsed;
     } catch {
-      return new Set();
+      return {};
     }
   });
+
+  const isChannelMuted = (channelId: string) => {
+    const val = mutedChannels[channelId];
+    if (val === true) return true;
+    if (typeof val === 'number') {
+      if (val > Date.now()) return true;
+    }
+    return false;
+  };
+
+  const [showMuteModal, setShowMuteModal] = useState(false);
 
   const [showSelectionMenu, setShowSelectionMenu] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -287,6 +321,7 @@ export default function MinistryChannels() {
   const [editChannelDescription, setEditChannelDescription] = useState('');
   const [editChannelType, setEditChannelType] = useState('general');
   const [editChannelLevel, setEditChannelLevel] = useState('branch');
+  const [editChannelSlowMode, setEditChannelSlowMode] = useState<number>(0);
   const [isEditingChannel, setIsEditingChannel] = useState(false);
 
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -306,6 +341,39 @@ export default function MinistryChannels() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isCurrentlyTypingRef = useRef(false);
+
+  const [muteUserTarget, setMuteUserTarget] = useState<string | null>(null);
+
+  const handleMuteUser = async (durationHours: number | null) => {
+     if (!muteUserTarget || !activeChannelId) return;
+     const channelRef = doc(db, 'ministryChannels', activeChannelId);
+     const key = `mutedUsers.${muteUserTarget}`;
+     const val = durationHours === null ? Date.now() + 10 * 365 * 24 * 60 * 60 * 1000 : Date.now() + durationHours * 60 * 60 * 1000;
+     
+     try {
+       await updateDoc(channelRef, {
+         [key]: val
+       });
+       toast.success(`User muted ${durationHours ? 'for ' + durationHours + ' hours' : 'indefinitely'}`);
+       setMuteUserTarget(null);
+     } catch (err: any) {
+       toast.error("Failed to mute user");
+     }
+  }
+
+  const handleUnmuteUser = async (userId: string) => {
+      if (!activeChannelId) return;
+      const channelRef = doc(db, 'ministryChannels', activeChannelId);
+      const key = `mutedUsers.${userId}`;
+      try {
+         await updateDoc(channelRef, {
+            [key]: 0
+         });
+         toast.success("User unmuted");
+      } catch (err: any) {
+         toast.error("Failed to unmute user");
+      }
+  }
 
   const handleRemoveMember = async (memberId: string) => {
     if (!activeChannelId || isAddingMembers) return;
@@ -369,8 +437,9 @@ export default function MinistryChannels() {
   const activeChannel = channels.find(c => c.id === activeChannelId);
 
   const isLeader = profile && ['superadmin', 'admin', 'district', 'branch_admin'].includes(profile.role);
-  const isAnnouncement = activeChannel?.type === 'announcement';
-  const canPost = !isAnnouncement || isLeader;
+  const isAnnouncement = activeChannel?.type === 'announcement' || activeChannel?.isAnnouncementMode;
+  const isMutedUser = user && activeChannel?.mutedUsers?.[user.uid] && activeChannel.mutedUsers[user.uid] > Date.now();
+  const canPost = (!isAnnouncement || isLeader) && !isMutedUser;
 
   // Filter channels the user has access to based on their profile
   const visibleChannels = channels.filter(channel => {
@@ -479,6 +548,7 @@ export default function MinistryChannels() {
               },
               content: data.content,
               time: createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              timestampMs: createdAt.getTime(),
               isEdited: data.isEdited,
               replyTo: data.replyTo,
               deletedBy: data.deletedBy || [],
@@ -486,7 +556,13 @@ export default function MinistryChannels() {
               reactions,
               attachment: data.attachment,
               poll: data.poll,
-              event: data.event
+              event: data.event,
+              isPrayerRequest: data.isPrayerRequest || false,
+              prayedBy: data.prayedBy || [],
+              isPinned: data.isPinned || false,
+              threadId: data.threadId,
+              threadReplyCount: data.threadReplyCount,
+              threadLastReply: data.threadLastReply
             };
           }) as Message[];
           setMessages(fetchedMessages);
@@ -678,6 +754,7 @@ export default function MinistryChannels() {
 
   const handleSendPoll = async (pollData: any) => {
     if (!activeChannelId || !user || !profile || isSubmitting) return;
+    if (!checkCanSend()) return;
     
     setIsSubmitting(true);
     try {
@@ -716,6 +793,7 @@ export default function MinistryChannels() {
 
   const handleSendEvent = async (eventData: EventDraft) => {
     if (!activeChannelId || !user || !profile || isSubmitting) return;
+    if (!checkCanSend()) return;
     
     setIsSubmitting(true);
     try {
@@ -750,9 +828,39 @@ export default function MinistryChannels() {
     }
   };
 
+  const checkCanSend = () => {
+     if (!activeChannel || !user) return false;
+     
+     if (activeChannel.mutedUsers?.[user.uid] && activeChannel.mutedUsers[user.uid] > Date.now()) {
+        const timeLeftMs = activeChannel.mutedUsers[user.uid] - Date.now();
+        const minsLeft = Math.ceil(timeLeftMs / 1000 / 60);
+        toast.error(`You are muted in this channel for ${minsLeft} more minute${minsLeft !== 1 ? 's' : ''}`);
+        return false;
+     }
+
+     const isLeader = profile && ['superadmin', 'admin', 'district', 'branch_admin'].includes(profile.role);
+     if (isLeader) return true;
+
+     if (activeChannel.slowModeCooldown && activeChannel.slowModeCooldown > 0) {
+        const lastMsg = [...messages].reverse().find(m => m.author.id === user.uid);
+        if (lastMsg && lastMsg.timestampMs) {
+           const timeSinceMs = Date.now() - lastMsg.timestampMs;
+           const cooldownMs = activeChannel.slowModeCooldown * 1000;
+           if (timeSinceMs < cooldownMs) {
+              const waitSec = Math.ceil((cooldownMs - timeSinceMs) / 1000);
+              toast.error(`Channel is in Slow Mode. Wait ${waitSec} seconds.`);
+              return false;
+           }
+        }
+     }
+     
+     return true;
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!newMessage.trim() && !pendingAttachment) || !user || !profile || !activeChannelId || isSubmitting) return;
+    if (!checkCanSend()) return;
 
     setIsSubmitting(true);
     try {
@@ -774,7 +882,8 @@ export default function MinistryChannels() {
             authorRole: profile?.role || 'Member',
             authorAvatar: user.photoURL || null,
             content: newMessage || '',
-            createdAt: serverTimestamp()
+            createdAt: serverTimestamp(),
+            ...(isPrayerRequest ? { isPrayerRequest: true, prayedBy: [] } : {})
         };
         
         if (replyingToMessage) {
@@ -817,11 +926,50 @@ export default function MinistryChannels() {
         await updateDoc(doc(db, 'ministryChannels', activeChannelId), { messagesCount: increment(1) });
       }
       setNewMessage('');
+      setIsPrayerRequest(false);
       setPendingAttachment(null);
       setReplyingToMessage(null);
     } catch (error: any) {
       toast.error(`Failed to send message: ${error?.message || error}`);
       handleFirestoreError(error, editingMessageId ? OperationType.UPDATE : OperationType.CREATE, `ministryChannels/${activeChannelId}/messages`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSendThreadMessage = async (e: React.FormEvent, threadMessage: string) => {
+    e.preventDefault();
+    if (!threadMessage.trim() || !user || !profile || !activeChannelId || !activeThreadMessage || isSubmitting) return;
+    if (!checkCanSend()) return;
+
+    setIsSubmitting(true);
+    try {
+      const messagesRef = collection(db, 'ministryChannels', activeChannelId, 'messages');
+      const initials = profile.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
+
+      const messageData: any = {
+          authorId: user.uid,
+          authorName: profile.fullName || user.displayName || 'Unknown User',
+          authorInitials: initials || 'U',
+          authorRole: profile?.role || 'Member',
+          authorAvatar: user.photoURL || null,
+          content: threadMessage || '',
+          createdAt: serverTimestamp(),
+          threadId: activeThreadMessage.id
+      };
+
+      await addDoc(messagesRef, messageData);
+      
+      const parentMsgRef = doc(db, 'ministryChannels', activeChannelId, 'messages', activeThreadMessage.id);
+      await updateDoc(parentMsgRef, {
+         threadReplyCount: increment(1),
+         threadLastReply: new Date().toISOString()
+      });
+
+      await updateDoc(doc(db, 'ministryChannels', activeChannelId), { messagesCount: increment(1) });
+    } catch (error: any) {
+      toast.error(`Failed to send reply: ${error?.message || error}`);
+      handleFirestoreError(error, OperationType.CREATE, `ministryChannels/${activeChannelId}/messages`);
     } finally {
       setIsSubmitting(false);
     }
@@ -855,9 +1003,10 @@ export default function MinistryChannels() {
   };
 
   const handleReplyMessage = (msg: Message) => {
-    setReplyingToMessage(msg);
+    setActiveThreadMessage(msg);
     setEditingMessageId(null);
-    inputRef.current?.focus();
+    setReplyingToMessage(null);
+    setShowDetails(false);
   };
 
   const handleDeleteMessage = async (messageId: string) => {
@@ -943,18 +1092,28 @@ export default function MinistryChannels() {
     }
   };
 
-  const toggleMute = () => {
+  const handleMuteChannel = (durationHours: number | null) => {
     if (!activeChannelId) return;
-    const newMuted = new Set(mutedChannels);
-    if (newMuted.has(activeChannelId)) {
-      newMuted.delete(activeChannelId);
-      toast.success('Notifications unmuted');
+    const newMuted = { ...mutedChannels };
+    if (durationHours === null) {
+      newMuted[activeChannelId] = true;
+      toast.success('Notifications muted indefinitely');
     } else {
-      newMuted.add(activeChannelId);
-      toast.success('Notifications muted');
+      newMuted[activeChannelId] = Date.now() + durationHours * 60 * 60 * 1000;
+      toast.success(`Notifications muted for ${durationHours} hour${durationHours > 1 ? 's' : ''}`);
     }
     setMutedChannels(newMuted);
-    localStorage.setItem('mutedChannels', JSON.stringify(Array.from(newMuted)));
+    localStorage.setItem('mutedChannels', JSON.stringify(newMuted));
+    setShowMuteModal(false);
+  };
+
+  const handleUnmuteChannel = () => {
+    if (!activeChannelId) return;
+    const newMuted = { ...mutedChannels };
+    delete newMuted[activeChannelId];
+    setMutedChannels(newMuted);
+    localStorage.setItem('mutedChannels', JSON.stringify(newMuted));
+    toast.success('Notifications unmuted');
   };
 
   const confirmDeleteMultiple = async (forEveryone: boolean) => {
@@ -1045,6 +1204,7 @@ export default function MinistryChannels() {
     setEditChannelDescription(activeChannel.description || '');
     setEditChannelType(activeChannel.type || 'general');
     setEditChannelLevel(activeChannel.level || 'branch');
+    setEditChannelSlowMode(activeChannel.slowModeCooldown || 0);
     setIsEditModalOpen(true);
   };
 
@@ -1058,7 +1218,8 @@ export default function MinistryChannels() {
         name: editChannelName.trim(),
         description: editChannelDescription.trim(),
         type: editChannelType,
-        level: editChannelLevel
+        level: editChannelLevel,
+        slowModeCooldown: editChannelSlowMode
       });
       toast.success('Channel updated');
       setIsEditModalOpen(false);
@@ -1068,6 +1229,20 @@ export default function MinistryChannels() {
       handleFirestoreError(error, OperationType.UPDATE, 'ministryChannels');
     } finally {
       setIsEditingChannel(false);
+    }
+  };
+
+  const handleToggleAnnouncementMode = async () => {
+    if (!activeChannelId || !activeChannel) return;
+    try {
+      const channelRef = doc(db, 'ministryChannels', activeChannelId);
+      await updateDoc(channelRef, {
+        isAnnouncementMode: !activeChannel.isAnnouncementMode
+      });
+      toast.success(activeChannel.isAnnouncementMode ? 'Announcement mode disabled' : 'Announcement mode enabled');
+    } catch (error: any) {
+      toast.error('Failed to update channel mode: ' + error.message);
+      handleFirestoreError(error, OperationType.UPDATE, 'ministryChannels');
     }
   };
 
@@ -1084,6 +1259,20 @@ export default function MinistryChannels() {
       console.error(error);
       toast.error('Failed to delete channel');
       handleFirestoreError(error, OperationType.DELETE, 'ministryChannels');
+    }
+  };
+
+  const handleTogglePinMessage = async (msg: Message) => {
+    if (!activeChannelId) return;
+    try {
+      const msgRef = doc(db, 'ministryChannels', activeChannelId, 'messages', msg.id);
+      await updateDoc(msgRef, {
+        isPinned: !msg.isPinned
+      });
+      toast.success(msg.isPinned ? 'Message unpinned' : 'Message pinned');
+    } catch (error: any) {
+      toast.error('Failed to toggle pin setting: ' + error.message);
+      handleFirestoreError(error, OperationType.UPDATE, `ministryChannels/${activeChannelId}/messages`);
     }
   };
 
@@ -1209,6 +1398,7 @@ export default function MinistryChannels() {
                             <Hash size={14} className={`flex-shrink-0 ${activeChannelId === channel.id ? 'text-indigo-200' : 'text-slate-400'}`} />
                             <span className={`text-sm truncate flex items-center gap-1.5 min-w-0 ${activeChannelId === channel.id ? 'text-white font-bold' : (channel.unreadCount && channel.unreadCount > 0 ? 'text-slate-900 font-black' : 'text-slate-700 font-medium')}`}>
                               <span className="truncate">{channel.name}</span>
+                              {isChannelMuted(channel.id) && <BellOff size={12} className={`flex-shrink-0 ${activeChannelId === channel.id ? 'text-indigo-200' : 'text-slate-400'}`} />}
                               {channel.level && <span className={`flex-shrink-0 text-[8px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded-sm ${activeChannelId === channel.id ? 'bg-indigo-500/50 text-white' : 'bg-slate-100 text-slate-500'}`}>{channel.level}</span>}
                             </span>
                           </div>
@@ -1316,6 +1506,12 @@ export default function MinistryChannels() {
                                </button>
                              </>
                            )}
+                           <button onClick={() => {
+                             setDeleteConfirmInfo({ type: 'multiple' });
+                             setShowSelectionMenu(false);
+                           }} className="w-full text-left px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-3 border-t border-slate-100">
+                             <Trash2 size={16} /> Delete Selected
+                           </button>
                          </div>
                       </div>
                    )}
@@ -1348,9 +1544,14 @@ export default function MinistryChannels() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 relative z-20">
-                <button type="button" className="hidden sm:flex p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
-                  <Phone size={18} />
+              <div className="flex items-center gap-1 sm:gap-3 relative z-20">
+                <button 
+                  type="button" 
+                  onClick={() => setIsSearchingChannel(!isSearchingChannel)}
+                  className={`p-2 rounded-lg transition-all ${isSearchingChannel ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                  title="Search in channel"
+                >
+                  <Search size={18} />
                 </button>
                 <div className="relative" ref={channelMenuRef}>
                   <button 
@@ -1364,7 +1565,7 @@ export default function MinistryChannels() {
                     <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden z-50">
                       <div className="py-1 flex flex-col">
                         <button
-                           onClick={() => { setShowDetails(!showDetails); setShowChannelMenu(false); }}
+                           onClick={() => { setShowDetails(!showDetails); setActiveThreadMessage(null); setShowChannelMenu(false); }}
                            className={`w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-3 ${showDetails ? 'text-indigo-600' : 'text-slate-700'}`}
                         >
                            <Info size={16} /> Channel Details
@@ -1376,11 +1577,18 @@ export default function MinistryChannels() {
                            <Search size={16} /> Search Channel
                         </button>
                         <button
-                           onClick={() => { toggleMute(); setShowChannelMenu(false); }}
+                           onClick={() => { 
+                               if (isChannelMuted(activeChannelId!)) {
+                                   handleUnmuteChannel();
+                               } else {
+                                   setShowMuteModal(true);
+                               }
+                               setShowChannelMenu(false); 
+                           }}
                            className="w-full text-left px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-3"
                         >
-                           {mutedChannels.has(activeChannelId!) ? <Bell size={16} /> : <BellOff size={16} />}
-                           <span>{mutedChannels.has(activeChannelId!) ? 'Unmute Notifications' : 'Mute Notifications'}</span>
+                           {isChannelMuted(activeChannelId!) ? <Bell size={16} /> : <BellOff size={16} />}
+                           <span>{isChannelMuted(activeChannelId!) ? 'Unmute Notifications' : 'Mute Notifications'}</span>
                         </button>
                         <button
                            onClick={() => { handleClearChat(); setShowChannelMenu(false); }}
@@ -1435,6 +1643,56 @@ export default function MinistryChannels() {
           )}
         </AnimatePresence>
 
+        {/* Pinned Messages */}
+        {messages.filter(msg => msg.isPinned).length > 0 && (
+          <div className="bg-white border-b border-slate-200 px-4 py-3 space-y-2 sticky top-0 z-[5]">
+             <div className="flex items-center gap-1.5 mb-1.5 opacity-80">
+                <Pin size={12} className="text-indigo-600" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-700">Pinned Messages</span>
+             </div>
+             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {messages.filter(msg => msg.isPinned).map(msg => (
+                   <div key={msg.id} 
+                        onClick={() => {
+                           const element = document.getElementById(`msg-${msg.id}`);
+                           if (element) {
+                             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                             element.classList.add('bg-indigo-50');
+                             setTimeout(() => element.classList.remove('bg-indigo-50'), 2000);
+                           }
+                        }}
+                        className="w-[200px] max-w-[280px] bg-slate-50 border border-slate-100 rounded-lg p-2.5 shrink-0 flex flex-col gap-2 cursor-pointer hover:bg-slate-100 transition-colors relative group">
+                       <div className="flex items-center gap-2 w-full">
+                         <div className="w-6 h-6 rounded-md bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                           {msg.author.avatar ? (
+                             <img src={msg.author.avatar} alt="" className="w-full h-full rounded-md object-cover" />
+                           ) : (
+                             <span className="text-[10px] font-black">{msg.author.initials}</span>
+                           )}
+                         </div>
+                         <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold text-slate-700 truncate">{msg.author.name}</p>
+                         </div>
+                         {isLeader && (
+                           <button 
+                             onClick={(e) => { e.stopPropagation(); handleTogglePinMessage(msg); }}
+                             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-full transition-all"
+                           >
+                             <X size={12} />
+                           </button>
+                         )}
+                       </div>
+                       <div className="w-full">
+                          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                            {msg.content || (msg.attachment ? "Attachment" : msg.poll ? "Poll" : msg.event ? "Event" : "")}
+                          </p>
+                       </div>
+                   </div>
+                ))}
+             </div>
+          </div>
+        )}
+
         {/* Messages */}
         <div 
           ref={scrollRef}
@@ -1448,9 +1706,16 @@ export default function MinistryChannels() {
 
           <AnimatePresence initial={false}>
             {messages.filter(msg => {
+                if (msg.threadId) return false;
                 if (user && msg.deletedBy?.includes(user.uid)) return false;
                 if (isSearchingChannel && channelSearchQuery.trim() !== '') {
-                  return msg.content.toLowerCase().includes(channelSearchQuery.toLowerCase());
+                  const query = channelSearchQuery.toLowerCase();
+                  return (
+                    msg.content.toLowerCase().includes(query) ||
+                    msg.attachment?.name.toLowerCase().includes(query) ||
+                    msg.poll?.question.toLowerCase().includes(query) ||
+                    msg.event?.title.toLowerCase().includes(query)
+                  );
                 }
                 return true;
             }).map((msg) => {
@@ -1459,6 +1724,7 @@ export default function MinistryChannels() {
               return (
                 <motion.div 
                   key={msg.id}
+                  id={`msg-${msg.id}`}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   drag={!isSelectionMode ? "x" : false}
@@ -1520,8 +1786,15 @@ export default function MinistryChannels() {
                   <div className={`flex-1 min-w-0 group relative flex flex-col ${isMe ? 'items-end' : 'items-start'} ${isSelectionMode ? 'pointer-events-none' : ''}`}>
                     <div 
                       onClick={() => !isSelectionMode && setActiveMessageId(activeMessageId === msg.id ? null : msg.id)}
-                      className={`${isMe ? 'bg-indigo-600 border-indigo-500 rounded-tr-none' : 'bg-white border-slate-100 rounded-tl-none'} px-4 py-2.5 pb-1.5 rounded-2xl shadow-sm inline-block max-w-[90%] break-words whitespace-pre-wrap relative min-w-[100px] cursor-pointer lg:cursor-default`}
+                      className={`${isMe ? 'bg-indigo-600 border-indigo-500 rounded-tr-none' : 'bg-white border-slate-100 rounded-tl-none'} ${msg.isPrayerRequest ? (isMe ? 'bg-amber-600 border-amber-500 text-white' : 'bg-amber-50 border-amber-200 text-slate-800 ring-1 ring-amber-200') : ''} px-4 py-2.5 pb-1.5 rounded-2xl shadow-sm inline-block max-w-[90%] break-words whitespace-pre-wrap relative min-w-[100px] cursor-pointer lg:cursor-default`}
                     >
+                      {msg.isPrayerRequest && (
+                        <div className={`flex items-center gap-1.5 mb-2 -mx-4 -mt-2.5 px-4 py-1.5 rounded-t-2xl border-b ${isMe ? 'bg-amber-700/50 border-amber-500/50' : 'bg-amber-100/50 border-amber-200/50'}`}>
+                          <Heart size={10} className={isMe ? "text-amber-200" : "text-amber-500"} fill="currentColor" />
+                          <span className={`text-[9px] font-black uppercase tracking-widest ${isMe ? 'text-amber-100' : 'text-amber-600'}`}>Prayer Request</span>
+                        </div>
+                      )}
+                      
                       <div className="flex items-center gap-2 mb-0.5">
                         <button 
                           type="button"
@@ -1568,18 +1841,12 @@ export default function MinistryChannels() {
 
                       {msg.content && (
                         <p className={`text-[14px] leading-relaxed mb-1 ${isMe ? 'text-white text-right' : 'text-slate-800 text-left'}`}>
-                          {profile?.fullName && msg.content.includes(`@${profile.fullName}`) ? (
-                             msg.content.split(`@${profile.fullName}`).map((part, i, arr) => (
-                                <React.Fragment key={i}>
-                                   {part}
-                                   {i < arr.length - 1 && (
-                                      <span className={`font-bold px-1.5 py-0.5 rounded-md ${isMe ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800'}`}>@{profile.fullName}</span>
-                                   )}
-                                </React.Fragment>
-                             ))
-                          ) : (
-                             msg.content
-                          )}
+                          <FormattedMessageText 
+                             content={msg.content} 
+                             isMe={isMe} 
+                             mentionedName={profile?.fullName || undefined} 
+                             onScriptureClick={(ref) => setViewScripture(ref)}
+                          />
                         </p>
                       )}
                       
@@ -1590,7 +1857,7 @@ export default function MinistryChannels() {
                       
                       {/* Quick Reaction Picker & Action Buttons */}
                       <div className={`absolute -top-12 lg:-top-2 ${activeMessageId === msg.id ? 'opacity-100 scale-100 z-20 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none lg:pointer-events-auto'} lg:group-hover:opacity-100 lg:group-hover:scale-100 transition-all duration-200 flex items-center gap-1 bg-white border border-slate-200 rounded-full px-2 py-1.5 lg:py-1 shadow-lg lg:shadow-sm ${isMe ? 'right-0 lg:-left-2 lg:right-auto' : 'left-0 lg:-right-2 lg:left-auto'} min-w-max`}>
-                         {['👍', '❤️', '🙏', '🔥'].map(emoji => (
+                         {!msg.isPrayerRequest && ['👍', '❤️', '🙏', '🔥'].map(emoji => (
                            <button
                              key={emoji}
                              onClick={(e) => {
@@ -1603,37 +1870,143 @@ export default function MinistryChannels() {
                              {emoji}
                            </button>
                          ))}
+                         {!msg.isPrayerRequest && (
+                           <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               setEmojiDrawerMessageId(msg.id);
+                               setActiveMessageId(null);
+                             }}
+                             className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors ml-1"
+                             title="More Emojis"
+                           >
+                             <Plus size={16} />
+                           </button>
+                         )}
                          <button
                            onClick={(e) => {
                              e.stopPropagation();
-                             setEmojiDrawerMessageId(msg.id);
+                             setIsForwardModalOpen(true);
+                             setMessageToForward({
+                               id: msg.id,
+                               content: msg.content,
+                               author: { ...msg.author }
+                             } as any);
                              setActiveMessageId(null);
                            }}
-                           className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors ml-1"
-                           title="More Emojis"
+                           className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                           title="Forward"
                          >
-                           <Plus size={16} />
+                           <Forward size={16} />
                          </button>
+                         <button 
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             handleReplyMessage(msg);
+                             setActiveMessageId(null);
+                           }}
+                           className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-indigo-600 transition-colors hidden lg:block"
+                           title="Reply"
+                         >
+                           <Reply size={16} />
+                         </button>
+                         {(isLeader) && (
+                           <button 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleTogglePinMessage(msg);
+                               setActiveMessageId(null);
+                             }}
+                             className={`p-1 rounded-full transition-colors hidden lg:block ${msg.isPinned ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'}`}
+                             title={msg.isPinned ? "Unpin message" : "Pin message"}
+                           >
+                             <Pin size={16} />
+                           </button>
+                         )}
+                         {isMe && (
+                           <button 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               setEditingMessageId(msg.id);
+                               setNewMessage(msg.content);
+                               setActiveMessageId(null);
+                             }}
+                             className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-indigo-600 transition-colors hidden lg:block"
+                             title="Edit"
+                           >
+                             <Edit2 size={16} />
+                           </button>
+                         )}
+                         {(isMe || isLeader) && (
+                           <button 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               setDeleteConfirmInfo({ type: 'single', id: msg.id });
+                               setActiveMessageId(null);
+                             }}
+                             className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-full transition-colors hidden lg:block"
+                             title="Delete message"
+                           >
+                              <Trash2 size={16} />
+                           </button>
+                         )}
                       </div>
                     </div>
 
-                    {msg.reactions && msg.reactions.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {msg.reactions.map((r, i) => (
-                        <button 
-                          key={i} 
-                          onClick={() => handleReaction(msg.id, r.emoji)}
-                          className={`flex items-center gap-1.5 border rounded-full px-2 py-0.5 transition-all text-xs ${
-                            r.reactedByMe ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'
+                    {msg.isPrayerRequest ? (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <button
+                          onClick={async () => {
+                              try {
+                                  const mePrayed = msg.prayedBy?.includes(user!.uid);
+                                  const msgRef = doc(db, 'ministryChannels', activeChannelId!, 'messages', msg.id);
+                                  await updateDoc(msgRef, {
+                                      prayedBy: mePrayed ? arrayRemove(user!.uid) : arrayUnion(user!.uid)
+                                  });
+                              } catch (e: any) {
+                                  toast.error("Failed to action: " + e.message);
+                              }
+                          }}
+                          className={`flex items-center gap-1.5 border rounded-full px-3 py-1 transition-all text-xs font-bold ${
+                            msg.prayedBy?.includes(user?.uid || '') ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100' : 'bg-white border-slate-200 hover:bg-amber-50 hover:text-amber-600 text-slate-600 hover:border-amber-200 shadow-sm'
                           }`}
                         >
-                          <span>{r.emoji}</span>
-                          <span className={`text-[10px] font-black ${r.reactedByMe ? 'text-indigo-600' : 'text-slate-500'}`}>{r.count}</span>
+                          <HandHeart size={14} className={msg.prayedBy?.includes(user?.uid || '') ? 'text-emerald-500' : 'text-amber-500'} />
+                          <span>I prayed for this</span>
+                          {msg.prayedBy && msg.prayedBy.length > 0 && (
+                            <span className={`ml-1 px-1.5 rounded-full text-[10px] ${msg.prayedBy.includes(user?.uid || '') ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
+                              {msg.prayedBy.length}
+                            </span>
+                          )}
                         </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                      </div>
+                    ) : (
+                      msg.reactions && msg.reactions.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {msg.reactions.map((r, i) => (
+                            <button 
+                              key={i} 
+                              onClick={() => handleReaction(msg.id, r.emoji)}
+                              className={`flex items-center gap-1.5 border rounded-full px-2 py-0.5 transition-all text-xs ${
+                                r.reactedByMe ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              <span>{r.emoji}</span>
+                              <span className={`text-[10px] font-black ${r.reactedByMe ? 'text-indigo-600' : 'text-slate-500'}`}>{r.count}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )
+                    )}
+                    
+                    {msg.threadReplyCount ? (
+                        <div className="mt-2 text-sm">
+                           <button onClick={(e) => { e.stopPropagation(); setActiveThreadMessage(msg); }} className="text-indigo-600 font-bold hover:underline flex items-center gap-1">
+                              {msg.threadReplyCount} {msg.threadReplyCount === 1 ? 'reply' : 'replies'}
+                           </button>
+                        </div>
+                    ) : null}
+                 </div>
                 </motion.div>
               );
             })}
@@ -1643,6 +2016,24 @@ export default function MinistryChannels() {
         {/* Input Area */}
         {canPost ? (
         <div className="p-2 md:p-3 bg-transparent mt-auto shrink-0 w-full border-t-0">
+          {isPrayerRequest && (
+             <div className="mb-2 mx-2 px-3 py-2 bg-amber-50 border-l-4 border-amber-500 rounded-r-lg flex justify-between items-center text-sm shadow-sm">
+                <div className="flex flex-col truncate">
+                   <span className="font-bold text-amber-700 text-xs uppercase tracking-widest flex items-center gap-1">
+                     <Heart size={12} fill="currentColor" /> Prayer Request
+                   </span>
+                   <span className="text-slate-600 truncate text-xs mt-0.5">Your message will be highlighted as a prayer request</span>
+                </div>
+                <button 
+                  type="button" 
+                  title="Cancel Prayer Request"
+                  onClick={() => setIsPrayerRequest(false)} 
+                  className="p-1 hover:bg-amber-100 rounded-full text-amber-600 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+             </div>
+          )}
           {(replyingToMessage || editingMessageId) && (
              <div className="mb-2 mx-2 px-3 py-2 bg-indigo-50 border-l-4 border-indigo-500 rounded-r-lg flex justify-between items-center text-sm shadow-sm">
                 <div className="flex flex-col truncate">
@@ -1733,6 +2124,12 @@ export default function MinistryChannels() {
                          <Calendar size={20} />
                        </div>
                        <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Event</span>
+                    </button>
+                    <button type="button" onClick={() => { setIsPrayerRequest(true); setShowAttachmentMenu(false); }} className="flex flex-col items-center gap-1 group">
+                       <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+                         <Heart fill="currentColor" size={20} />
+                       </div>
+                       <span className="text-[10px] text-slate-600 font-medium whitespace-nowrap">Prayer</span>
                     </button>
                     <button type="button" onClick={handleShareLocation} className="flex flex-col items-center gap-1 group">
                        <div className="w-12 h-12 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center group-hover:bg-teal-100 transition-colors">
@@ -1908,7 +2305,7 @@ export default function MinistryChannels() {
         </div>
         ) : (
           <div className="p-4 bg-slate-50 border-t border-slate-200 text-center text-sm font-medium text-slate-500">
-            Only channel admins can send messages to this channel.
+            {isMutedUser ? 'You are currently muted in this channel.' : 'Only channel admins can send messages to this channel.'}
           </div>
         )}
         </>
@@ -2085,12 +2482,29 @@ export default function MinistryChannels() {
                           <div className="flex justify-between items-center w-full">
                             <p className="text-xs font-bold text-slate-900 leading-none truncate">{m.fullName}</p>
                             {isLeader && m.userId !== user?.uid && (
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); handleRemoveMember(m.userId); }}
-                                className="text-[10px] uppercase font-black tracking-widest text-slate-300 hover:text-rose-500 transition-colors ml-2 flex-shrink-0 opacity-0 group-hover:opacity-100"
-                              >
-                                Remove
-                              </button>
+                              <div className="flex items-center gap-2 ml-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {(activeChannel?.mutedUsers?.[m.userId] && activeChannel?.mutedUsers[m.userId] > Date.now()) ? (
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); handleUnmuteUser(m.userId); }}
+                                      className="text-[10px] uppercase font-black tracking-widest text-emerald-500 hover:text-emerald-600 transition-colors"
+                                    >
+                                      Unmute
+                                    </button>
+                                ) : (
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); setMuteUserTarget(m.userId); }}
+                                      className="text-[10px] uppercase font-black tracking-widest text-slate-300 hover:text-indigo-500 transition-colors"
+                                    >
+                                      Mute
+                                    </button>
+                                )}
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleRemoveMember(m.userId); }}
+                                  className="text-[10px] uppercase font-black tracking-widest text-slate-300 hover:text-rose-500 transition-colors"
+                                >
+                                  Remove
+                                </button>
+                              </div>
                             )}
                           </div>
                           <p className="text-[10px] text-slate-400 font-medium mt-1 truncate">{m.role}</p>
@@ -2122,6 +2536,18 @@ export default function MinistryChannels() {
                   </h4>
                   <div className="space-y-2">
                     <button 
+                      onClick={handleToggleAnnouncementMode}
+                      className="w-full relative flex items-center justify-between px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      <div className="flex flex-col text-left">
+                         <span>Announcement Mode</span>
+                         <span className="text-[10px] text-slate-500 font-medium">Only admins/leaders can post</span>
+                      </div>
+                      <div className={`w-8 h-4 rounded-full transition-colors relative ${activeChannel?.isAnnouncementMode ? 'bg-indigo-500' : 'bg-slate-300'}`}>
+                         <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all duration-200 ${activeChannel?.isAnnouncementMode ? 'left-[18px]' : 'left-0.5'}`}></div>
+                      </div>
+                    </button>
+                    <button 
                       onClick={openEditModal}
                       className="w-full text-left px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                     >
@@ -2137,6 +2563,120 @@ export default function MinistryChannels() {
                 </div>
               )}
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Thread Sidebar */}
+      <AnimatePresence>
+        {activeThreadMessage && (
+          <motion.div 
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: window.innerWidth < 1024 ? window.innerWidth : 380, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            className="flex flex-col bg-white border-l border-slate-200 overflow-y-auto absolute lg:static inset-y-0 right-0 z-[60] lg:z-auto shadow-2xl lg:shadow-none bg-slate-50"
+          >
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white shrink-0">
+              <div className="flex items-center gap-2">
+                 <h3 className="text-base font-black text-slate-900">Thread</h3>
+                 <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{activeChannel?.name}</span>
+              </div>
+              <button onClick={() => setActiveThreadMessage(null)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+                 <X size={20} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+               {/* Parent Message */}
+               <div className="flex gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold shrink-0">
+                      {activeThreadMessage.author.avatar ? (
+                          <img src={activeThreadMessage.author.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                          activeThreadMessage.author.initials
+                      )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                     <div className="flex items-center gap-2 mb-1">
+                        <span className="font-bold text-slate-900 text-sm truncate">{activeThreadMessage.author.name}</span>
+                        <span className="text-[10px] whitespace-nowrap text-slate-400">
+                            {typeof activeThreadMessage.time === 'string' ? activeThreadMessage.time : new Date(activeThreadMessage.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                     </div>
+                     <p className="text-slate-700 text-sm whitespace-pre-wrap">{activeThreadMessage.content}</p>
+                  </div>
+               </div>
+
+               <div className="flex items-center gap-4 py-2">
+                  <div className="flex-1 h-px bg-slate-200"></div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{messages.filter(m => m.threadId === activeThreadMessage.id).length} Replies</span>
+                  <div className="flex-1 h-px bg-slate-200"></div>
+               </div>
+
+               {/* Thread Replies */}
+               <div className="space-y-4">
+                 {messages.filter(m => m.threadId === activeThreadMessage.id).map(msg => (
+                    <div key={msg.id} className="flex gap-3 px-2">
+                      <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold shrink-0">
+                          {msg.author.avatar ? (
+                              <img src={msg.author.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                              msg.author.initials
+                          )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                         <div className="flex items-center gap-2 mb-0.5">
+                            <span className="font-bold text-slate-900 text-xs truncate">{msg.author.name}</span>
+                            <span className="text-[10px] whitespace-nowrap text-slate-400">
+                                {typeof msg.time === 'string' ? msg.time : new Date(msg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                         </div>
+                         <p className="text-slate-700 text-sm whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                    </div>
+                 ))}
+               </div>
+            </div>
+
+            {/* Thread Input Area */}
+            {canPost ? (
+              <div className="p-3 bg-white border-t border-slate-200 shrink-0">
+                <form 
+                    onSubmit={(e) => {
+                       const val = (e.target as any).elements.replyInput.value;
+                       handleSendThreadMessage(e, val);
+                       (e.target as any).reset();
+                    }}
+                    className="flex items-end gap-2"
+                >
+                    <textarea 
+                      name="replyInput"
+                      placeholder="Reply in thread..."
+                      rows={1}
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none min-h-[40px] max-h-[120px]"
+                      onKeyDown={(e) => {
+                         if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            const val = e.currentTarget.value;
+                            handleSendThreadMessage(e as any, val);
+                            e.currentTarget.value = '';
+                         }
+                      }}
+                    />
+                    <button 
+                       type="submit"
+                       disabled={isSubmitting}
+                       className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shrink-0 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                       <Send size={16} className="ml-0.5" />
+                    </button>
+                </form>
+              </div>
+            ) : (
+              <div className="p-4 bg-slate-50 border-t border-slate-200 text-center text-sm font-medium text-slate-500 shrink-0">
+                {isMutedUser ? 'You are currently muted in this channel.' : 'Only channel admins can send messages to this channel.'}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -2431,6 +2971,22 @@ export default function MinistryChannels() {
               <option value="branch">Branch Level</option>
             </select>
           </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-widest mb-2">Slow Mode</label>
+            <select
+              value={editChannelSlowMode}
+              onChange={(e) => setEditChannelSlowMode(Number(e.target.value))}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600 transition-all appearance-none"
+            >
+              <option value={0}>Off</option>
+              <option value={10}>10 seconds</option>
+              <option value={30}>30 seconds</option>
+              <option value={60}>1 minute</option>
+              <option value={120}>2 minutes</option>
+              <option value={300}>5 minutes</option>
+              <option value={600}>10 minutes</option>
+            </select>
+          </div>
           <div className="flex gap-2 justify-end pt-4">
             <button 
               type="button"
@@ -2702,7 +3258,13 @@ export default function MinistryChannels() {
             return (
               <div className="space-y-6">
                 <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-                  <p className="text-sm font-medium text-slate-800 break-words whitespace-pre-wrap">{msg.content}</p>
+                  <p className="text-sm font-medium text-slate-800 break-words whitespace-pre-wrap">
+                    <FormattedMessageText 
+                      content={msg.content} 
+                      isMe={false} 
+                      onScriptureClick={(ref) => setViewScripture(ref)}
+                    />
+                  </p>
                 </div>
                 
                 <div>
@@ -2794,6 +3356,50 @@ export default function MinistryChannels() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={showMuteModal} onClose={() => setShowMuteModal(false)} title="Mute Notifications">
+        <div className="space-y-2 p-2">
+          <p className="text-sm text-slate-600 mb-4 px-2">
+             How long would you like to mute notifications for this channel?
+          </p>
+          {[
+            { label: '1 hour', value: 1 },
+            { label: '8 hours', value: 8 },
+            { label: '24 hours', value: 24 },
+            { label: 'Indefinitely', value: null }
+          ].map(opt => (
+             <button
+                key={opt.label}
+                onClick={() => handleMuteChannel(opt.value)}
+                className="w-full text-left px-4 py-3 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-700 font-medium transition-colors border border-transparent shadow-sm hover:shadow"
+             >
+                {opt.label}
+             </button>
+          ))}
+        </div>
+      </Modal>
+
+      <Modal isOpen={!!muteUserTarget} onClose={() => setMuteUserTarget(null)} title="Mute User">
+        <div className="space-y-2 p-2">
+          <p className="text-sm text-slate-600 mb-4 px-2">
+             How long would you like to mute this user for? They won't be able to send messages.
+          </p>
+          {[
+            { label: '1 hour', value: 1 },
+            { label: '8 hours', value: 8 },
+            { label: '24 hours', value: 24 },
+            { label: 'Indefinitely', value: null }
+          ].map(opt => (
+             <button
+                key={opt.label}
+                onClick={() => handleMuteUser(opt.value)}
+                className="w-full text-left px-4 py-3 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-700 font-medium transition-colors border border-transparent shadow-sm hover:shadow"
+             >
+                {opt.label}
+             </button>
+          ))}
+        </div>
       </Modal>
 
       <Modal
@@ -2958,6 +3564,12 @@ export default function MinistryChannels() {
           setNewMessage(reply);
           if (inputRef.current) (inputRef.current as any).focus();
         }}
+      />
+      
+      <ScriptureModal 
+        reference={viewScripture} 
+        isOpen={!!viewScripture} 
+        onClose={() => setViewScripture(null)} 
       />
 
     </div>

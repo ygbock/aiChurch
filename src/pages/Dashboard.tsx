@@ -28,6 +28,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import CollapsibleSection from '../components/CollapsibleSection';
+import VerseOfTheDay from '../components/VerseOfTheDay';
 import { useFirebase } from '../components/FirebaseProvider';
 import { doc, getDoc, collection, query, limit, onSnapshot, orderBy, where, addDoc, serverTimestamp, getDocs, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -398,6 +399,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <VerseOfTheDay />
 
       {loadingTasks ? (
         <div className="flex justify-center py-10">

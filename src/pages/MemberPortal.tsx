@@ -28,6 +28,7 @@ import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { MemberTransferModal } from '../components/MemberTransferModal';
+import VerseOfTheDay from '../components/VerseOfTheDay';
 
 export default function MemberPortal() {
   const { profile } = useFirebase();
@@ -224,6 +225,8 @@ export default function MemberPortal() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content Area */}
         <div className="lg:col-span-2 space-y-8">
+          <VerseOfTheDay />
+          
           {/* Quick Check-in Card */}
           <section className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
