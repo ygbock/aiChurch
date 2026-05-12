@@ -12,6 +12,7 @@ import PollMessage from '../components/PollMessage';
 import EventMessage, { EventAttachment } from '../components/EventMessage';
 import CreateEventModal, { EventDraft } from '../components/CreateEventModal';
 import QuickReplyModal from '../components/QuickReplyModal';
+import GroupCallModal from '../components/GroupCallModal';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -253,6 +254,7 @@ export default function MinistryChannels() {
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
+  const [showCallModal, setShowCallModal] = useState(false);
   const [showQuickReplyModal, setShowQuickReplyModal] = useState(false);
   const [emojiDrawerMessageId, setEmojiDrawerMessageId] = useState<string | null>(null);
   
@@ -1553,6 +1555,15 @@ export default function MinistryChannels() {
                 >
                   <Search size={18} />
                 </button>
+                <button 
+                  type="button" 
+                  onClick={() => setShowCallModal(true)}
+                  className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all font-bold text-xs flex items-center gap-2"
+                  title="Group Call"
+                >
+                  <Phone size={18} />
+                  <span className="hidden sm:inline">Group Call</span>
+                </button>
                 <div className="relative" ref={channelMenuRef}>
                   <button 
                     type="button"
@@ -1714,7 +1725,7 @@ export default function MinistryChannels() {
                     msg.content.toLowerCase().includes(query) ||
                     msg.attachment?.name.toLowerCase().includes(query) ||
                     msg.poll?.question.toLowerCase().includes(query) ||
-                    msg.event?.title.toLowerCase().includes(query)
+                    msg.event?.name.toLowerCase().includes(query)
                   );
                 }
                 return true;
@@ -3564,6 +3575,14 @@ export default function MinistryChannels() {
           setNewMessage(reply);
           if (inputRef.current) (inputRef.current as any).focus();
         }}
+      />
+
+      <GroupCallModal
+        isOpen={showCallModal}
+        onClose={() => setShowCallModal(false)}
+        type="audio"
+        channelName={activeChannel?.name || 'Channel'}
+        participantsCount={activeChannel?.membersCount || 0}
       />
       
       <ScriptureModal 

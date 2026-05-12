@@ -11,6 +11,8 @@ import PollMessage from '../components/PollMessage';
 import EventMessage, { EventAttachment } from '../components/EventMessage';
 import CreateEventModal, { EventDraft } from '../components/CreateEventModal';
 import QuickReplyModal from '../components/QuickReplyModal';
+import GroupCallModal from '../components/GroupCallModal';
+import NewGroupChatModal from '../components/NewGroupChatModal';
 import { 
   Camera,
   Mic,
@@ -96,6 +98,8 @@ interface Chat {
   lastMessageTime: string;
   unreadCount: number;
   messages: ChatMessage[];
+  isGroup?: boolean;
+  groupName?: string | null;
 }
 
 declare global {
@@ -134,8 +138,11 @@ export default function DirectMessages() {
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
+  const [showCallModal, setShowCallModal] = useState<'audio' | 'video' | false>(false);
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [showQuickReplyModal, setShowQuickReplyModal] = useState(false);
   const [previewFile, setPreviewFile] = useState<{url: string, type: string, name: string} | null>(null);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
@@ -303,6 +310,12 @@ export default function DirectMessages() {
                          avatar: userData.photoUrl
                      };
                  }
+
+                 if (data.isGroup && data.groupName) {
+                    otherUser.name = data.groupName;
+                    otherUser.avatar = undefined;
+                    otherUser.initials = data.groupName.split(' ').map((n:string)=>n[0]).join('').substring(0,2).toUpperCase();
+                 }
                 
                  let timeString = '';
                  const diffInMinutes = Math.floor((new Date().getTime() - updatedAt.getTime()) / 60000);
@@ -318,6 +331,8 @@ export default function DirectMessages() {
                     unreadCount: 0,
                     user: otherUser,
                     messages: [],
+                    isGroup: data.isGroup,
+                    groupName: data.groupName,
                     _updatedAt: updatedAt.getTime()
                 } as Chat & { _updatedAt: number };
             });
@@ -795,6 +810,59 @@ export default function DirectMessages() {
     }
   };
 
+  const handleCreateGroupChat = async (participantIds: string[], groupName?: string) => {
+    if (!user) return;
+    
+    try {
+      const chatParticipants = [...new Set([...participantIds, user.uid])];
+      
+      // If single user and chat exists, redirect to it
+      if (chatParticipants.length === 2 && !groupName) {
+         const toUserId = participantIds[0];
+         const existingChat = chats.find(c => c.participants.includes(toUserId) && c.participants.length === 2 && !c.isGroup);
+         if (existingChat) {
+             navigate(`/direct-messages/${existingChat.id}`);
+             return;
+         }
+      }
+      
+      const isGroup = chatParticipants.length > 2 || !!groupName;
+      
+      const newChatRef = await addDoc(collection(db, 'directMessageChats'), {
+          participants: chatParticipants,
+          isGroup: isGroup,
+          groupName: groupName || null,
+          lastMessage: '',
+          lastMessageTime: serverTimestamp(),
+          createdAt: serverTimestamp(),
+      });
+      
+      navigate(`/direct-messages/${newChatRef.id}`);
+    } catch (err) {
+      console.error(err);
+      handleFirestoreError(err, OperationType.CREATE, 'directMessageChats');
+    }
+  };
+
+  useEffect(() => {
+    if (!showNewChatModal) return;
+    const fetchUsers = async () => {
+      try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, orderBy('fullName'));
+        const snapshot = await getDocs(q);
+        const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setAllUsers(users);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, 'users');
+      }
+    };
+    fetchUsers();
+  }, [showNewChatModal]);
+
+  const participantsCount = activeChat?.participants?.length || 0;
+  const chatName = activeChat?.user?.name || 'Chat';
+
   return (
     <div className="flex flex-col gap-6">
       {/* Social Tab Navigation */}
@@ -833,7 +901,7 @@ export default function DirectMessages() {
         <div className="p-4 border-b border-slate-100 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Direct Messages</h3>
-            <button className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="New Message">
+            <button onClick={() => setShowNewChatModal(true)} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="New Message">
               <Plus size={18} />
             </button>
           </div>
@@ -924,10 +992,10 @@ export default function DirectMessages() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Audio Call">
+                <button onClick={() => setShowCallModal('audio')} className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title={activeChat.isGroup ? "Group Audio Call" : "Voice Call"}>
                   <Phone size={18} />
                 </button>
-                <button className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Video Call">
+                <button onClick={() => setShowCallModal('video')} className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title={activeChat.isGroup ? "Group Video Call" : "Video Call"}>
                   <Video size={18} />
                 </button>
                 <button onClick={() => setShowChatMenu(!showChatMenu)} className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
@@ -1520,6 +1588,21 @@ export default function DirectMessages() {
           setMessageText(reply);
           if (inputRef.current) inputRef.current.focus();
         }}
+      />
+
+      <NewGroupChatModal
+        isOpen={showNewChatModal}
+        onClose={() => setShowNewChatModal(false)}
+        onSubmit={handleCreateGroupChat}
+        users={allUsers}
+      />
+
+      <GroupCallModal
+        isOpen={!!showCallModal}
+        onClose={() => setShowCallModal(false)}
+        type={showCallModal === 'video' ? 'video' : 'audio'}
+        channelName={chatName || undefined}
+        participantsCount={participantsCount}
       />
 
       <Modal isOpen={!!showMessageStatsId} onClose={() => setShowMessageStatsId(null)} title="Message Info">
