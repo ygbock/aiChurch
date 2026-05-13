@@ -597,8 +597,7 @@ export default function SuperadminDashboard() {
         {[
           { id: 'overview', label: 'Global Overview', icon: <Globe size={18} className="w-4 h-4 sm:w-[18px] sm:h-[18px]" /> },
           { id: 'leadership', label: 'Leadership', icon: <Shield size={18} className="w-4 h-4 sm:w-[18px] sm:h-[18px]" /> },
-          { id: 'financials', label: 'Financials', icon: <TrendingUp size={18} className="w-4 h-4 sm:w-[18px] sm:h-[18px]" /> },
-          { id: 'baptism', label: 'Baptism Queue', icon: <div className="relative"><CheckCircle2 size={18} className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />{baptismRequests.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-3 h-3 sm:w-4 sm:h-4 bg-red-500 text-white text-[8px] sm:text-[10px] flex items-center justify-center rounded-full border-2 border-white">{baptismRequests.length}</span>}</div> }
+          { id: 'baptism', label: 'Baptism', icon: <div className="relative"><CheckCircle2 size={18} className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />{baptismRequests.length > 0 && <span className="absolute -top-1.5 -right-1.5 w-3 h-3 sm:w-4 sm:h-4 bg-red-500 text-white text-[8px] sm:text-[10px] flex items-center justify-center rounded-full border-2 border-white">{baptismRequests.length}</span>}</div> }
         ].map(tab => (
           <button
             key={tab.id}
@@ -805,87 +804,7 @@ export default function SuperadminDashboard() {
         </div>
       )}
 
-      {activeTab === 'financials' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <GlobalStatCard 
-              label="Total Remittances" 
-              value={`$${globalRemittances.reduce((acc, curr) => acc + (curr.totalIncome || 0), 0).toLocaleString()}`} 
-              trend="Global Revenue" 
-              icon={<TrendingUp size={20} className="text-blue-600" />} 
-            />
-            <GlobalStatCard 
-              label="HQ Shared Amount" 
-              value={`$${globalRemittances.reduce((acc, curr) => acc + (curr.hqAmount || 0), 0).toLocaleString()}`} 
-              trend="Net Headquarters" 
-              icon={<Building2 size={20} className="text-emerald-600" />} 
-            />
-            <GlobalStatCard 
-              label="Pending Reports" 
-              value={globalRemittances.filter(r => r.status === 'Submitted').length.toString()} 
-              trend="Awaiting Review" 
-              icon={<Activity size={20} className="text-orange-600" />} 
-            />
-          </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="px-6 py-5 border-b border-slate-200">
-              <h3 className="text-lg font-bold text-slate-900">Ministry Remittance Ledger</h3>
-              <p className="text-sm text-slate-500">Consolidated financial reports from all districts and branches.</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Period / Date</th>
-                    <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Branch & District</th>
-                    <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">Income</th>
-                    <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-right">HQ Share</th>
-                    <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {globalRemittances.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
-                        No remittance records found.
-                      </td>
-                    </tr>
-                  ) : (
-                    globalRemittances.map(rem => (
-                      <tr key={rem.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <p className="text-xs font-bold text-slate-900">{rem.period}</p>
-                          <p className="text-[10px] text-slate-500">{rem.submittedAt?.toDate().toLocaleDateString()}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="text-xs font-bold text-slate-900">{rem.branchName || 'Branch'}</p>
-                          <p className="text-[10px] text-slate-500">{rem.districtId}</p>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <p className="text-xs font-black text-slate-900">${(rem.totalIncome || 0).toLocaleString()}</p>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <p className="text-xs font-bold text-emerald-600">${(rem.hqAmount || 0).toLocaleString()}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${
-                            rem.status === 'Acknowledged' 
-                              ? 'bg-emerald-100 text-emerald-700' 
-                              : 'bg-orange-100 text-orange-700'
-                          }`}>
-                            {rem.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {activeTab === 'baptism' && (
         <div className="space-y-6">

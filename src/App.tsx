@@ -68,7 +68,7 @@ import Budgets from './modules/finance/budgets/Budgets';
 import Payroll from './modules/finance/payroll/Payroll';
 import Expenses from './modules/finance/expenses/Expenses';
 import Assets from './modules/finance/assets/Assets';
-import Reports from './modules/finance/reports/Reports';
+import FinanceReports from './modules/finance/reports/Reports';
 import AuditLogs from './modules/finance/audit/AuditLogs';
 
 export default function App() {
@@ -92,7 +92,7 @@ export default function App() {
               <Route path="budgets" element={<Budgets />} />
               <Route path="payroll" element={<Payroll />} />
               <Route path="assets" element={<Assets />} />
-              <Route path="reports" element={<Reports />} />
+              <Route path="reports" element={<FinanceReports />} />
               <Route path="audit" element={<AuditLogs />} />
               <Route path="integrations" element={<div className="p-8">Integrations Comming Soon</div>} />
             </Route>

@@ -15,9 +15,12 @@ import {
   ArrowLeft,
   Bell,
   Search,
-  Church
+  Church,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useFirebase } from '../../components/FirebaseProvider';
+import { useTheme } from '../../components/ThemeProvider';
 
 const FINANCE_NAV = [
   { name: 'Overview', path: '/finance/dashboard', icon: <LayoutDashboard size={18} /> },
@@ -35,6 +38,7 @@ const FINANCE_NAV = [
 
 export default function FinanceLayout() {
   const { profile } = useFirebase();
+  const { theme, setTheme } = useTheme();
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
@@ -60,6 +64,13 @@ export default function FinanceLayout() {
               className="pl-9 pr-4 py-1.5 bg-[#152a4a] border border-[#1e3a63] rounded-full text-sm text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-64"
             />
           </div>
+          <button 
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="p-2 text-slate-300 hover:text-white hover:bg-[#152a4a] rounded-full transition-colors"
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
           <button className="p-2 text-slate-300 hover:text-white hover:bg-[#152a4a] rounded-full relative">
             <Bell size={20} />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border border-[#0B1E36]" />

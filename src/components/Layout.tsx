@@ -438,10 +438,10 @@ export default function Layout() {
               )}
               <nav className="space-y-0.5">
                 <NavItem
-                  to="/financials"
+                  to="/finance"
                   icon={<Banknote size={18} />}
                   label="Financials"
-                  active={location.pathname.startsWith("/financials")}
+                  active={location.pathname.startsWith("/finance")}
                   isCollapsed={isCollapsed}
                   onClick={() => setIsSidebarOpen(false)}
                 />
