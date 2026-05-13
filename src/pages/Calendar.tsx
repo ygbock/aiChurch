@@ -1633,7 +1633,7 @@ export default function Calendar() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-white overflow-hidden font-sans">
+    <div className="h-[100dvh] flex flex-col bg-white overflow-hidden font-sans">
       {/* Top Header - Global App Nav */}
       <div className="h-14 border-b border-slate-100 flex items-center justify-between px-4 sm:px-6 shrink-0">
           <h2 className="text-xl sm:text-2xl font-bold text-[#002B70] tracking-tight font-display truncate">Digital Calendar Visualization</h2>

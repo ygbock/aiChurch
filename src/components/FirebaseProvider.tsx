@@ -12,6 +12,7 @@ interface UserProfile {
   role: Role;
   districtId?: string;
   branchId?: string;
+  avatarUrl?: string; // Optional avatar field
   requirePasswordChange?: boolean;
   availability?: {
     enabled: boolean;

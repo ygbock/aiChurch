@@ -35,8 +35,9 @@ service cloud.firestore {
 
     function isSuperAdmin() {
       return isSignedIn() && (
-        getEmail() == "ygbock@gmail.com" ||
+        request.auth.token.email == "ygbock@gmail.com" ||
         request.auth.token.get('email', '') == "ygbock@gmail.com" ||
+        request.auth.token.get('email_address', '') == "ygbock@gmail.com" ||
         hasUserRole("superadmin")
       );
     }
@@ -92,11 +93,13 @@ service cloud.firestore {
              data.fullName is string && data.fullName.size() <= 100 &&
              data.branchId is string &&
              data.level in ['Visitor', 'Convert', 'Disciple', 'Worker', 'Leader'] &&
-             data.status in ['Active', 'Pending', 'Inactive'];
+             data.status in ['Active', 'Pending', 'Inactive'] &&
+             (!('cellId' in data) || (data.cellId is string || data.cellId == null)) &&
+             (!('cellName' in data) || (data.cellName is string || data.cellName == null));
     }
 
     function isValidAttendance(data) {
-      return data.keys().hasAll(['timestamp', 'recordedBy', 'date', 'service', 'method', 'status']) &&
+      return data.keys().hasAll(['timestamp', 'recordedBy', 'status']) &&
              data.timestamp == request.time &&
              data.recordedBy == request.auth.uid;
     }
@@ -170,6 +173,63 @@ service cloud.firestore {
              (!('baptismLocation' in data) || data.baptismLocation is string);
     }
 
+    function isValidCell(data) {
+      return data.keys().hasAll(['name', 'leaderId', 'branchId']) &&
+             data.name is string && data.name.size() <= 200 &&
+             data.leaderId is string &&
+             data.branchId is string &&
+             (!('location' in data) || data.location is string) &&
+             (!('leaderName' in data) || data.leaderName is string) &&
+             (!('districtId' in data) || data.districtId is string) &&
+             (!('meetingDay' in data) || data.meetingDay in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]) &&
+             (!('meetingTime' in data) || data.meetingTime is string);
+    }
+
+    function isPastor() {
+      return isSignedIn() && (
+        hasUserRole("pastor") || 
+        hasUserRole("admin") || 
+        isSuperAdmin() ||
+        (getEmail() != "" && 
+         exists(/databases/$(database)/documents/accessControl/$(getEmail())) && 
+         get(/databases/$(database)/documents/accessControl/$(getEmail())).data.role in ["pastor", "admin"])
+      );
+    }
+
+    function isValidPastoralNote(data) {
+      return data.keys().hasAll(['memberId', 'pastorId', 'content', 'date']) &&
+             data.memberId is string &&
+             data.pastorId is string &&
+             data.content is string && data.content.size() <= 5000;
+    }
+
+    function isValidFinancialRecord(data) {
+      return data.keys().hasAll(['amount', 'type', 'category', 'date', 'status']) &&
+             data.amount is number &&
+             data.type in ['Income', 'Expense'] &&
+             data.category in ['Tithe', 'Offering', 'Pledge', 'Special Project', 'Utility', 'Maintenance', 'Welfare', 'Others'] &&
+             data.date is string &&
+             data.status in ['Pending', 'Approved', 'Rejected'] &&
+             (!('memberId' in data) || data.memberId is string) &&
+             (!('memberName' in data) || data.memberName is string) &&
+             (!('paymentMethod' in data) || data.paymentMethod in ['Cash', 'Card', 'Transfer', 'Cheque']) &&
+             (!('description' in data) || data.description is string) &&
+             (!('recordedBy' in data) || data.recordedBy == request.auth.uid) &&
+             (!('districtId' in data) || data.districtId is string) &&
+             (!('branchId' in data) || data.branchId is string);
+    }
+
+    function isValidRemittance(data) {
+      return data.keys().hasAll(['period', 'totalIncome', 'hqAmount', 'districtAmount', 'status']) &&
+             data.period is string &&
+             data.totalIncome is number &&
+             data.hqAmount is number &&
+             data.districtAmount is number &&
+             data.status in ['Pending', 'Submitted', 'Acknowledged'] &&
+             (!('submittedAt' in data) || data.submittedAt is string) &&
+             (!('submittedBy' in data) || data.submittedBy == request.auth.uid);
+    }
+
     function isValidReminder(data) {
       return data.keys().hasAll(['title', 'date', 'status', 'userId']) &&
              data.title is string && data.title.size() <= 200 &&
@@ -204,6 +264,19 @@ service cloud.firestore {
         (isDistrictLeader(resource.data.districtId)) ||
         (isBranchAdmin(resource.data.districtId, resource.data.branchId))
       ));
+    }
+
+    match /pastoralNotes/{noteId} {
+      allow read, list: if isVerified() && (isPastor() || isSuperAdmin());
+      allow create: if isVerified() && (isPastor() || isSuperAdmin()) && isValidPastoralNote(incoming()) && incoming().pastorId == request.auth.uid;
+      allow update: if isVerified() && (isSuperAdmin() || (isPastor() && existing().pastorId == request.auth.uid)) && isValidPastoralNote(incoming());
+      allow delete: if isSuperAdmin();
+    }
+
+    match /followUps/{taskId} {
+      allow read, list: if isSignedIn();
+      allow create, update: if isVerified() && isValidFollowUp(incoming());
+      allow delete: if isSuperAdmin() || isPastor();
     }
 
     match /users/{uid} {
@@ -251,14 +324,19 @@ service cloud.firestore {
           allow delete: if isBranchAdmin(districtId, branchId) && isVerified();
 
           match /attendance/{attendanceId} {
-            allow read, list: if isBranchAdmin(districtId, branchId) || (isSignedIn() && request.auth.uid == memberId) || isSuperAdmin() || isDistrictLeader(districtId);
-            allow write: if (isBranchAdmin(districtId, branchId) || isSuperAdmin() || isDistrictLeader(districtId)) && isVerified() && isValidAttendance(incoming());
+            allow read, list: if isBranchAdmin(districtId, branchId) || isPastor() || (isSignedIn() && request.auth.uid == memberId) || isSuperAdmin() || isDistrictLeader(districtId);
+            allow write: if (isBranchAdmin(districtId, branchId) || isPastor() || isSuperAdmin() || isDistrictLeader(districtId)) && isVerified() && isValidAttendance(incoming());
           }
         }
 
-        match /transactions/{transactionId} {
+        match /financials/{recordId} {
           allow read, list: if isBranchAdmin(districtId, branchId) || isSuperAdmin() || isDistrictLeader(districtId) || (isSignedIn() && resource.data.memberId == request.auth.uid);
-          allow write: if isBranchAdmin(districtId, branchId) && isVerified();
+          allow write: if (isBranchAdmin(districtId, branchId) || hasUserRole("finance")) && isVerified() && isValidFinancialRecord(incoming());
+        }
+
+        match /remittances/{remittanceId} {
+          allow read, list: if isBranchAdmin(districtId, branchId) || isSuperAdmin() || isDistrictLeader(districtId);
+          allow write: if (isBranchAdmin(districtId, branchId) || hasUserRole("finance")) && isVerified() && isValidRemittance(incoming());
         }
 
         match /fundRequests/{requestId} {
@@ -277,9 +355,9 @@ service cloud.firestore {
           allow delete: if isBranchAdmin(districtId, branchId) && isVerified();
 
           match /attendance/{attendeeId} {
-            allow read, list: if isBranchAdmin(districtId, branchId) || (isSignedIn() && attendeeId == request.auth.uid);
-            allow create: if (isBranchAdmin(districtId, branchId) || (isSignedIn() && incoming().memberId == request.auth.uid)) && isVerified() && isValidAttendance(incoming());
-            allow delete: if isBranchAdmin(districtId, branchId) && isVerified();
+            allow read, list: if isBranchAdmin(districtId, branchId) || isPastor() || (isSignedIn() && attendeeId == request.auth.uid);
+            allow write: if (isBranchAdmin(districtId, branchId) || isPastor() || (isSignedIn() && (incoming().get('memberId', '') == request.auth.uid || attendeeId == request.auth.uid))) && isVerified() && isValidAttendance(incoming());
+            allow delete: if (isBranchAdmin(districtId, branchId) || isPastor()) && isVerified();
           }
 
           match /queueEntries/{entryId} {
@@ -303,6 +381,12 @@ service cloud.firestore {
             isBranchAdmin(districtId, branchId) || 
             existing().createdBy == request.auth.uid
           );
+        }
+
+        match /cells/{cellId} {
+          allow read, list: if isSignedIn();
+          allow create, update: if isBranchAdmin(districtId, branchId) && isVerified() && isValidCell(incoming());
+          allow delete: if isBranchAdmin(districtId, branchId) && isVerified();
         }
       }
     }
@@ -442,6 +526,7 @@ service cloud.firestore {
              (!('replyTo' in data) || data.replyTo is map) &&
              (!('attachment' in data) || data.attachment is map) &&
              (!('event' in data) || data.event is map) &&
+             (!('callData' in data) || data.callData is map) &&
              (!('poll' in data) || data.poll is map);
     }
 
@@ -468,6 +553,7 @@ service cloud.firestore {
              (!('isEdited' in data) || data.isEdited is bool) &&
              (!('reactions' in data) || data.reactions is map) &&
              (!('deletedBy' in data) || data.deletedBy is list) &&
+             (!('callData' in data) || data.callData is map) &&
              data.createdAt == request.time;
     }
 
@@ -701,6 +787,18 @@ service cloud.firestore {
 
     match /{path=**}/queueEntries/{entryId} {
       allow read, list: if isBranchAdmin('any', 'any');
+    }
+
+    match /{path=**}/remittances/{remittanceId} {
+      allow read, list: if isSuperAdmin() || isDistrictLeader('any') || isBranchAdmin('any', 'any');
+    }
+
+    match /{path=**}/financials/{recordId} {
+      allow read, list: if isSuperAdmin() || 
+        (isSignedIn() && (
+          isDistrictLeader(resource.data.districtId) || 
+          isBranchAdmin(resource.data.districtId, resource.data.branchId)
+        ));
     }
 
     match /baptismPrograms/{programId} {

@@ -37,9 +37,14 @@ import {
   Droplets,
   ClipboardList,
   QrCode,
+  UserCheck,
+  Scan,
+  Sun,
+  Moon
 } from "lucide-react";
 import { APP_MODULES, Role } from "../constants/modules";
 import { useFirebase } from "./FirebaseProvider";
+import { useTheme } from "./ThemeProvider";
 import Login from "../pages/Login";
 import {
   setDoc,
@@ -73,6 +78,7 @@ export function useRole() {
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
   const {
     user,
     profile,
@@ -213,7 +219,7 @@ export default function Layout() {
   return (
     <RoleContext.Provider value={{ role, setRole: () => {} }}>
       <NotificationManager />
-      <div className="min-h-screen bg-slate-50 flex font-sans text-slate-800">
+      <div className="min-h-[100dvh] bg-slate-50 flex font-sans text-slate-800">
         {/* Sidebar Overlay */}
         {isSidebarOpen && (
           <div
@@ -225,7 +231,7 @@ export default function Layout() {
         {/* Sidebar */}
         <aside
           className={`
-          fixed inset-y-0 left-0 z-50 bg-white flex flex-col h-screen border-r border-slate-200 transition-all duration-300 lg:translate-x-0 lg:sticky lg:top-0 
+          fixed inset-y-0 left-0 z-50 bg-white flex flex-col h-[100dvh] border-r border-slate-200 transition-all duration-300 lg:translate-x-0 lg:sticky lg:top-0 
           ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
           ${isCollapsed ? "lg:w-[80px]" : "lg:w-[260px]"}
           ${!isSidebarOpen && !isCollapsed ? "w-[260px]" : ""}
@@ -306,6 +312,30 @@ export default function Layout() {
                   icon={<Users size={18} />}
                   label="Members"
                   active={location.pathname.startsWith("/members")}
+                  isCollapsed={isCollapsed}
+                  onClick={() => setIsSidebarOpen(false)}
+                />
+                <NavItem
+                  to="/cells"
+                  icon={<Users size={18} />}
+                  label="Home Cells"
+                  active={location.pathname.startsWith("/cells")}
+                  isCollapsed={isCollapsed}
+                  onClick={() => setIsSidebarOpen(false)}
+                />
+                <NavItem
+                  to="/follow-ups"
+                  icon={<UserCheck size={18} />}
+                  label="Follow-ups"
+                  active={location.pathname.startsWith("/follow-ups")}
+                  isCollapsed={isCollapsed}
+                  onClick={() => setIsSidebarOpen(false)}
+                />
+                <NavItem
+                  to="/attendance-tracker"
+                  icon={<Scan size={18} />}
+                  label="Scan Attendance"
+                  active={location.pathname.startsWith("/attendance-tracker")}
                   isCollapsed={isCollapsed}
                   onClick={() => setIsSidebarOpen(false)}
                 />
@@ -548,7 +578,7 @@ export default function Layout() {
 
         {/* Main Content */}
         <main
-          className={`flex-1 flex flex-col min-h-screen min-w-0 px-4 pt-0 pb-4 md:px-8 md:pb-8`}
+          className={`flex-1 flex flex-col min-h-[100dvh] min-w-0 px-4 pt-0 pb-4 md:px-8 md:pb-8 overflow-x-hidden`}
         >
           {/* Topbar */}
           <header className="sticky top-0 z-40 flex justify-between items-center py-4 md:py-6 mb-6 md:mb-8 gap-4 bg-slate-50/90 backdrop-blur-md -mx-4 px-4 md:-mx-8 md:px-8 shadow-sm">
@@ -717,6 +747,13 @@ export default function Layout() {
                   )}
                 </AnimatePresence>
               </div>
+              <button
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="p-2 text-slate-500 hover:bg-slate-100 transition-colors rounded-full"
+                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              >
+                {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
               <Link
                 to="/settings"
                 className="p-2 text-slate-500 hover:bg-slate-100 transition-colors rounded-full"

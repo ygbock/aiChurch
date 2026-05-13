@@ -1681,6 +1681,8 @@ export default function DistrictDashboard() {
                 >
                   <option value="district">District Admin</option>
                   <option value="admin">Branch Admin</option>
+                  <option value="pastor">Pastor</option>
+                  <option value="finance">Financial Secretary</option>
                 </select>
               </div>
               <div>

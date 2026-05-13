@@ -81,7 +81,16 @@ export default function PublicUserProfile() {
             
             const fetchedPosts = postsSnap.docs.map(doc => {
               const data = doc.data();
-              const createdAt = data.createdAt ? data.createdAt.toDate() : new Date();
+              let createdAt: Date;
+              if (data.createdAt && typeof data.createdAt.toDate === 'function') {
+                createdAt = data.createdAt.toDate();
+              } else if (data.createdAt && (typeof data.createdAt === 'string' || typeof data.createdAt === 'number')) {
+                createdAt = new Date(data.createdAt);
+              } else {
+                createdAt = new Date();
+              }
+              if (isNaN(createdAt.getTime())) createdAt = new Date();
+              
               let timeString = 'Just now';
               const diffInMinutes = Math.floor((new Date().getTime() - createdAt.getTime()) / 60000);
               if (diffInMinutes > 0 && diffInMinutes < 60) {

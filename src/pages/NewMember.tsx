@@ -104,6 +104,8 @@ interface MemberFormData {
   createAccount: boolean;
   username: string;
   password: string;
+  cellId: string;
+  cellName: string;
 }
 
 const childSchema = z.object({
@@ -143,6 +145,8 @@ const memberSchema = z.object({
   pastoralNotes: z.string().optional(),
   createAccount: z.boolean().optional(),
   password: z.string().optional(),
+  cellId: z.string().optional().nullable(),
+  cellName: z.string().optional().nullable(),
 });
 
 export default function NewMember() {
@@ -159,6 +163,7 @@ export default function NewMember() {
   const [activeTab, setActiveTab] = useState('personal');
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [cells, setCells] = useState<{ id: string; name: string }[]>([]);
   const [showCamera, setShowCamera] = useState(false);
   const [showChildDialog, setShowChildDialog] = useState(false);
   const [editingChildIndex, setEditingChildIndex] = useState<number | null>(null);
@@ -265,6 +270,8 @@ export default function NewMember() {
       baptismOfficiator: '',
       spiritualMentor: '',
       assignedDepartment: '',
+      cellId: '',
+      cellName: '',
       status: 'active',
       prayerNeeds: '',
       pastoralNotes: '',
@@ -314,6 +321,8 @@ export default function NewMember() {
               joinDate: data.joinDate || new Date().toISOString().split('T')[0],
               baptismDate: data.baptismDate || '',
               assignedDepartment: data.assignedDepartment || data.departmentId || '_none',
+              cellId: data.cellId || '',
+              cellName: data.cellName || '',
               gender: data.gender ? String(data.gender).toLowerCase() : undefined,
               status: data.status ? String(data.status).toLowerCase() : undefined,
               maritalStatus: data.maritalStatus ? String(data.maritalStatus).toLowerCase() : undefined,
@@ -349,20 +358,23 @@ export default function NewMember() {
     fetchBranches();
   }, [profile?.districtId, districtIdParam]);
 
-  // Fetch Departments when branch changes
+  // Fetch Departments and Cells when branch changes
   const watchedBranchId = form.watch('branchId');
   useEffect(() => {
     const districtId = districtIdParam || profile?.districtId;
     if (watchedBranchId && districtId) {
-      const fetchDepts = async () => {
+      const fetchData = async () => {
         try {
-          const snap = await getDocs(collection(db, 'districts', districtId, 'branches', watchedBranchId, 'departments'));
-          setDepartments(snap.docs.map(d => ({ id: d.id, name: d.data().name })));
+          const deptsSnap = await getDocs(collection(db, 'districts', districtId, 'branches', watchedBranchId, 'departments'));
+          setDepartments(deptsSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+
+          const cellsSnap = await getDocs(collection(db, 'districts', districtId, 'branches', watchedBranchId, 'cells'));
+          setCells(cellsSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
         } catch (err) {
-          console.error("Failed to fetch departments:", err);
+          console.error("Failed to fetch branch data:", err);
         }
       };
-      fetchDepts();
+      fetchData();
     }
   }, [watchedBranchId, profile?.districtId, districtIdParam]);
 
@@ -417,11 +429,18 @@ export default function NewMember() {
         if (found) branchName = found.name;
       }
 
+      let cellName = '';
+      if (data.cellId) {
+        const found = cells.find(c => c.id === data.cellId);
+        if (found) cellName = found.name;
+      }
+
       const memberData = {
         ...data,
         districtId,
         departmentName,
         branchName,
+        cellName,
         level: calculatedLevel,
         status: capitalizedStatus,
         ministries: calculatedMinistries,
@@ -1232,6 +1251,29 @@ export default function NewMember() {
                                       <SelectItem value="_none">None</SelectItem>
                                       {departments.map(d => (
                                         <SelectItem key={d.id} value={d.id} className="font-bold">{d.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="cellId"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Home Cell Assignment</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger className="h-14 rounded-2xl border-indigo-200 bg-white text-sm font-bold">
+                                        <SelectValue placeholder="Select Home Cell" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent className="rounded-2xl">
+                                      <SelectItem value="_none">None</SelectItem>
+                                      {cells.map(c => (
+                                        <SelectItem key={c.id} value={c.id} className="font-bold">{c.name}</SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>

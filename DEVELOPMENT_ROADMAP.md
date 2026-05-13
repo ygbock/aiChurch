@@ -18,9 +18,9 @@ This document outlines the structured development roadmap for the church managem
 - [x] Standardized Member Creation (Global, District, Branch levels).
 - [x] Centralized Leadership Provisioning (Linking Auth accounts to existing member records).
 - [x] Force Password Change flow for newly provisioned leaders.
-- [ ] Member Profile Detail Views (Personal info, family ties, ministerial involvement).
-- [ ] Member Transfer System (Moving members seamlessly between Branches/Districts).
-- [ ] Advanced Member Filtering & Bulk Operations.
+- [x] Member Profile Detail Views (Personal info, family ties, ministerial involvement).
+- [x] Member Transfer System (Moving members seamlessly between Branches/Districts).
+- [x] Advanced Member Filtering & Bulk Operations.
 
 ## Phase 3: Branch Operations & Pastoral Care ⚪️ (Upcoming)
 *Objective: Empower Branch Admins and Pastors to manage day-to-day church activities.*

@@ -41,6 +41,8 @@ export interface MemberData {
   assignedDepartment?: string;
   departmentId?: string;
   departmentName?: string;
+  cellId?: string;
+  cellName?: string;
   
   // Category
   category?: 'Adult' | 'Youth' | 'Child' | 'Senior';

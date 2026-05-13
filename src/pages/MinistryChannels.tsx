@@ -111,6 +111,12 @@ interface Message {
     allowMultipleAnswers: boolean;
   };
   event?: EventAttachment;
+  callData?: {
+    type: 'audio' | 'video';
+    roomType: 'direct' | 'channel';
+    channelId: string;
+    status: string;
+  };
   isPrayerRequest?: boolean;
   prayedBy?: string[];
   isPinned?: boolean;
@@ -859,6 +865,42 @@ export default function MinistryChannels() {
      return true;
   };
 
+  const handleStartCall = async (type: 'audio' | 'video' = 'audio') => {
+    setShowCallModal(true);
+    
+    if (!activeChannelId || !user || !profile) return;
+    if (!checkCanSend()) return;
+
+    try {
+        const messagesRef = collection(db, 'ministryChannels', activeChannelId, 'messages');
+        const channelRef = doc(db, 'ministryChannels', activeChannelId);
+        
+        const initials = profile.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
+
+        await addDoc(messagesRef, {
+            content: `started a group call`,
+            authorId: user.uid,
+            authorName: profile.fullName || 'Unknown User',
+            authorInitials: initials,
+            authorRole: profile.role || 'Member',
+            authorAvatar: profile.avatarUrl || null,
+            createdAt: serverTimestamp(),
+            callData: {
+                type,
+                roomType: 'channel',
+                channelId: activeChannelId,
+                status: 'active'
+            }
+        });
+
+        await updateDoc(channelRef, {
+            messagesCount: increment(1)
+        });
+    } catch(error) {
+       console.error("Failed to post call message", error);
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!newMessage.trim() && !pendingAttachment) || !user || !profile || !activeChannelId || isSubmitting) return;
@@ -1336,7 +1378,7 @@ export default function MinistryChannels() {
         ))}
       </div>
 
-      <div className={`flex bg-white lg:rounded-2xl lg:border lg:border-slate-200 shadow-sm overflow-hidden relative -mx-4 md:-mx-6 lg:mx-0 w-[calc(100%+32px)] md:w-[calc(100%+48px)] lg:w-full ${activeChannelId ? 'h-[calc(100vh-100px)] lg:h-[calc(100vh-200px)] border-t border-slate-200 lg:border-t-0' : 'h-[calc(100vh-160px)] lg:h-[calc(100vh-200px)]'}`}>
+      <div className={`flex bg-white lg:rounded-2xl lg:border lg:border-slate-200 shadow-sm overflow-hidden relative -mx-4 md:-mx-6 lg:mx-0 w-[calc(100%+32px)] md:w-[calc(100%+48px)] lg:w-full ${activeChannelId ? 'h-[calc(100dvh-100px)] lg:h-[calc(100dvh-200px)] border-t border-slate-200 lg:border-t-0' : 'h-[calc(100dvh-160px)] lg:h-[calc(100dvh-200px)]'}`}>
       {/* Channel Sidebar */}
       <div className={`flex flex-col w-full lg:w-72 lg:border-r border-slate-200 bg-slate-50 ${activeChannelId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="p-4 border-b border-slate-200 bg-white/50">
@@ -1557,7 +1599,7 @@ export default function MinistryChannels() {
                 </button>
                 <button 
                   type="button" 
-                  onClick={() => setShowCallModal(true)}
+                  onClick={() => handleStartCall('audio')}
                   className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all font-bold text-xs flex items-center gap-2"
                   title="Group Call"
                 >
@@ -1848,6 +1890,32 @@ export default function MinistryChannels() {
                            chatId={activeChannelId!} 
                            currentUserId={user!.uid} 
                         />
+                      )}
+
+                      {/* Call Card */}
+                      {msg.callData && (
+                        <div className={`mt-1 mb-2 p-3 rounded-xl border ${isMe ? 'bg-indigo-700 border-indigo-400 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'}`}>
+                          <div className="flex items-center gap-3 mb-2 justify-start">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isMe ? 'bg-indigo-500 text-white' : 'bg-indigo-600 text-white'}`}>
+                              {msg.callData.type === 'video' ? <Video size={20} /> : <Phone size={20} />}
+                            </div>
+                            <div className={isMe ? 'text-right flex-1' : 'text-left flex-1'}>
+                              <p className="font-bold text-sm">
+                                {isMe ? `You started a ${msg.callData.type} call` : `${msg.author.name} started a ${msg.callData.type} call`}
+                              </p>
+                              <p className="text-[11px] opacity-70">Tap to join the conversation</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowCallModal(true);
+                            }}
+                            className={`w-full py-2 rounded-lg font-bold text-sm transition-colors ${isMe ? 'bg-white text-indigo-700 hover:bg-slate-50' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+                          >
+                            Join Call
+                          </button>
+                        </div>
                       )}
 
                       {msg.content && (
@@ -3582,7 +3650,9 @@ export default function MinistryChannels() {
         onClose={() => setShowCallModal(false)}
         type="audio"
         channelName={activeChannel?.name || 'Channel'}
+        channelId={activeChannelId || undefined}
         participantsCount={activeChannel?.membersCount || 0}
+        context="channel"
       />
       
       <ScriptureModal 

@@ -21,16 +21,21 @@ import {
   CheckCircle2,
   Calendar,
   Save,
-  CalendarDays
+  CalendarDays,
+  Sun,
+  Moon,
+  Monitor
 } from 'lucide-react';
 import AccessManagement from './AccessManagement';
 import { useFirebase } from '../components/FirebaseProvider';
+import { useTheme } from '../components/ThemeProvider';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { toast } from 'sonner';
 
 export default function Settings() {
   const { profile, user } = useFirebase();
+  const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
   
@@ -220,6 +225,13 @@ export default function Settings() {
                color="amber"
             />
           )}
+          <ModernSettingsTab 
+             onClick={() => setActiveTab('appearance')} 
+             icon={<Layout />} 
+             label="Appearance" 
+             active={activeTab === 'appearance'} 
+             color="purple"
+          />
           <ModernSettingsTab 
              onClick={() => setActiveTab('network')} 
              icon={<Globe />} 
@@ -523,6 +535,38 @@ export default function Settings() {
                        ) : <Save size={16} />}
                        Commit Prefs
                      </button>
+                  </div>
+               </div>
+            </motion.div>
+          ) : activeTab === 'appearance' ? (
+            <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+               <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                  <div className="px-10 py-8 border-b border-slate-50 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/30">
+                     <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-3">
+                       <Layout className="text-purple-500" />
+                       Appearance Configuration
+                     </h3>
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Select your preferred user interface theme</p>
+                  </div>
+                  <div className="p-10 space-y-8">
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {[
+                          { id: 'light', label: 'Light Mode', icon: <Sun size={24} /> },
+                          { id: 'dark', label: 'Dark Mode', icon: <Moon size={24} /> },
+                          { id: 'system', label: 'System Pref', icon: <Monitor size={24} /> }
+                        ].map(opt => (
+                           <button
+                             key={opt.id}
+                             onClick={() => setTheme(opt.id as any)}
+                             className={`p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-4 ${theme === opt.id ? 'border-purple-600 bg-purple-50/50 dark:bg-purple-900/20 text-purple-600 shadow-sm' : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400'}`}
+                           >
+                              <div className={`p-4 rounded-full ${theme === opt.id ? 'bg-purple-100 dark:bg-purple-900/50' : 'bg-slate-50 dark:bg-slate-800'}`}>
+                                {opt.icon}
+                              </div>
+                              <span className="font-bold text-sm">{opt.label}</span>
+                           </button>
+                        ))}
+                     </div>
                   </div>
                </div>
             </motion.div>

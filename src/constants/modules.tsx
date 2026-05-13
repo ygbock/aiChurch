@@ -14,7 +14,7 @@ import {
   User
 } from 'lucide-react';
 
-export type Role = 'superadmin' | 'admin' | 'branch_admin' | 'district' | 'member';
+export type Role = 'superadmin' | 'admin' | 'branch_admin' | 'district' | 'member' | 'pastor' | 'finance';
 
 export interface AppModule {
   id: string;
@@ -83,12 +83,12 @@ export const APP_MODULES: AppModule[] = [
   },
   {
     id: 'financials',
-    name: 'Financials',
-    description: 'Ledger, tithes, offerings, and budget management.',
+    name: 'Finance',
+    description: 'Enterprise ERP for church financials, mobile money, and payroll.',
     icon: <Banknote size={24} />,
-    path: '/financials',
-    color: 'bg-orange-600',
-    allowedRoles: ['superadmin', 'admin', 'district']
+    path: '/finance',
+    color: 'bg-emerald-600',
+    allowedRoles: ['superadmin', 'admin', 'district', 'finance']
   },
   {
     id: 'tasks',

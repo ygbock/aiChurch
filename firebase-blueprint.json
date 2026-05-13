@@ -51,6 +51,8 @@
         "maritalStatus": { "type": "string", "enum": ["Single", "Married", "Widowed", "Divorced"] },
         "address": { "type": "string" },
         "branchId": { "type": "string" },
+        "cellId": { "type": "string", "description": "ID of the Home Cell the member belongs to" },
+        "cellName": { "type": "string" },
         "level": { "type": "string", "enum": ["Convert", "Disciple", "Worker", "Leader"] },
         "status": { "type": "string", "enum": ["Active", "Pending", "Inactive"] },
         "photoUrl": { "type": "string" },
@@ -59,20 +61,42 @@
       },
       "required": ["fullName", "branchId", "level", "status"]
     },
-    "Transaction": {
-      "title": "Transaction",
-      "description": "Financial records (tithes, offerings, expenses).",
+    "FinancialRecord": {
+      "title": "Financial Record",
+      "description": "General income and expense entries (Tithes, Offerings, operational costs).",
       "type": "object",
       "properties": {
-        "description": { "type": "string" },
         "amount": { "type": "number" },
-        "type": { "type": "string", "enum": ["income", "expense"] },
-        "category": { "type": "string" },
+        "type": { "type": "string", "enum": ["Income", "Expense"] },
+        "category": { "type": "string", "enum": ["Tithe", "Offering", "Pledge", "Special Project", "Utility", "Maintenance", "Welfare", "Others"] },
+        "memberId": { "type": "string", "description": "Optional: Link to a specific member" },
+        "memberName": { "type": "string" },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "Card", "Transfer", "Cheque"] },
+        "description": { "type": "string" },
         "date": { "type": "string", "format": "date-time" },
-        "branchId": { "type": "string" },
-        "recordedBy": { "type": "string", "description": "UID of the admin who recorded it" }
+        "recordedBy": { "type": "string", "description": "UID of the staff who recorded it" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "districtId": { "type": "string" },
+        "branchId": { "type": "string" }
       },
-      "required": ["amount", "type", "category", "date", "branchId"]
+      "required": ["amount", "type", "category", "date", "status"]
+    },
+    "Remittance": {
+      "title": "Remittance",
+      "description": "Record of funds remitted to District or HQ.",
+      "type": "object",
+      "properties": {
+        "period": { "type": "string", "description": "e.g., 'May 2026'" },
+        "totalIncome": { "type": "number" },
+        "hqAmount": { "type": "number" },
+        "districtAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Submitted", "Acknowledged"] },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "submittedBy": { "type": "string" },
+        "branchId": { "type": "string" },
+        "districtId": { "type": "string" }
+      },
+      "required": ["period", "totalIncome", "hqAmount", "districtAmount", "status"]
     },
     "Event": {
       "title": "Event",
@@ -484,9 +508,64 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "channel", "targetGroup", "status", "senderId", "createdAt"]
+    },
+    "Cell": {
+      "title": "Home Cell",
+      "description": "Small group/Care group meeting within a branch.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "leaderId": { "type": "string", "description": "UID of the cell leader" },
+        "leaderName": { "type": "string" },
+        "meetingDay": { "type": "string", "enum": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
+        "meetingTime": { "type": "string" },
+        "branchId": { "type": "string" },
+        "districtId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "leaderId", "branchId"]
+    },
+    "PastoralNote": {
+      "title": "Pastoral Care Note",
+      "description": "Private visitation or counseling records for members.",
+      "type": "object",
+      "properties": {
+        "memberId": { "type": "string" },
+        "pastorId": { "type": "string" },
+        "pastorName": { "type": "string" },
+        "type": { "type": "string", "enum": ["Visitation", "Counseling", "Welfare", "Deliverance", "Other"] },
+        "content": { "type": "string" },
+        "followUpRequired": { "type": "boolean" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["memberId", "pastorId", "content", "date"]
+    },
+    "FollowUpTask": {
+      "title": "Follow-up Task",
+      "description": "Tracking communication with first-timers.",
+      "type": "object",
+      "properties": {
+        "firstTimerId": { "type": "string" },
+        "assignedTo": { "type": "string", "description": "UID of follow-up officer" },
+        "status": { "type": "string", "enum": ["Pending", "In-Progress", "Completed", "Unreachable"] },
+        "method": { "type": "string", "enum": ["Call", "SMS", "Visit", "Email"] },
+        "notes": { "type": "string" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["firstTimerId", "status", "method"]
     }
   },
   "firestore": {
+    "/pastoralNotes/{noteId}": {
+      "schema": "PastoralNote",
+      "description": "Private pastoral logs."
+    },
+    "/followUps/{taskId}": {
+      "schema": "FollowUpTask",
+      "description": "First-timer follow-up tracking."
+    },
     "/users/{uid}": {
       "schema": "User",
       "description": "Private user profiles."
@@ -519,9 +598,13 @@
       "schema": "Member",
       "description": "Member records scoped by district and branch."
     },
-    "/districts/{districtId}/branches/{branchId}/transactions/{transactionId}": {
-      "schema": "Transaction",
-      "description": "Financial records scoped by branch."
+    "/districts/{districtId}/branches/{branchId}/financials/{recordId}": {
+      "schema": "FinancialRecord",
+      "description": "Branch-level financial records."
+    },
+    "/districts/{districtId}/branches/{branchId}/remittances/{remittanceId}": {
+      "schema": "Remittance",
+      "description": "Branch remittance tracking."
     },
     "/districts/{districtId}/branches/{branchId}/events/{eventId}": {
       "schema": "Event",
@@ -594,6 +677,10 @@
     "/broadcasts/{broadcastId}": {
       "schema": "Broadcast",
       "description": "Collection of all broadcasts sent."
+    },
+    "/districts/{districtId}/branches/{branchId}/cells/{cellId}": {
+      "schema": "Cell",
+      "description": "Home cell groups scoped by branch."
     }
   }
 }

@@ -116,7 +116,16 @@ export const MemberAttendanceTab: React.FC<MemberAttendanceTabProps> = ({ member
                       <div className="flex items-center gap-2">
                          <Calendar size={14} className="text-slate-400" />
                          <span className="font-medium text-slate-700">
-                           {a.date ? format(new Date(a.date), 'MMM d, yyyy') : 'N/A'}
+                           {(() => {
+                             if (!a.date) return 'N/A';
+                             try {
+                               const d = new Date(a.date);
+                               if (isNaN(d.getTime())) return 'N/A';
+                               return format(d, 'MMM d, yyyy');
+                             } catch {
+                               return 'N/A';
+                             }
+                           })()}
                          </span>
                       </div>
                     </td>

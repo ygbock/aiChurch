@@ -3,10 +3,21 @@ import { User, Users, Heart, Briefcase, Calendar, MapPin, Building, Target, Zap 
 import { MemberData } from '../../../types/membership';
 
 export function MemberBioTab({ member }: { member: MemberData }) {
-  const safeFormatDate = (dateString?: string) => {
+  const safeFormatDate = (dateString?: any) => {
     if (!dateString) return 'Not Provided';
     try {
-      const d = new Date(dateString);
+      let d: Date;
+      if (typeof dateString === 'string') {
+        d = new Date(dateString);
+      } else if (typeof dateString === 'number') {
+        d = new Date(dateString);
+      } else if (dateString.toDate && typeof dateString.toDate === 'function') {
+        d = dateString.toDate();
+      } else if (dateString.seconds) {
+        d = new Date(dateString.seconds * 1000);
+      } else {
+        d = new Date(dateString);
+      }
       if (isNaN(d.getTime())) return 'Not Provided';
       return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(d);
     } catch {
@@ -27,6 +38,39 @@ export function MemberBioTab({ member }: { member: MemberData }) {
           <InfoCard label="Date of Birth" value={safeFormatDate(member.dob || member.dateOfBirth)} />
           <InfoCard label="Occupation" value={member.occupation || 'Not Provided'} />
           <InfoCard label="Marital Status" value={member.maritalStatus ? member.maritalStatus.charAt(0).toUpperCase() + member.maritalStatus.slice(1) : 'Not Provided'} />
+          <InfoCard label="Member Category" value={member.category} />
+        </div>
+      </div>
+
+      {/* Address & Location */}
+      {(member.community || member.area || member.street || member.publicLandmark) && (
+        <div>
+          <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2 mt-8">
+            <MapPin size={20} className="text-emerald-600" /> Address & Location
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <InfoCard label="Community" value={member.community} />
+            <InfoCard label="Area" value={member.area} />
+            <InfoCard label="Street" value={member.street} />
+            <InfoCard label="Public Landmark" value={member.publicLandmark} />
+          </div>
+        </div>
+      )}
+
+      {/* Spiritual Journey */}
+      <div>
+        <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2 mt-8">
+          <Target size={20} className="text-orange-600" /> Spiritual Journey
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <InfoCard label="Baptism Status" value={member.baptismStatus} />
+          {member.baptismDate && <InfoCard label="Baptism Date" value={safeFormatDate(member.baptismDate)} />}
+          {member.conversionDate && <InfoCard label="Conversion Date" value={safeFormatDate(member.conversionDate)} />}
+          {member.soulWinner && <InfoCard label="Soul Winner" value={member.soulWinner} />}
+          {member.decision && <InfoCard label="Decision" value={member.decision} />}
+          {member.firstVisit && <InfoCard label="First Visit" value={safeFormatDate(member.firstVisit)} />}
+          {member.invitedBy && <InfoCard label="Invited By" value={member.invitedBy} />}
+          {member.source && <InfoCard label="Source" value={member.source} />}
         </div>
       </div>
 

@@ -10,7 +10,6 @@ import NewConvert from './pages/NewConvert';
 import NewFirstTimer from './pages/NewFirstTimer';
 import Departments from './pages/Departments';
 import DepartmentDashboard from './pages/DepartmentDashboard';
-import Financials from './pages/Financials';
 import Ministries from './pages/Ministries';
 import MinistryDashboard from './pages/MinistryDashboard';
 import CommitteeWorkspace from './pages/CommitteeWorkspace';
@@ -43,7 +42,11 @@ import ProgramDashboard from './pages/ProgramDashboard';
 import Directory from './pages/Directory';
 import BaptismManagement from './pages/BaptismManagement';
 import BaptismInterviewPanel from './pages/BaptismInterviewPanel';
+import CellManagement from './pages/CellManagement';
+import FollowUpManagement from './pages/FollowUpManagement';
+import ServiceAttendance from './pages/ServiceAttendance';
 import { FirebaseProvider } from './components/FirebaseProvider';
+import { ThemeProvider } from './components/ThemeProvider';
 import { Toaster } from 'sonner';
 
 // Placeholder components for other pages
@@ -56,66 +59,98 @@ const Help = () => (
 
 import ServiceReports from './pages/ServiceReports';
 
+import FinanceLayout from './modules/finance/FinanceLayout';
+import FinanceDashboard from './modules/finance/dashboard/FinanceDashboard';
+import Donations from './modules/finance/donations/Donations';
+import Accounting from './modules/finance/accounting/Accounting';
+import Transactions from './modules/finance/transactions/Transactions';
+import Budgets from './modules/finance/budgets/Budgets';
+import Payroll from './modules/finance/payroll/Payroll';
+import Expenses from './modules/finance/expenses/Expenses';
+import Assets from './modules/finance/assets/Assets';
+import Reports from './modules/finance/reports/Reports';
+import AuditLogs from './modules/finance/audit/AuditLogs';
+
 export default function App() {
   return (
-    <FirebaseProvider>
-      <BrowserRouter>
-        <Toaster position="top-right" richColors />
-        <Routes>
-          <Route path="/kiosk" element={<KioskCheckIn />} />
-          <Route path="/register" element={<AdminRegistration />} />
-          <Route path="/public/events/:districtId/:branchId/:eventId/register" element={<PublicEventRegistration />} />
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<DashboardDispatcher />} />
-            <Route path="districts" element={<AdminDistricts />} />
-            <Route path="members" element={<MemberManagementPage />} />
-            <Route path="members/registry" element={<Navigate to="/members" replace />} />
-            <Route path="members/profile/:memberId" element={<MemberProfile />} />
-            <Route path="members/new" element={<NewMember />} />
-            <Route path="members/new-convert" element={<NewConvert />} />
-            <Route path="members/new-first-timer" element={<NewFirstTimer />} />
-            <Route path="members/edit/:memberId" element={<NewMember />} />
-            <Route path="ministries" element={<Ministries />} />
-            <Route path="ministries/:ministryId" element={<MinistryDashboard />} />
-            <Route path="ministries/:ministryId/committees/:committeeId" element={<CommitteeWorkspace />} />
-            <Route path="programs/:programId" element={<ProgramDashboard />} />
-            <Route path="departments" element={<Departments />} />
-            <Route path="departments/:departmentId" element={<DepartmentDashboard />} />
-            <Route path="departments/:departmentId/members/:memberId" element={<DepartmentMemberProfile />} />
-            <Route path="financials" element={<Financials />} />
-            <Route path="service-reports" element={<ServiceReports />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="events" element={<Events />} />
-            <Route path="calendar" element={<Calendar />} />
-            <Route path="streaming" element={<LiveStreaming />} />
-            <Route path="bible-school" element={<BibleSchool />} />
-            <Route path="baptism" element={<BaptismManagement />} />
-            <Route path="baptism/interviews" element={<BaptismInterviewPanel />} />
-            <Route path="communication" element={<CommunicationHub />} />
-            <Route path="community-feed" element={<CommunityFeed />} />
-            <Route path="community-profile/:userId" element={<PublicUserProfile />} />
-            <Route path="ministry-channels" element={<MinistryChannels />} />
-            <Route path="direct-messages" element={<DirectMessages />} />
-            <Route path="direct-messages/:chatId" element={<DirectMessages />} />
-            <Route path="cms" element={<CMS />} />
-            <Route path="volunteers" element={<Volunteers />} />
-            <Route path="rosters" element={<Rosters />} />
-            <Route path="tasks" element={<Tasks />} />
-            <Route path="transfers" element={<TransferManagement />} />
-            <Route path="directory" element={<Directory />} />
-            <Route path="superadmin" element={<SuperadminDashboard />} />
-            <Route path="system-alerts" element={<SystemAlerts />} />
-            <Route path="member-portal" element={<MemberPortal />} />
-            <Route path="district" element={<DistrictDashboard />}>
-              <Route path=":districtId" element={<DistrictDashboard />} />
+    <ThemeProvider>
+      <FirebaseProvider>
+        <BrowserRouter>
+          <Toaster position="top-right" richColors />
+          <Routes>
+            <Route path="/kiosk" element={<KioskCheckIn />} />
+            <Route path="/register" element={<AdminRegistration />} />
+            <Route path="/public/events/:districtId/:branchId/:eventId/register" element={<PublicEventRegistration />} />
+            
+            <Route path="/finance" element={<FinanceLayout />}>
+              <Route index element={<Navigate to="/finance/dashboard" replace />} />
+              <Route path="dashboard" element={<FinanceDashboard />} />
+              <Route path="donations" element={<Donations />} />
+              <Route path="transactions" element={<Transactions />} />
+              <Route path="accounting" element={<Accounting />} />
+              <Route path="expenses" element={<Expenses />} />
+              <Route path="budgets" element={<Budgets />} />
+              <Route path="payroll" element={<Payroll />} />
+              <Route path="assets" element={<Assets />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="audit" element={<AuditLogs />} />
+              <Route path="integrations" element={<div className="p-8">Integrations Comming Soon</div>} />
             </Route>
-            <Route path="settings" element={<Settings />} />
-            <Route path="help" element={<Help />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </FirebaseProvider>
+
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardDispatcher />} />
+              <Route path="districts" element={<AdminDistricts />} />
+              <Route path="members" element={<MemberManagementPage />} />
+              <Route path="members/registry" element={<Navigate to="/members" replace />} />
+              <Route path="members/profile/:memberId" element={<MemberProfile />} />
+              <Route path="members/new" element={<NewMember />} />
+              <Route path="members/new-convert" element={<NewConvert />} />
+              <Route path="members/new-first-timer" element={<NewFirstTimer />} />
+              <Route path="members/edit/:memberId" element={<NewMember />} />
+              <Route path="ministries" element={<Ministries />} />
+              <Route path="ministries/:ministryId" element={<MinistryDashboard />} />
+              <Route path="ministries/:ministryId/committees/:committeeId" element={<CommitteeWorkspace />} />
+              <Route path="programs/:programId" element={<ProgramDashboard />} />
+              <Route path="departments" element={<Departments />} />
+              <Route path="departments/:departmentId" element={<DepartmentDashboard />} />
+              <Route path="departments/:departmentId/members/:memberId" element={<DepartmentMemberProfile />} />
+              <Route path="service-reports" element={<ServiceReports />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="events" element={<Events />} />
+              <Route path="calendar" element={<Calendar />} />
+              <Route path="streaming" element={<LiveStreaming />} />
+              <Route path="bible-school" element={<BibleSchool />} />
+              <Route path="baptism" element={<BaptismManagement />} />
+              <Route path="baptism/interviews" element={<BaptismInterviewPanel />} />
+              <Route path="communication" element={<CommunicationHub />} />
+              <Route path="community-feed" element={<CommunityFeed />} />
+              <Route path="community-profile/:userId" element={<PublicUserProfile />} />
+              <Route path="ministry-channels" element={<MinistryChannels />} />
+              <Route path="direct-messages" element={<DirectMessages />} />
+              <Route path="direct-messages/:chatId" element={<DirectMessages />} />
+              <Route path="cms" element={<CMS />} />
+              <Route path="volunteers" element={<Volunteers />} />
+              <Route path="rosters" element={<Rosters />} />
+              <Route path="tasks" element={<Tasks />} />
+              <Route path="transfers" element={<TransferManagement />} />
+              <Route path="cells" element={<CellManagement />} />
+              <Route path="follow-ups" element={<FollowUpManagement />} />
+              <Route path="attendance-tracker" element={<ServiceAttendance />} />
+              <Route path="directory" element={<Directory />} />
+              <Route path="superadmin" element={<SuperadminDashboard />} />
+              <Route path="system-alerts" element={<SystemAlerts />} />
+              <Route path="member-portal" element={<MemberPortal />} />
+              <Route path="district" element={<DistrictDashboard />}>
+                <Route path=":districtId" element={<DistrictDashboard />} />
+              </Route>
+              <Route path="settings" element={<Settings />} />
+              <Route path="help" element={<Help />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </FirebaseProvider>
+    </ThemeProvider>
   );
 }

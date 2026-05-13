@@ -67,6 +67,12 @@ interface ChatMessage {
     allowMultipleAnswers: boolean;
   };
   event?: EventAttachment;
+  callData?: {
+    type: 'audio' | 'video';
+    roomType: 'direct' | 'channel';
+    channelId: string;
+    status: string;
+  };
   isEdited?: boolean;
   replyTo?: {
     id: string;
@@ -728,6 +734,36 @@ export default function DirectMessages() {
     }
   };
 
+  const handleStartCall = async (type: 'audio' | 'video') => {
+    setShowCallModal(type);
+    
+    if (!activeChatId || !user) return;
+    try {
+        const messagesRef = collection(db, 'directMessageChats', activeChatId, 'messages');
+        const chatRef = doc(db, 'directMessageChats', activeChatId);
+        
+        await addDoc(messagesRef, {
+            senderId: user.uid,
+            text: `started a ${type} call`,
+            status: 'sent',
+            createdAt: serverTimestamp(),
+            callData: {
+                type,
+                roomType: 'direct',
+                channelId: activeChatId,
+                status: 'active' // we can just drop a card
+            }
+        });
+        await updateDoc(chatRef, {
+            lastMessage: `started a ${type} call`,
+            lastMessageTime: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+    } catch(error) {
+       console.error("Failed to post call message", error);
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!messageText.trim() && !pendingAttachment) || !activeChat || !user || isSubmitting) return;
@@ -895,7 +931,7 @@ export default function DirectMessages() {
         ))}
       </div>
 
-      <div className={`flex bg-white lg:rounded-2xl lg:border lg:border-slate-200 shadow-sm overflow-hidden relative -mx-4 md:-mx-6 lg:mx-0 w-[calc(100%+32px)] md:w-[calc(100%+48px)] lg:w-full ${activeChatId ? 'h-[calc(100vh-100px)] lg:h-[calc(100vh-200px)] border-t border-slate-200 lg:border-t-0' : 'h-[calc(100vh-160px)] lg:h-[calc(100vh-200px)]'}`}>
+      <div className={`flex bg-white lg:rounded-2xl lg:border lg:border-slate-200 shadow-sm overflow-hidden relative -mx-4 md:-mx-6 lg:mx-0 w-[calc(100%+32px)] md:w-[calc(100%+48px)] lg:w-full ${activeChatId ? 'h-[calc(100dvh-100px)] lg:h-[calc(100dvh-200px)] border-t border-slate-200 lg:border-t-0' : 'h-[calc(100dvh-160px)] lg:h-[calc(100dvh-200px)]'}`}>
       {/* Search & List Panel */}
       <div className={`flex flex-col w-full lg:w-96 lg:border-r border-slate-200 bg-white ${activeChatId ? 'hidden lg:flex' : 'flex'}`}>
         <div className="p-4 border-b border-slate-100 flex flex-col gap-4">
@@ -992,10 +1028,10 @@ export default function DirectMessages() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setShowCallModal('audio')} className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title={activeChat.isGroup ? "Group Audio Call" : "Voice Call"}>
+                <button onClick={() => handleStartCall('audio')} className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title={activeChat.isGroup ? "Group Audio Call" : "Voice Call"}>
                   <Phone size={18} />
                 </button>
-                <button onClick={() => setShowCallModal('video')} className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title={activeChat.isGroup ? "Group Video Call" : "Video Call"}>
+                <button onClick={() => handleStartCall('video')} className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title={activeChat.isGroup ? "Group Video Call" : "Video Call"}>
                   <Video size={18} />
                 </button>
                 <button onClick={() => setShowChatMenu(!showChatMenu)} className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
@@ -1086,6 +1122,30 @@ export default function DirectMessages() {
                              currentUserId={user!.uid} 
                              isDirectMessage={true}
                           />
+                        )}
+                        {msg.callData && (
+                          <div className={`mt-1 mb-2 p-3 rounded-xl border ${isMe ? 'bg-[#d9fdd3] border-[#86d2bb] text-black' : 'bg-slate-50 border-slate-200 text-slate-800'}`}>
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isMe ? 'bg-[#00a884] text-white' : 'bg-indigo-600 text-white'}`}>
+                                {msg.callData.type === 'video' ? <Video size={20} /> : <Phone size={20} />}
+                              </div>
+                              <div>
+                                <p className="font-bold text-sm">
+                                  {isMe ? `You started a ${msg.callData.type} call` : `${chats.find(c => c.id === activeChatId)?.user.name || 'User'} started a ${msg.callData.type} call`}
+                                </p>
+                                <p className="text-[11px] opacity-70">Tap to join the conversation</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowCallModal(msg.callData.type);
+                              }}
+                              className={`w-full py-2 rounded-lg font-bold text-sm transition-colors ${isMe ? 'bg-white text-[#00a884] hover:bg-slate-50' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+                            >
+                              Join Call
+                            </button>
+                          </div>
                         )}
                         <FormattedMessageText 
                           content={msg.text} 
@@ -1602,7 +1662,9 @@ export default function DirectMessages() {
         onClose={() => setShowCallModal(false)}
         type={showCallModal === 'video' ? 'video' : 'audio'}
         channelName={chatName || undefined}
+        channelId={activeChatId || undefined}
         participantsCount={participantsCount}
+        context="direct"
       />
 
       <Modal isOpen={!!showMessageStatsId} onClose={() => setShowMessageStatsId(null)} title="Message Info">

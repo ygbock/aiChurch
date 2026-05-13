@@ -28,7 +28,8 @@ import {
   Award,
   Edit,
   Plus,
-  Flame
+  Flame,
+  Heart
 } from 'lucide-react';
 import { doc, getDoc, collection, query, where, getDocs, limit, orderBy, collectionGroup } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -38,11 +39,14 @@ import { MemberAttendanceTab } from './members/components/MemberAttendanceTab';
 import { MemberBioTab } from './members/components/MemberBioTab';
 import { MemberSignalTab } from './members/components/MemberSignalTab';
 import { MemberDiscipleshipTab } from './members/components/MemberDiscipleshipTab';
+import { PastoralCareTab } from './members/components/PastoralCareTab';
 import IDCardGenerator from '../components/IDCardGenerator';
 import { MemberData } from '../types/membership';
+import { useFirebase } from '../components/FirebaseProvider';
 
 export default function MemberProfile() {
   const { memberId } = useParams();
+  const { profile } = useFirebase();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [member, setMember] = useState<MemberData | null>(null);
@@ -161,6 +165,10 @@ export default function MemberProfile() {
     { id: 'timeline', label: 'Historical Record', icon: History }
   ];
 
+  if (profile?.role === 'admin' || profile?.role === 'superadmin' || profile?.role === 'pastor') {
+    tabs.splice(tabs.length - 1, 0, { id: 'pastoral', label: 'Pastoral Care Log', icon: Heart });
+  }
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -263,6 +271,13 @@ export default function MemberProfile() {
                       {tag}
                    </span>
                 ))}
+                
+                {member.cellName && (
+                  <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold uppercase tracking-wide flex items-center gap-1">
+                    <Users size={12} />
+                    {member.cellName}
+                  </span>
+                )}
                 
                 <button 
                   onClick={() => setIsTagModalOpen(true)}
@@ -461,6 +476,8 @@ export default function MemberProfile() {
               <MemberSignalTab member={member} />
             ) : activeTab === 'giving' ? (
               <MemberGivingTab member={member} />
+            ) : activeTab === 'pastoral' ? (
+              <PastoralCareTab memberId={member?.id || ''} memberName={member?.fullName || ''} />
             ) : (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                  <p className="text-lg font-medium">No {activeTab} records</p>

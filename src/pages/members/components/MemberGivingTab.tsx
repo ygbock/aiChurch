@@ -87,7 +87,10 @@ export const MemberGivingTab: React.FC<MemberGivingTabProps> = ({ member }) => {
         category,
         method,
         description: `Contribution from ${member.fullName}`,
-        date: new Date(date).toISOString(),
+        date: (() => {
+          const d = new Date(date);
+          return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+        })(),
         note,
         memberId: member.id,
         recordedBy: profile?.uid || 'system',
@@ -140,10 +143,28 @@ export const MemberGivingTab: React.FC<MemberGivingTabProps> = ({ member }) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
   };
 
-  const uniqueYears = Array.from(new Set(contributions.map(c => c.date ? new Date(c.date).getFullYear().toString() : new Date().getFullYear().toString()))).sort((a, b) => parseInt(b) - parseInt(a));
+  const uniqueYears = Array.from(new Set(contributions.map(c => {
+    if (!c.date) return new Date().getFullYear().toString();
+    try {
+      const d = new Date(c.date);
+      if (isNaN(d.getTime())) return new Date().getFullYear().toString();
+      return d.getFullYear().toString();
+    } catch {
+      return new Date().getFullYear().toString();
+    }
+  }))).sort((a, b) => parseInt(b) - parseInt(a));
   
   const filteredContributions = isPrinting 
-    ? contributions.filter(c => c.date && new Date(c.date).getFullYear().toString() === statementYear)
+    ? contributions.filter(c => {
+      if (!c.date) return false;
+      try {
+        const d = new Date(c.date);
+        if (isNaN(d.getTime())) return false;
+        return d.getFullYear().toString() === statementYear;
+      } catch {
+        return false;
+      }
+    })
     : contributions;
 
   const totalFilteredGiven = filteredContributions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
@@ -234,7 +255,16 @@ export const MemberGivingTab: React.FC<MemberGivingTabProps> = ({ member }) => {
                       <div className="flex items-center gap-2">
                          <Calendar size={14} className="text-slate-400 print:hidden" />
                          <span className="font-medium text-slate-700">
-                           {c.date ? format(new Date(c.date), 'MMM d, yyyy') : 'N/A'}
+                            {(() => {
+                              if (!c.date) return 'N/A';
+                              try {
+                                const d = new Date(c.date);
+                                if (isNaN(d.getTime())) return 'N/A';
+                                return format(d, 'MMM d, yyyy');
+                              } catch {
+                                return 'N/A';
+                              }
+                            })()}
                          </span>
                       </div>
                     </td>
