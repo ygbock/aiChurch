@@ -5,556 +5,1691 @@
       "description": "Represents a user of the FaithFlow application (staff or admin).",
       "type": "object",
       "properties": {
-        "uid": { "type": "string", "description": "Firebase Auth UID" },
-        "fullName": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["superadmin", "admin", "district", "member"] },
-        "districtId": { "type": "string", "description": "Required if role is district" },
-        "branchId": { "type": "string", "description": "Required if role is admin or member" },
-        "maritalStatus": { "type": "string" },
-        "position": { "type": "string" },
-        "department": { "type": "string" },
-        "photoUrl": { "type": "string" },
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID"
+        },
+        "fullName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "superadmin",
+            "admin",
+            "district",
+            "member"
+          ]
+        },
+        "districtId": {
+          "type": "string",
+          "description": "Required if role is district"
+        },
+        "branchId": {
+          "type": "string",
+          "description": "Required if role is admin or member"
+        },
+        "maritalStatus": {
+          "type": "string"
+        },
+        "position": {
+          "type": "string"
+        },
+        "department": {
+          "type": "string"
+        },
+        "photoUrl": {
+          "type": "string"
+        },
         "availability": {
           "type": "object",
           "properties": {
-             "enabled": { "type": "boolean" },
-             "days": { "type": "array", "items": { "type": "string" } },
-             "startTime": { "type": "string" },
-             "endTime": { "type": "string" }
+            "enabled": {
+              "type": "boolean"
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "startTime": {
+              "type": "string"
+            },
+            "endTime": {
+              "type": "string"
+            }
           }
         },
-        "visibility": { "type": "string", "enum": ["public", "district", "branch", "hidden"] },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "public",
+            "district",
+            "branch",
+            "hidden"
+          ]
+        },
         "notificationPrefs": {
           "type": "object",
           "properties": {
-             "bookings": { "type": "boolean" },
-             "reminders": { "type": "boolean" },
-             "events": { "type": "boolean" },
-             "news": { "type": "boolean" }
+            "bookings": {
+              "type": "boolean"
+            },
+            "reminders": {
+              "type": "boolean"
+            },
+            "events": {
+              "type": "boolean"
+            },
+            "news": {
+              "type": "boolean"
+            }
           }
         },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["uid", "fullName", "email", "role"]
+      "required": [
+        "uid",
+        "fullName",
+        "email",
+        "role"
+      ]
     },
     "Member": {
       "title": "Member",
       "description": "Information about a congregation member.",
       "type": "object",
       "properties": {
-        "fullName": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "phone": { "type": "string" },
-        "dob": { "type": "string", "format": "date" },
-        "gender": { "type": "string", "enum": ["Male", "Female"] },
-        "maritalStatus": { "type": "string", "enum": ["Single", "Married", "Widowed", "Divorced"] },
-        "address": { "type": "string" },
-        "branchId": { "type": "string" },
-        "cellId": { "type": "string", "description": "ID of the Home Cell the member belongs to" },
-        "cellName": { "type": "string" },
-        "level": { "type": "string", "enum": ["Convert", "Disciple", "Worker", "Leader"] },
-        "status": { "type": "string", "enum": ["Active", "Pending", "Inactive"] },
-        "photoUrl": { "type": "string" },
-        "isBaptised": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "fullName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "dob": {
+          "type": "string",
+          "format": "date"
+        },
+        "gender": {
+          "type": "string",
+          "enum": [
+            "Male",
+            "Female"
+          ]
+        },
+        "maritalStatus": {
+          "type": "string",
+          "enum": [
+            "Single",
+            "Married",
+            "Widowed",
+            "Divorced"
+          ]
+        },
+        "address": {
+          "type": "string"
+        },
+        "branchId": {
+          "type": "string"
+        },
+        "cellId": {
+          "type": "string",
+          "description": "ID of the Home Cell the member belongs to"
+        },
+        "cellName": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "Convert",
+            "Disciple",
+            "Worker",
+            "Leader"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Active",
+            "Pending",
+            "Inactive"
+          ]
+        },
+        "photoUrl": {
+          "type": "string"
+        },
+        "isBaptised": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["fullName", "branchId", "level", "status"]
+      "required": [
+        "fullName",
+        "branchId",
+        "level",
+        "status"
+      ]
     },
     "FinancialRecord": {
       "title": "Financial Record",
       "description": "General income and expense entries (Tithes, Offerings, operational costs).",
       "type": "object",
       "properties": {
-        "amount": { "type": "number" },
-        "type": { "type": "string", "enum": ["Income", "Expense"] },
-        "category": { "type": "string", "enum": ["Tithe", "Offering", "Pledge", "Special Project", "Utility", "Maintenance", "Welfare", "Others"] },
-        "memberId": { "type": "string", "description": "Optional: Link to a specific member" },
-        "memberName": { "type": "string" },
-        "paymentMethod": { "type": "string", "enum": ["Cash", "Card", "Transfer", "Cheque"] },
-        "description": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "recordedBy": { "type": "string", "description": "UID of the staff who recorded it" },
-        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
-        "districtId": { "type": "string" },
-        "branchId": { "type": "string" }
+        "amount": {
+          "type": "number"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Income",
+            "Expense"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "Tithe",
+            "Offering",
+            "Pledge",
+            "Special Project",
+            "Utility",
+            "Maintenance",
+            "Welfare",
+            "Others"
+          ]
+        },
+        "memberId": {
+          "type": "string",
+          "description": "Optional: Link to a specific member"
+        },
+        "memberName": {
+          "type": "string"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": [
+            "Cash",
+            "Card",
+            "Transfer",
+            "Cheque"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "recordedBy": {
+          "type": "string",
+          "description": "UID of the staff who recorded it"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Pending",
+            "Approved",
+            "Rejected"
+          ]
+        },
+        "districtId": {
+          "type": "string"
+        },
+        "branchId": {
+          "type": "string"
+        }
       },
-      "required": ["amount", "type", "category", "date", "status"]
+      "required": [
+        "amount",
+        "type",
+        "category",
+        "date",
+        "status"
+      ]
     },
     "Remittance": {
       "title": "Remittance",
       "description": "Record of funds remitted to District or HQ.",
       "type": "object",
       "properties": {
-        "period": { "type": "string", "description": "e.g., 'May 2026'" },
-        "totalIncome": { "type": "number" },
-        "hqAmount": { "type": "number" },
-        "districtAmount": { "type": "number" },
-        "status": { "type": "string", "enum": ["Pending", "Submitted", "Acknowledged"] },
-        "submittedAt": { "type": "string", "format": "date-time" },
-        "submittedBy": { "type": "string" },
-        "branchId": { "type": "string" },
-        "districtId": { "type": "string" }
+        "period": {
+          "type": "string",
+          "description": "e.g., 'May 2026'"
+        },
+        "totalIncome": {
+          "type": "number"
+        },
+        "hqAmount": {
+          "type": "number"
+        },
+        "districtAmount": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Pending",
+            "Submitted",
+            "Acknowledged"
+          ]
+        },
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "submittedBy": {
+          "type": "string"
+        },
+        "branchId": {
+          "type": "string"
+        },
+        "districtId": {
+          "type": "string"
+        }
       },
-      "required": ["period", "totalIncome", "hqAmount", "districtAmount", "status"]
+      "required": [
+        "period",
+        "totalIncome",
+        "hqAmount",
+        "districtAmount",
+        "status"
+      ]
     },
     "Event": {
       "title": "Event",
       "description": "Church services, conferences, and meetings.",
       "type": "object",
       "properties": {
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "time": { "type": "string" },
-        "location": { "type": "string" },
-        "branchId": { "type": "string" },
-        "type": { "type": "string", "enum": ["Service", "Youth", "Conference", "Meetings", "Outreach"] },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "time": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "branchId": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Service",
+            "Youth",
+            "Conference",
+            "Meetings",
+            "Outreach"
+          ]
+        },
         "recurrence": {
           "type": "object",
           "properties": {
-            "isRecurring": { "type": "boolean" },
-            "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
-            "days": { "type": "array", "items": { "type": "string" } },
-            "until": { "type": "string", "format": "date" }
+            "isRecurring": {
+              "type": "boolean"
+            },
+            "frequency": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ]
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "until": {
+              "type": "string",
+              "format": "date"
+            }
           }
         }
       },
-      "required": ["title", "date", "branchId"]
+      "required": [
+        "title",
+        "date",
+        "branchId"
+      ]
     },
     "EventAttendance": {
       "title": "Event Attendance",
       "description": "Records representing a member's attendance at a specific event instance.",
       "type": "object",
       "properties": {
-        "memberId": { "type": "string" },
-        "memberName": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["present", "late", "excused"] }
+        "memberId": {
+          "type": "string"
+        },
+        "memberName": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "present",
+            "late",
+            "excused"
+          ]
+        }
       },
-      "required": ["memberId", "memberName", "timestamp"]
+      "required": [
+        "memberId",
+        "memberName",
+        "timestamp"
+      ]
     },
     "Branch": {
       "title": "Branch",
       "description": "Church branch in a district.",
       "type": "object",
       "properties": {
-        "name": { "type": "string" },
-        "location": { "type": "string" },
-        "capacity": { "type": "number" },
-        "districtId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "name": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "capacity": {
+          "type": "number"
+        },
+        "districtId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["name", "districtId"]
+      "required": [
+        "name",
+        "districtId"
+      ]
     },
     "Department": {
       "title": "Department",
       "description": "Organizational unit or ministry within a branch.",
       "type": "object",
       "properties": {
-        "name": { "type": "string" },
-        "category": { "type": "string" },
-        "mission": { "type": "string" },
-        "headId": { "type": "string" },
-        "headName": { "type": "string" },
-        "branchId": { "type": "string" },
-        "isVisible": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "name": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "mission": {
+          "type": "string"
+        },
+        "headId": {
+          "type": "string"
+        },
+        "headName": {
+          "type": "string"
+        },
+        "branchId": {
+          "type": "string"
+        },
+        "isVisible": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["name", "category", "branchId"]
+      "required": [
+        "name",
+        "category",
+        "branchId"
+      ]
     },
     "TransferRequest": {
       "title": "Transfer Request",
       "description": "A request to move a member from one branch to another.",
       "type": "object",
       "properties": {
-        "memberId": { "type": "string" },
-        "memberName": { "type": "string" },
-        "fromBranchId": { "type": "string" },
-        "fromBranchName": { "type": "string" },
-        "fromDistrictId": { "type": "string" },
-        "toBranchId": { "type": "string" },
-        "toBranchName": { "type": "string" },
-        "toDistrictId": { "type": "string" },
-        "reason": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
-        "requestedBy": { "type": "string" },
-        "requestedAt": { "type": "string", "format": "date-time" },
-        "resolvedBy": { "type": "string" },
-        "resolvedAt": { "type": "string", "format": "date-time" }
+        "memberId": {
+          "type": "string"
+        },
+        "memberName": {
+          "type": "string"
+        },
+        "fromBranchId": {
+          "type": "string"
+        },
+        "fromBranchName": {
+          "type": "string"
+        },
+        "fromDistrictId": {
+          "type": "string"
+        },
+        "toBranchId": {
+          "type": "string"
+        },
+        "toBranchName": {
+          "type": "string"
+        },
+        "toDistrictId": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "approved",
+            "rejected"
+          ]
+        },
+        "requestedBy": {
+          "type": "string"
+        },
+        "requestedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "resolvedBy": {
+          "type": "string"
+        },
+        "resolvedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["memberId", "fromBranchId", "toBranchId", "status", "requestedBy"]
+      "required": [
+        "memberId",
+        "fromBranchId",
+        "toBranchId",
+        "status",
+        "requestedBy"
+      ]
     },
     "Task": {
       "title": "Task",
       "description": "Operational tasks and assignments.",
       "type": "object",
       "properties": {
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "dept": { "type": "string" },
-        "priority": { "type": "string", "enum": ["Low", "Medium", "High"] },
-        "dueDate": { "type": "string", "format": "date" },
-        "assigneeId": { "type": "string" },
-        "assigneeName": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "in-progress", "completed"] },
-        "createdBy": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "branchId": { "type": "string" }
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "dept": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "Low",
+            "Medium",
+            "High"
+          ]
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "assigneeId": {
+          "type": "string"
+        },
+        "assigneeName": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "in-progress",
+            "completed"
+          ]
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "branchId": {
+          "type": "string"
+        }
       },
-      "required": ["title", "priority", "status", "assigneeId", "branchId"]
+      "required": [
+        "title",
+        "priority",
+        "status",
+        "assigneeId",
+        "branchId"
+      ]
     },
     "Attendance": {
       "title": "Attendance",
       "description": "Record of a member's attendance at an event.",
       "type": "object",
       "properties": {
-        "timestamp": { "type": "string", "format": "date-time" },
-        "recordedBy": { "type": "string", "description": "UID of the person who scanned the member" }
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "recordedBy": {
+          "type": "string",
+          "description": "UID of the person who scanned the member"
+        }
       },
-      "required": ["timestamp", "recordedBy"]
+      "required": [
+        "timestamp",
+        "recordedBy"
+      ]
     },
     "QueueEntry": {
       "title": "Queue Entry",
       "description": "An entry in a queue for an event.",
       "type": "object",
       "properties": {
-        "ticketNumber": { "type": "string" },
-        "status": { "type": "string", "enum": ["waiting", "serving", "completed", "cancelled"] },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "servedAt": { "type": "string", "format": "date-time" },
-        "counter": { "type": "string" }
+        "ticketNumber": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "waiting",
+            "serving",
+            "completed",
+            "cancelled"
+          ]
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "servedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "counter": {
+          "type": "string"
+        }
       },
-      "required": ["ticketNumber", "status", "timestamp"]
+      "required": [
+        "ticketNumber",
+        "status",
+        "timestamp"
+      ]
     },
     "Appointment": {
       "title": "Appointment",
       "description": "Scheduled appointments with clients or members.",
       "type": "object",
       "properties": {
-        "title": { "type": "string" },
-        "clientName": { "type": "string" },
-        "clientEmail": { "type": "string", "format": "email" },
-        "date": { "type": "string", "format": "date" },
-        "time": { "type": "string" },
-        "duration": { "type": "string" },
-        "location": { "type": "string" },
-        "type": { "type": "string" },
-        "sessionFormat": { "type": "string", "enum": ["physical", "virtual", "phone"] },
-        "duration": { "type": "string", "enum": ["30 mins", "1 hour", "1.5 hours"] },
-        "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled", "completed"] },
-        "notes": { "type": "string" },
-        "staffId": { "type": "string", "description": "UID of the pastor/staff member being booked" },
-        "staffName": { "type": "string" },
-        "staffFeedback": { "type": "string", "description": "Notes from the pastor during approval/decline" },
-        "requesterId": { "type": "string", "description": "UID of the member who booked the session" },
+        "title": {
+          "type": "string"
+        },
+        "clientName": {
+          "type": "string"
+        },
+        "clientEmail": {
+          "type": "string",
+          "format": "email"
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "time": {
+          "type": "string"
+        },
+        "duration": {
+          "type": "string",
+          "enum": [
+            "30 mins",
+            "1 hour",
+            "1.5 hours"
+          ]
+        },
+        "location": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "sessionFormat": {
+          "type": "string",
+          "enum": [
+            "physical",
+            "virtual",
+            "phone"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "confirmed",
+            "cancelled",
+            "completed"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        },
+        "staffId": {
+          "type": "string",
+          "description": "UID of the pastor/staff member being booked"
+        },
+        "staffName": {
+          "type": "string"
+        },
+        "staffFeedback": {
+          "type": "string",
+          "description": "Notes from the pastor during approval/decline"
+        },
+        "requesterId": {
+          "type": "string",
+          "description": "UID of the member who booked the session"
+        },
         "growthSteps": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "id": { "type": "string" },
-              "title": { "type": "string" },
-              "completed": { "type": "boolean" },
-              "dueDate": { "type": "string", "format": "date" }
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "completed": {
+                "type": "boolean"
+              },
+              "dueDate": {
+                "type": "string",
+                "format": "date"
+              }
             }
           }
         },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["title", "clientName", "date", "time", "status"]
+      "required": [
+        "title",
+        "clientName",
+        "date",
+        "time",
+        "status"
+      ]
     },
     "StaffNote": {
       "title": "Staff Note",
       "description": "Private sensitive notes from a counselor or guide.",
       "type": "object",
       "properties": {
-        "content": { "type": "string" },
-        "authorId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "content": {
+          "type": "string"
+        },
+        "authorId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["content", "authorId"]
+      "required": [
+        "content",
+        "authorId"
+      ]
     },
     "CalendarEvent": {
       "title": "Calendar Event",
       "description": "General events for the church calendar.",
       "type": "object",
       "properties": {
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "date": { "type": "string", "format": "date" },
-        "time": { "type": "string" },
-        "location": { "type": "string" },
-        "type": { "type": "string" },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "time": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
         "recurrence": {
           "type": "object",
           "properties": {
-            "isRecurring": { "type": "boolean" },
-            "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
-            "days": { "type": "array", "items": { "type": "string" } },
-            "until": { "type": "string", "format": "date" }
+            "isRecurring": {
+              "type": "boolean"
+            },
+            "frequency": {
+              "type": "string",
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly"
+              ]
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "until": {
+              "type": "string",
+              "format": "date"
+            }
           }
         },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["title", "date"]
+      "required": [
+        "title",
+        "date"
+      ]
     },
     "Reminder": {
       "title": "Reminder",
       "description": "Personal reminders for users.",
       "type": "object",
       "properties": {
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "date": { "type": "string", "format": "date" },
-        "time": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "completed"] },
-        "userId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "time": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "completed"
+          ]
+        },
+        "userId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["title", "date", "status", "userId"]
+      "required": [
+        "title",
+        "date",
+        "status",
+        "userId"
+      ]
     },
     "Chat": {
       "title": "Chat",
       "description": "A conversation between users.",
       "type": "object",
       "properties": {
-        "participants": { "type": "array", "items": { "type": "string" } },
-        "lastMessage": { "type": "string" },
-        "lastMessageAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lastMessage": {
+          "type": "string"
+        },
+        "lastMessageAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["participants"]
+      "required": [
+        "participants"
+      ]
     },
     "Message": {
       "title": "Message",
       "description": "A message within a chat.",
       "type": "object",
       "properties": {
-        "senderId": { "type": "string" },
-        "text": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "senderId": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["senderId", "text", "createdAt"]
+      "required": [
+        "senderId",
+        "text",
+        "createdAt"
+      ]
     },
     "BaptismProgram": {
       "title": "Baptism Program",
       "description": "A program for baptism.",
       "type": "object",
       "properties": {
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "targetDate": { "type": "string" },
-        "baptismDate": { "type": "string" },
-        "baptismOfficiator": { "type": "string" },
-        "baptismLocation": { "type": "string" },
-        "status": { "type": "string", "enum": ["Pending", "Approved", "Completed", "Rescheduled"] },
-        "createdBy": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "targetDate": {
+          "type": "string"
+        },
+        "baptismDate": {
+          "type": "string"
+        },
+        "baptismOfficiator": {
+          "type": "string"
+        },
+        "baptismLocation": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Pending",
+            "Approved",
+            "Completed",
+            "Rescheduled"
+          ]
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["title", "targetDate", "status"]
+      "required": [
+        "title",
+        "targetDate",
+        "status"
+      ]
     },
     "CommunityPost": {
       "title": "Community Post",
       "description": "A post in the community feed.",
       "type": "object",
       "properties": {
-        "authorId": { "type": "string" },
-        "authorName": { "type": "string" },
-        "authorRole": { "type": "string" },
-        "authorDistrictId": { "type": "string", "nullable": true },
-        "authorBranchId": { "type": "string", "nullable": true },
-        "authorInitials": { "type": "string" },
-        "authorAvatar": { "type": "string", "nullable": true },
-        "content": { "type": "string" },
-        "image": { "type": "string" },
-        "likes": { "type": "number" },
-        "commentsCount": { "type": "number" },
-        "tags": { "type": "array", "items": { "type": "string" } },
-        "privacy": { "type": "string", "enum": ["public", "district", "branch", "friends", "only_me"] },
-        "commentPrivacy": { "type": "string", "enum": ["global", "district", "branch", "friends"] },
-        "isPinned": { "type": "boolean" },
-        "hiddenBy": { "type": "array", "items": { "type": "string" } },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "authorId": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "authorRole": {
+          "type": "string"
+        },
+        "authorDistrictId": {
+          "type": "string",
+          "nullable": true
+        },
+        "authorBranchId": {
+          "type": "string",
+          "nullable": true
+        },
+        "authorInitials": {
+          "type": "string"
+        },
+        "authorAvatar": {
+          "type": "string",
+          "nullable": true
+        },
+        "content": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "likes": {
+          "type": "number"
+        },
+        "commentsCount": {
+          "type": "number"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "privacy": {
+          "type": "string",
+          "enum": [
+            "public",
+            "district",
+            "branch",
+            "friends",
+            "only_me"
+          ]
+        },
+        "commentPrivacy": {
+          "type": "string",
+          "enum": [
+            "global",
+            "district",
+            "branch",
+            "friends"
+          ]
+        },
+        "isPinned": {
+          "type": "boolean"
+        },
+        "hiddenBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["authorId", "authorName", "content", "createdAt", "likes", "commentsCount"]
+      "required": [
+        "authorId",
+        "authorName",
+        "content",
+        "createdAt",
+        "likes",
+        "commentsCount"
+      ]
     },
     "CommunityPostLike": {
       "title": "Community Post Like",
       "description": "A like on a community post by a user.",
       "type": "object",
       "properties": {
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["createdAt"]
+      "required": [
+        "createdAt"
+      ]
     },
     "CommunityPostComment": {
       "title": "Community Post Comment",
       "description": "A comment on a community post.",
       "type": "object",
       "properties": {
-        "authorId": { "type": "string" },
-        "authorName": { "type": "string" },
-        "authorInitials": { "type": "string" },
-        "authorAvatar": { "type": "string", "nullable": true },
-        "content": { "type": "string" },
-        "likes": { "type": "number" },
-        "repliesCount": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "authorId": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "authorInitials": {
+          "type": "string"
+        },
+        "authorAvatar": {
+          "type": "string",
+          "nullable": true
+        },
+        "content": {
+          "type": "string"
+        },
+        "likes": {
+          "type": "number"
+        },
+        "repliesCount": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["authorId", "authorName", "authorInitials", "content", "likes", "repliesCount", "createdAt"]
+      "required": [
+        "authorId",
+        "authorName",
+        "authorInitials",
+        "content",
+        "likes",
+        "repliesCount",
+        "createdAt"
+      ]
     },
     "CommunityPostCommentLike": {
       "title": "Community Post Comment Like",
       "description": "A like on a community post comment by a user.",
       "type": "object",
       "properties": {
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["createdAt"]
+      "required": [
+        "createdAt"
+      ]
     },
     "CommunityPostCommentReply": {
       "title": "Community Post Comment Reply",
       "description": "A reply to a community post comment.",
       "type": "object",
       "properties": {
-        "authorId": { "type": "string" },
-        "authorName": { "type": "string" },
-        "authorInitials": { "type": "string" },
-        "authorAvatar": { "type": "string", "nullable": true },
-        "content": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "authorId": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "authorInitials": {
+          "type": "string"
+        },
+        "authorAvatar": {
+          "type": "string",
+          "nullable": true
+        },
+        "content": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["authorId", "authorName", "authorInitials", "content", "createdAt"]
+      "required": [
+        "authorId",
+        "authorName",
+        "authorInitials",
+        "content",
+        "createdAt"
+      ]
     },
     "MinistryChannel": {
       "title": "Ministry Channel",
       "description": "A group discussion channel.",
       "type": "object",
       "properties": {
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "membersCount": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "membersCount": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["name", "description", "createdAt"]
+      "required": [
+        "name",
+        "description",
+        "createdAt"
+      ]
     },
     "ChannelMessage": {
       "title": "Channel Message",
       "description": "A message within a ministry channel.",
       "type": "object",
       "properties": {
-        "authorId": { "type": "string" },
-        "authorName": { "type": "string" },
-        "authorInitials": { "type": "string" },
-        "authorRole": { "type": "string" },
-        "content": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "authorId": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "authorInitials": {
+          "type": "string"
+        },
+        "authorRole": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["authorId", "authorName", "authorInitials", "content", "createdAt"]
+      "required": [
+        "authorId",
+        "authorName",
+        "authorInitials",
+        "content",
+        "createdAt"
+      ]
     },
     "DirectMessageChat": {
       "title": "Direct Message Chat",
       "description": "A chat between two users.",
       "type": "object",
       "properties": {
-        "participants": { "type": "array", "items": { "type": "string" } },
-        "lastMessage": { "type": "string" },
-        "lastMessageTime": { "type": "string", "format": "date-time" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "participants": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lastMessage": {
+          "type": "string"
+        },
+        "lastMessageTime": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["participants", "createdAt", "updatedAt"]
+      "required": [
+        "participants",
+        "createdAt",
+        "updatedAt"
+      ]
     },
     "DirectMessage": {
       "title": "Direct Message",
       "description": "A direct message between two users.",
       "type": "object",
       "properties": {
-        "senderId": { "type": "string" },
-        "text": { "type": "string" },
-        "status": { "type": "string", "enum": ["sent", "delivered", "read"] },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "senderId": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "sent",
+            "delivered",
+            "read"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["senderId", "text", "status", "createdAt"]
+      "required": [
+        "senderId",
+        "text",
+        "status",
+        "createdAt"
+      ]
     },
     "Friendship": {
       "title": "Friendship",
       "description": "A friendship relationship between two users.",
       "type": "object",
       "properties": {
-        "user1Id": { "type": "string" },
-        "user2Id": { "type": "string" },
-        "initiatorId": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "accepted", "rejected", "blocked"] },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "user1Id": {
+          "type": "string"
+        },
+        "user2Id": {
+          "type": "string"
+        },
+        "initiatorId": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "accepted",
+            "rejected",
+            "blocked"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["user1Id", "user2Id", "initiatorId", "status", "createdAt", "updatedAt"]
+      "required": [
+        "user1Id",
+        "user2Id",
+        "initiatorId",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
     },
     "Broadcast": {
       "title": "Broadcast",
       "description": "An email, SMS or push notification broadcast.",
       "type": "object",
       "properties": {
-        "title": { "type": "string" },
-        "body": { "type": "string" },
-        "channel": { "type": "string", "enum": ["Email", "SMS", "Push"] },
-        "targetGroup": { "type": "string" },
-        "recipientsCount": { "type": "number" },
-        "status": { "type": "string", "enum": ["Sent", "Delivered", "Failed"] },
-        "senderId": { "type": "string" },
-        "senderName": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string",
+          "enum": [
+            "Email",
+            "SMS",
+            "Push"
+          ]
+        },
+        "targetGroup": {
+          "type": "string"
+        },
+        "recipientsCount": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Sent",
+            "Delivered",
+            "Failed"
+          ]
+        },
+        "senderId": {
+          "type": "string"
+        },
+        "senderName": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["title", "channel", "targetGroup", "status", "senderId", "createdAt"]
+      "required": [
+        "title",
+        "channel",
+        "targetGroup",
+        "status",
+        "senderId",
+        "createdAt"
+      ]
     },
     "Cell": {
       "title": "Home Cell",
       "description": "Small group/Care group meeting within a branch.",
       "type": "object",
       "properties": {
-        "name": { "type": "string" },
-        "location": { "type": "string" },
-        "leaderId": { "type": "string", "description": "UID of the cell leader" },
-        "leaderName": { "type": "string" },
-        "meetingDay": { "type": "string", "enum": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
-        "meetingTime": { "type": "string" },
-        "branchId": { "type": "string" },
-        "districtId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "name": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "leaderId": {
+          "type": "string",
+          "description": "UID of the cell leader"
+        },
+        "leaderName": {
+          "type": "string"
+        },
+        "meetingDay": {
+          "type": "string",
+          "enum": [
+            "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday"
+          ]
+        },
+        "meetingTime": {
+          "type": "string"
+        },
+        "branchId": {
+          "type": "string"
+        },
+        "districtId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["name", "leaderId", "branchId"]
+      "required": [
+        "name",
+        "leaderId",
+        "branchId"
+      ]
     },
     "PastoralNote": {
       "title": "Pastoral Care Note",
       "description": "Private visitation or counseling records for members.",
       "type": "object",
       "properties": {
-        "memberId": { "type": "string" },
-        "pastorId": { "type": "string" },
-        "pastorName": { "type": "string" },
-        "type": { "type": "string", "enum": ["Visitation", "Counseling", "Welfare", "Deliverance", "Other"] },
-        "content": { "type": "string" },
-        "followUpRequired": { "type": "boolean" },
-        "date": { "type": "string", "format": "date-time" }
+        "memberId": {
+          "type": "string"
+        },
+        "pastorId": {
+          "type": "string"
+        },
+        "pastorName": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "Visitation",
+            "Counseling",
+            "Welfare",
+            "Deliverance",
+            "Other"
+          ]
+        },
+        "content": {
+          "type": "string"
+        },
+        "followUpRequired": {
+          "type": "boolean"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["memberId", "pastorId", "content", "date"]
+      "required": [
+        "memberId",
+        "pastorId",
+        "content",
+        "date"
+      ]
     },
     "FollowUpTask": {
       "title": "Follow-up Task",
       "description": "Tracking communication with first-timers.",
       "type": "object",
       "properties": {
-        "firstTimerId": { "type": "string" },
-        "assignedTo": { "type": "string", "description": "UID of follow-up officer" },
-        "status": { "type": "string", "enum": ["Pending", "In-Progress", "Completed", "Unreachable"] },
-        "method": { "type": "string", "enum": ["Call", "SMS", "Visit", "Email"] },
-        "notes": { "type": "string" },
-        "dueDate": { "type": "string", "format": "date-time" },
-        "completedAt": { "type": "string", "format": "date-time" }
+        "firstTimerId": {
+          "type": "string"
+        },
+        "assignedTo": {
+          "type": "string",
+          "description": "UID of follow-up officer"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Pending",
+            "In-Progress",
+            "Completed",
+            "Unreachable"
+          ]
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "Call",
+            "SMS",
+            "Visit",
+            "Email"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        },
+        "dueDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
       },
-      "required": ["firstTimerId", "status", "method"]
+      "required": [
+        "firstTimerId",
+        "status",
+        "method"
+      ]
+    },
+    "AccountingAccount": {
+      "title": "Accounting Account",
+      "description": "A chart of accounts entry.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "parentAccountId": {
+          "type": "string"
+        },
+        "branchId": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "name",
+        "category",
+        "isActive",
+        "branchId"
+      ]
+    },
+    "AccountingFund": {
+      "title": "Accounting Fund",
+      "description": "A fund for accounting.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "isRestricted": {
+          "type": "boolean"
+        },
+        "balanceLimit": {
+          "type": "number"
+        },
+        "branchId": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "isRestricted",
+        "branchId"
+      ]
+    },
+    "JournalEntry": {
+      "title": "Journal Entry",
+      "description": "A journal entry.",
+      "type": "object",
+      "properties": {
+        "entryDate": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Draft",
+            "Pending Approval",
+            "Posted",
+            "Reversed"
+          ]
+        },
+        "fundId": {
+          "type": "string"
+        },
+        "branchId": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "string"
+              },
+              "debit": {
+                "type": "number"
+              },
+              "credit": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "entryDate",
+        "description",
+        "status",
+        "fundId",
+        "branchId",
+        "createdBy",
+        "createdAt",
+        "lines"
+      ]
+    },
+    "AccountingBudget": {
+      "title": "Accounting Budget",
+      "description": "A monthly or quarterly budget.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "periodStart": {
+          "type": "string"
+        },
+        "periodEnd": {
+          "type": "string"
+        },
+        "branchId": {
+          "type": "string"
+        },
+        "accountId": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "periodStart",
+        "periodEnd",
+        "branchId",
+        "accountId",
+        "amount"
+      ]
     }
   },
   "firestore": {
@@ -681,6 +1816,22 @@
     "/districts/{districtId}/branches/{branchId}/cells/{cellId}": {
       "schema": "Cell",
       "description": "Home cell groups scoped by branch."
+    },
+    "/districts/{districtId}/branches/{branchId}/accountingAccounts/{accountId}": {
+      "schema": "AccountingAccount",
+      "description": "Accounts scoped by branch."
+    },
+    "/districts/{districtId}/branches/{branchId}/accountingFunds/{fundId}": {
+      "schema": "AccountingFund",
+      "description": "Funds scoped by branch."
+    },
+    "/districts/{districtId}/branches/{branchId}/journalEntries/{journalId}": {
+      "schema": "JournalEntry",
+      "description": "Journal entries scoped by branch."
+    },
+    "/districts/{districtId}/branches/{branchId}/accountingBudgets/{budgetId}": {
+      "schema": "AccountingBudget",
+      "description": "Budgets scoped by branch."
     }
   }
 }

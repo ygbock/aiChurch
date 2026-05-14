@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shield, Network, Building2, Eye, EyeOff, Mail, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useFirebase } from '../components/FirebaseProvider';
+import { toast } from 'sonner';
 
 export default function Login() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -28,7 +29,9 @@ export default function Login() {
       await login();
     } catch (e: any) {
       console.error("Login failed", e);
-      setErrorMsg(translateAuthError(e));
+      const translated = translateAuthError(e);
+      setErrorMsg(translated);
+      toast.error('Authentication Error', { description: translated, duration: 10000 });
     } finally {
       setIsAuthenticating(false);
     }
@@ -71,7 +74,9 @@ export default function Login() {
       }
     } catch (err: any) {
       console.error("Email Auth failed", err);
-      setErrorMsg(translateAuthError(err));
+      const translated = translateAuthError(err);
+      setErrorMsg(translated);
+      toast.error('Authentication Error', { description: translated, duration: 10000 });
     } finally {
       setIsAuthenticating(false);
     }

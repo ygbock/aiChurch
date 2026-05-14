@@ -1,7 +1,27 @@
 import React from 'react';
 import { Search, Filter, Download, ArrowLeftRight } from 'lucide-react';
+import { useFinanceStore } from '../store/financeStore';
 
 export default function Transactions() {
+  const transactionsFromStore = useFinanceStore(state => state.transactions);
+
+  const mergedTransactions = [
+    ...transactionsFromStore.map(tx => ({
+      id: tx.id,
+      date: new Date(tx.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
+      sub: `${tx.metadata?.category || tx.type} - ${tx.metadata?.donorName || 'Anonymous'}`,
+      prov: tx.provider,
+      amt: `${tx.currency} ${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+      status: tx.status
+    })),
+    // Dummy historic data
+    { id: 'TXN-M-9A3K2', date: '2026-05-13 14:02', sub: 'Tithe - James K.', prov: 'Orange Money', amt: 'Le 1,500.00', status: 'success' },
+    { id: 'TXN-M-8X2J1', date: '2026-05-13 13:45', sub: 'Payroll Payout - P. Sesay', prov: 'Bank Transfer', amt: 'Le 8,500.00', status: 'pending' },
+    { id: 'TXN-A-7L9P4', date: '2026-05-11 11:20', sub: 'Offering - Sarah B.', prov: 'Afrimoney', amt: 'Le 200.00', status: 'success' },
+    { id: 'TXN-M-6N3X8', date: '2026-05-13 09:12', sub: 'Youth Conference Tkt', prov: 'Orange Money', amt: 'Le 150.00', status: 'failed' },
+    { id: 'TXN-C-5B1M7', date: '2026-05-12 18:30', sub: 'Petty Cash - Media Dept', prov: 'Cash', amt: 'Le 400.00', status: 'success' },
+  ];
+
   return (
     <div className="p-6 md:p-8 lg:p-10 max-w-7xl mx-auto space-y-8 pb-32">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -56,18 +76,12 @@ export default function Transactions() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {[
-                { id: 'TXN-M-9A3K2', date: '2026-05-13 14:02', sub: 'Tithe - James K.', prov: 'Orange Money', amt: 'Le 1,500.00', status: 'success' },
-                { id: 'TXN-M-8X2J1', date: '2026-05-13 13:45', sub: 'Payroll Payout - P. Sesay', prov: 'Bank Transfer', amt: 'Le 8,500.00', status: 'pending' },
-                { id: 'TXN-A-7L9P4', date: '2026-05-13 11:20', sub: 'Offering - Sarah B.', prov: 'Afrimoney', amt: 'Le 200.00', status: 'success' },
-                { id: 'TXN-M-6N3X8', date: '2026-05-13 09:12', sub: 'Youth Conference Tkt', prov: 'Orange Money', amt: 'Le 150.00', status: 'failed' },
-                { id: 'TXN-C-5B1M7', date: '2026-05-12 18:30', sub: 'Petty Cash - Media Dept', prov: 'Cash', amt: 'Le 400.00', status: 'success' },
-              ].map((row, i) => (
+              {mergedTransactions.map((row, i) => (
                 <tr key={i} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-mono text-xs font-bold text-slate-500">{row.id}</td>
                   <td className="px-6 py-4 text-slate-500">{row.date}</td>
-                  <td className="px-6 py-4 font-medium text-slate-900">{row.sub}</td>
-                  <td className="px-6 py-4 text-slate-500">{row.prov}</td>
+                  <td className="px-6 py-4 font-medium text-slate-900 capitalize">{row.sub}</td>
+                  <td className="px-6 py-4 text-slate-500 capitalize">{row.prov}</td>
                   <td className="px-6 py-4 font-bold text-slate-900">{row.amt}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-full tracking-wider ${
@@ -84,7 +98,7 @@ export default function Transactions() {
           </table>
         </div>
         <div className="p-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500 bg-slate-50/50">
-          <span>Showing 5 of 124 transactions</span>
+          <span>Showing {mergedTransactions.length} transactions</span>
           <div className="flex gap-1">
             <button className="px-3 py-1 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm" disabled>Prev</button>
             <button className="px-3 py-1 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm">Next</button>

@@ -377,6 +377,15 @@ export default function Dashboard() {
                   <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Directory</span>
                 </button>
                 <button 
+                  onClick={() => navigate('/finance')}
+                  className="p-4 sm:p-6 bg-slate-50 hover:bg-slate-100 rounded-[1.5rem] sm:rounded-3xl transition-all group flex flex-col items-center gap-2 sm:gap-3 border border-transparent hover:border-slate-200"
+                >
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-[1rem] sm:rounded-2xl flex items-center justify-center shadow-sm text-emerald-600 group-hover:scale-110 transition-transform">
+                    <Banknote size={20} className="sm:w-6 sm:h-6 w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Finance ERP</span>
+                </button>
+                <button 
                   onClick={() => navigate('/direct-messages')}
                   className="p-4 sm:p-6 bg-slate-50 hover:bg-slate-100 rounded-[1.5rem] sm:rounded-3xl transition-all group flex flex-col items-center gap-2 sm:gap-3 border border-transparent hover:border-slate-200"
                 >

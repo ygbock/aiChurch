@@ -6,12 +6,37 @@ import {
   Download, 
   Plus, 
   Clock,
-  MoreVertical
+  MoreVertical,
+  ArrowRight,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { AccountingAutomation } from '../accounting/services/automationRules';
+import { toast } from 'sonner';
 
 export default function Payroll() {
   const [activeTab, setActiveTab] = useState<'employees' | 'runs' | 'settings'>('runs');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showRunModal, setShowRunModal] = useState(false);
+
+  const handleRunPayroll = () => {
+    setIsProcessing(true);
+    
+    // Simulate API delay
+    setTimeout(() => {
+      const runId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const totalAmount = 45200; // Simulated amount
+
+      // Sync to Accounting Ledger directly
+      AccountingAutomation.syncPayroll(runId, totalAmount, new Date().toISOString());
+
+      toast.success('Payroll Processed', { 
+        description: `Run ${runId} completed. Journal entry created in the ledger.` 
+      });
+      setIsProcessing(false);
+      setShowRunModal(false);
+    }, 2000);
+  };
 
   return (
     <div className="p-6 md:p-8 lg:p-10 max-w-7xl mxauto space-y-8 pb-32">
@@ -21,7 +46,7 @@ export default function Payroll() {
           <p className="text-slate-500 text-sm mt-1">Manage staff salaries, deductions, and initiate Monime payouts.</p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 text-sm transition-colors shadow-sm flex items-center gap-2">
+          <button onClick={() => setShowRunModal(true)} className="px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 text-sm transition-colors shadow-sm flex items-center gap-2">
             <Plus size={16} /> Run Payroll
           </button>
         </div>
@@ -104,6 +129,66 @@ export default function Payroll() {
               </table>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showRunModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100">
+                <h3 className="text-xl font-bold text-slate-900">Process Payroll</h3>
+                <p className="text-sm text-slate-500 mt-1">Review and execute the current payroll run.</p>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Period</span>
+                  <span className="font-bold text-slate-900">May 2026</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Total Employees</span>
+                  <span className="font-bold text-slate-900">14</span>
+                </div>
+                <div className="flex justify-between items-center text-sm border-b border-slate-100 pb-4">
+                  <span className="text-slate-500">Payment Account</span>
+                  <span className="font-bold text-slate-900">Main Bank Account</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Total Run Amount</span>
+                  <span className="text-2xl font-black text-slate-900">Le 45,200.00</span>
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 text-amber-800 text-sm mt-4">
+                  <ShieldAlert className="shrink-0" size={18} />
+                  <div>
+                    <p className="font-bold mb-1">Accounting Automation</p>
+                    <p className="opacity-90 leading-relaxed">Processing this payroll will automatically decrease the Bank asset account and increase Salary expenses in the general ledger.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 bg-slate-50 flex justify-end gap-3">
+                <button 
+                  onClick={() => setShowRunModal(false)}
+                  disabled={isProcessing}
+                  className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-200/50 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleRunPayroll}
+                  disabled={isProcessing}
+                  className="px-6 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isProcessing ? 'Processing...' : 'Confirm & Process'}
+                  {!isProcessing && <ArrowRight size={16} />}
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

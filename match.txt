@@ -1,0 +1,1306 @@
+src/modules/finance/accounting/components/CashFlowStatementModal.tsx:18:    d.setMonth(d.getMonth() - 1);
+src/modules/finance/accounting/components/Funds.tsx:104:      <TransferFundsModal isOpen={showTransferModal} onClose={() => setShowTransferModal(false)} />
+src/modules/finance/accounting/components/JournalEntryFormModal.tsx:35:    setLines([...lines, { id: Math.random().toString(), accountId: '', debit: 0, credit: 0 }]);
+src/modules/finance/accounting/components/JournalEntryFormModal.tsx:40:      setLines(lines.filter(l => l.id !== id));
+src/modules/finance/accounting/components/JournalEntryFormModal.tsx:45:    setLines(lines.map(l => {
+src/modules/finance/accounting/components/PeriodClosing.tsx:34:      setPeriods(prev => prev.map(p => 
+src/modules/finance/accounting/components/PeriodClosing.tsx:42:      nextMonthObj.setDate(nextMonthObj.getDate() + 1); // June 1st
+src/modules/finance/accounting/components/PeriodClosing.tsx:48:      setPeriods(prev => [...prev, {
+src/modules/finance/accounting/components/ChartOfAccounts.tsx:22:    setExpandedParents(prev => ({ ...prev, [id]: !prev[id] }));
+src/modules/finance/accounting/components/ChartOfAccounts.tsx:42:    setEditingAccount(acc);
+src/modules/finance/accounting/components/ChartOfAccounts.tsx:43:    setIsModalOpen(true);
+src/modules/finance/accounting/components/ChartOfAccounts.tsx:47:    setEditingAccount(null);
+src/modules/finance/accounting/components/ChartOfAccounts.tsx:48:    setIsModalOpen(true);
+src/modules/finance/accounting/components/ChartOfAccounts.tsx:151:      <AccountFormModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} editAccount={editingAccount} />
+src/modules/finance/accounting/components/Budgets.tsx:45:      setShowCreateModal(false);
+src/modules/finance/accounting/components/AccountingReports.tsx:26:      setIsTrialBalanceOpen(true);
+src/modules/finance/accounting/components/AccountingReports.tsx:28:      setIsIncomeStatementOpen(true);
+src/modules/finance/accounting/components/AccountingReports.tsx:30:      setIsCashFlowOpen(true);
+src/modules/finance/accounting/components/AccountingReports.tsx:32:      setIsBalanceSheetOpen(true);
+src/modules/finance/accounting/components/AccountingReports.tsx:79:      <TrialBalanceModal isOpen={isTrialBalanceOpen} onClose={() => setIsTrialBalanceOpen(false)} />
+src/modules/finance/accounting/components/AccountingReports.tsx:80:      <IncomeStatementModal isOpen={isIncomeStatementOpen} onClose={() => setIsIncomeStatementOpen(false)} />
+src/modules/finance/accounting/components/AccountingReports.tsx:81:      <CashFlowStatementModal isOpen={isCashFlowOpen} onClose={() => setIsCashFlowOpen(false)} />
+src/modules/finance/accounting/components/AccountingReports.tsx:82:      <BalanceSheetModal isOpen={isBalanceSheetOpen} onClose={() => setIsBalanceSheetOpen(false)} />
+src/modules/finance/accounting/components/Journals.tsx:101:      <JournalEntryFormModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+src/modules/finance/accounting/components/IncomeStatementModal.tsx:18:    d.setMonth(d.getMonth() - 1);
+src/modules/finance/payroll/Payroll.tsx:23:    setIsProcessing(true);
+src/modules/finance/payroll/Payroll.tsx:26:    setTimeout(() => {
+src/modules/finance/payroll/Payroll.tsx:36:      setIsProcessing(false);
+src/modules/finance/payroll/Payroll.tsx:37:      setShowRunModal(false);
+src/modules/finance/donations/Donations.tsx:54:      setIsProcessing(true);
+src/modules/finance/donations/Donations.tsx:68:         setTimeout(() => {
+src/modules/finance/donations/Donations.tsx:78:      setIsProcessing(false);
+src/modules/finance/donations/Donations.tsx:83:    setIsProcessing(false);
+src/modules/finance/donations/Donations.tsx:108:    setAmount('');
+src/modules/finance/donations/Donations.tsx:109:    setPhone('');
+src/modules/finance/donations/Donations.tsx:110:    setDonorName('');
+src/modules/finance/donations/Donations.tsx:111:    setActiveTab('history');
+src/modules/finance/FinanceLayout.tsx:50:    setIsMobileMenuOpen(false);
+src/pages/FollowUpManagement.tsx:75:      setVisitors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FirstTimer)));
+src/pages/FollowUpManagement.tsx:76:      setLoading(false);
+src/pages/FollowUpManagement.tsx:94:      setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FollowUpTask)));
+src/pages/FollowUpManagement.tsx:124:      setFormData({ method: 'Call', notes: '', status: 'Completed' });
+src/pages/FollowUpManagement.tsx:125:      setIsLogModalOpen(false);
+src/pages/FollowUpManagement.tsx:267:        onClose={() => setIsLogModalOpen(false)} 
+src/pages/ServiceReports.tsx:59:      setPastReports(reports);
+src/pages/ServiceReports.tsx:79:    setLoading(true);
+src/pages/ServiceReports.tsx:107:      setAdults('');
+src/pages/ServiceReports.tsx:108:      setChildren('');
+src/pages/ServiceReports.tsx:109:      setYouths('');
+src/pages/ServiceReports.tsx:110:      setFirstTimers('');
+src/pages/ServiceReports.tsx:111:      setNewConverts('');
+src/pages/ServiceReports.tsx:112:      setTotalSalvations('');
+src/pages/ServiceReports.tsx:113:      setTithe('');
+src/pages/ServiceReports.tsx:114:      setOffering('');
+src/pages/ServiceReports.tsx:115:      setNotes('');
+src/pages/ServiceReports.tsx:116:      setDate('');
+src/pages/ServiceReports.tsx:122:      setLoading(false);
+src/pages/DepartmentDashboard.tsx:113:    setModalType(type);
+src/pages/DepartmentDashboard.tsx:114:    setIsModalOpen(true);
+src/pages/DepartmentDashboard.tsx:118:    setIsModalOpen(false);
+src/pages/DepartmentDashboard.tsx:119:    setModalType(null);
+src/pages/DepartmentDashboard.tsx:130:          setDepartment({ id: deptSnap.id, ...deptSnap.data() });
+src/pages/DepartmentDashboard.tsx:143:        setMembers(memberSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+src/pages/DepartmentDashboard.tsx:148:        setLoading(false);
+src/pages/DepartmentDashboard.tsx:1235:              onUpdate={() => { setSelectedEquipment({ name: 'Main Sound Board', category: 'Audio Mixer', status: 'operational' }); openModal('update_equipment'); }}
+src/pages/DepartmentDashboard.tsx:1244:              onUpdate={() => { setSelectedEquipment({ name: 'Primary Projection A', category: 'Video Projector', status: 'operational' }); openModal('update_equipment'); }}
+src/pages/DepartmentDashboard.tsx:1253:              onUpdate={() => { setSelectedEquipment({ name: 'Live Stream Encoder', category: 'Streaming Equipment', status: 'maintenance' }); openModal('update_equipment'); }}
+src/pages/DepartmentDashboard.tsx:1262:              onUpdate={() => { setSelectedEquipment({ name: 'Stage Lighting Array', category: 'Lighting', status: 'operational' }); openModal('update_equipment'); }}
+src/pages/DepartmentDashboard.tsx:1271:              onUpdate={() => { setSelectedEquipment({ name: 'Wireless Vocal Pack B', category: 'Audio', status: 'offline' }); openModal('update_equipment'); }}
+src/pages/DepartmentDashboard.tsx:1280:              onUpdate={() => { setSelectedEquipment({ name: 'Network Core Switch', category: 'Networking', status: 'operational' }); openModal('update_equipment'); }}
+src/pages/DepartmentDashboard.tsx:1865:    setLoading(true);
+src/pages/DepartmentDashboard.tsx:1873:      setAvailableMembers(members);
+src/pages/DepartmentDashboard.tsx:1877:      setLoading(false);
+src/pages/DepartmentDashboard.tsx:1898:    setLoading(true);
+src/pages/DepartmentDashboard.tsx:1909:        setLoading(false);
+src/pages/DepartmentDashboard.tsx:1932:      setLoading(false);
+src/pages/DepartmentDashboard.tsx:2235:    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+src/pages/DepartmentDashboard.tsx:2239:    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+src/pages/Departments.tsx:61:      setDepartments(results);
+src/pages/Departments.tsx:80:      setMemberships(results);
+src/pages/Departments.tsx:115:        <NewDepartment onCancel={() => setShowNewForm(false)} onSuccess={() => setShowNewForm(false)} />
+src/pages/ForcePasswordChange.tsx:24:      setErrorMsg("New passwords do not match.");
+src/pages/ForcePasswordChange.tsx:29:      setErrorMsg("Password must be at least 6 characters.");
+src/pages/ForcePasswordChange.tsx:33:    setIsAuthenticating(true);
+src/pages/ForcePasswordChange.tsx:34:    setErrorMsg('');
+src/pages/ForcePasswordChange.tsx:67:        setErrorMsg("Incorrect current password.");
+src/pages/ForcePasswordChange.tsx:69:        setErrorMsg(err.message || 'Failed to update password.');
+src/pages/ForcePasswordChange.tsx:72:      setIsAuthenticating(false);
+src/pages/MemberProfile.tsx:75:        setLoading(true);
+src/pages/MemberProfile.tsx:76:        setMember(null);
+src/pages/MemberProfile.tsx:109:           setMember(foundMember);
+src/pages/MemberProfile.tsx:115:             setActivities(actsData);
+src/pages/MemberProfile.tsx:121:        setLoading(false);
+src/pages/MemberProfile.tsx:217:          onClose={() => setIsIDCardModalOpen(false)}
+src/pages/MemberProfile.tsx:230:          onClose={() => setIsTagModalOpen(false)}
+src/pages/MemberProfile.tsx:233:             setMember({ ...member, tags: newTags });
+src/pages/PublicEventRegistration.tsx:38:          setEvent({ id: docSnap.id, ...data });
+src/pages/PublicEventRegistration.tsx:48:      setLoading(false);
+src/pages/PublicEventRegistration.tsx:79:      setPassData(registrationData);
+src/pages/PublicEventRegistration.tsx:81:      setIsRegistered(true);
+src/pages/TransferManagement.tsx:104:      setTransfers(results);
+src/pages/TransferManagement.tsx:123:        setMembers(results);
+src/pages/TransferManagement.tsx:138:        setDistricts(results);
+src/pages/TransferManagement.tsx:157:        setBranches(results);
+src/pages/TransferManagement.tsx:174:    setSaving(true);
+src/pages/TransferManagement.tsx:199:      setIsModalOpen(false);
+src/pages/TransferManagement.tsx:200:      setFormData({ memberId: '', toDistrictId: '', toBranchId: '', reason: '' });
+src/pages/TransferManagement.tsx:204:      setSaving(false);
+src/pages/TransferManagement.tsx:386:                            setFormData({ ...formData, memberId: m.id });
+src/pages/TransferManagement.tsx:387:                            setSearchTerm('');
+src/pages/TransferManagement.tsx:513:    setProcessingId(requestObj.id);
+src/pages/TransferManagement.tsx:538:        await setDoc(doc(db, targetPath), {
+src/pages/TransferManagement.tsx:595:      setShowResolveModal(false);
+src/pages/TransferManagement.tsx:596:      setProcessingId(null);
+src/pages/TransferManagement.tsx:602:      setShowResolveModal(true);
+src/pages/TransferManagement.tsx:690:        onClose={() => setShowResolveModal(false)}
+src/pages/KioskCheckIn.tsx:41:      setIsScanning(false);
+src/pages/KioskCheckIn.tsx:42:      setSearchQuery('');
+src/pages/KioskCheckIn.tsx:55:    setIsLoading(true);
+src/pages/KioskCheckIn.tsx:69:      setMembers(membersList);
+src/pages/KioskCheckIn.tsx:70:      setFilteredMembers(membersList);
+src/pages/KioskCheckIn.tsx:75:      setIsLoading(false);
+src/pages/KioskCheckIn.tsx:96:    setFilteredMembers(members.filter(m => 
+src/pages/KioskCheckIn.tsx:106:     setIsCheckingIn(true);
+src/pages/KioskCheckIn.tsx:121:        await setDoc(docRef, payload);
+src/pages/KioskCheckIn.tsx:128:            await setDoc(doc(db, eventAttendancePath, member.id), payload);
+src/pages/KioskCheckIn.tsx:132:        setCheckedInList(prev => new Set([...prev, member.id]));
+src/pages/KioskCheckIn.tsx:133:        setRecentCheckIn(member);
+src/pages/KioskCheckIn.tsx:134:        setSearchQuery('');
+src/pages/KioskCheckIn.tsx:139:        setIsCheckingIn(false);
+src/pages/members/components/MemberAttendanceTab.tsx:28:      setLoading(false);
+src/pages/members/components/MemberAttendanceTab.tsx:39:      setAttendance(data);
+src/pages/members/components/MemberAttendanceTab.tsx:43:      setLoading(false);
+src/pages/members/components/MemberAttendanceTab.tsx:57:      setAttendance(attendance.filter(c => c.id !== id));
+src/pages/members/components/MemberSignalTab.tsx:34:      setUpcomingEvents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+src/pages/members/components/MemberSignalTab.tsx:42:       setLoading(false);
+src/pages/members/components/MemberSignalTab.tsx:46:    setLoading(true);
+src/pages/members/components/MemberSignalTab.tsx:55:       setSignals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+src/pages/members/components/MemberSignalTab.tsx:59:       setLoading(false);
+src/pages/members/components/MemberSignalTab.tsx:67:        await setDoc(signalRef, {
+src/pages/members/components/MemberSignalTab.tsx:77:        await setDoc(doc(db, eventAttendancePath, member.id), {
+src/pages/members/components/MemberSignalTab.tsx:88:        setExpandedEventId(null);
+src/pages/members/components/MemberDiscipleshipTab.tsx:27:    setIsUpdating(true);
+src/pages/members/components/MemberDiscipleshipTab.tsx:44:      setDiscipleship(newDiscipleship);
+src/pages/members/components/MemberDiscipleshipTab.tsx:49:      setIsUpdating(false);
+src/pages/members/components/MemberToolbar.tsx:229:                        setIsViewModeExpanded(true);
+src/pages/members/components/MemberToolbar.tsx:232:                        setIsViewModeExpanded(false);
+src/pages/members/components/MemberToolbar.tsx:261:                        setIsViewModeExpanded(true);
+src/pages/members/components/MemberToolbar.tsx:264:                        setIsViewModeExpanded(false);
+src/pages/members/components/MemberToolbar.tsx:293:                        setIsViewModeExpanded(true);
+src/pages/members/components/MemberToolbar.tsx:296:                        setIsViewModeExpanded(false);
+src/pages/members/components/MemberGivingTab.tsx:51:      setLoading(false);
+src/pages/members/components/MemberGivingTab.tsx:63:      setContributions(data);
+src/pages/members/components/MemberGivingTab.tsx:67:      setLoading(false);
+src/pages/members/components/MemberGivingTab.tsx:82:    setIsSaving(true);
+src/pages/members/components/MemberGivingTab.tsx:101:      setIsModalOpen(false);
+src/pages/members/components/MemberGivingTab.tsx:104:      setAmount('');
+src/pages/members/components/MemberGivingTab.tsx:105:      setCategory('Tithes');
+src/pages/members/components/MemberGivingTab.tsx:106:      setMethod('Cash');
+src/pages/members/components/MemberGivingTab.tsx:107:      setDate(format(new Date(), 'yyyy-MM-dd'));
+src/pages/members/components/MemberGivingTab.tsx:108:      setNote('');
+src/pages/members/components/MemberGivingTab.tsx:114:      setIsSaving(false);
+src/pages/members/components/MemberGivingTab.tsx:124:      setContributions(contributions.filter(c => c.id !== id));
+src/pages/members/components/MemberGivingTab.tsx:132:    setIsPrinting(true);
+src/pages/members/components/MemberGivingTab.tsx:133:    setIsStatementModalOpen(false);
+src/pages/members/components/MemberGivingTab.tsx:134:    setTimeout(() => {
+src/pages/members/components/MemberGivingTab.tsx:136:      setIsPrinting(false);
+src/pages/members/components/MemberGivingTab.tsx:309:      <Modal isOpen={isStatementModalOpen} onClose={() => setIsStatementModalOpen(false)} title="Generate Annual Statement">
+src/pages/members/components/MemberGivingTab.tsx:338:      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Log Contribution">
+src/pages/members/components/ImportMembersModal.tsx:45:    setFile(selectedFile);
+src/pages/members/components/ImportMembersModal.tsx:58:        setParsedData(results.data);
+src/pages/members/components/ImportMembersModal.tsx:59:        setStep(2);
+src/pages/members/components/ImportMembersModal.tsx:69:    setIsUploading(true);
+src/pages/members/components/ImportMembersModal.tsx:121:      setIsUploading(false);
+src/pages/members/components/ImportMembersModal.tsx:131:    link.setAttribute('download', 'members_import_template.csv');
+src/pages/members/components/ImportMembersModal.tsx:141:    setFile(null);
+src/pages/members/components/ImportMembersModal.tsx:142:    setParsedData([]);
+src/pages/members/components/ImportMembersModal.tsx:143:    setStep(1);
+src/pages/members/components/MemberTable.tsx:78:    setVisibleCount(50);
+src/pages/members/components/MemberTable.tsx:86:        setVisibleCount(prev => Math.min(prev + 50, members.length));
+src/pages/members/components/PastoralCareTab.tsx:73:      setNotes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PastoralNote)));
+src/pages/members/components/PastoralCareTab.tsx:74:      setLoading(false);
+src/pages/members/components/PastoralCareTab.tsx:77:      setLoading(false);
+src/pages/members/components/PastoralCareTab.tsx:99:      setIsAdding(false);
+src/pages/members/components/PastoralCareTab.tsx:100:      setFormData({ type: 'Visitation', content: '', followUpRequired: false });
+src/pages/members/components/BulkNotifyModal.tsx:49:    setIsSending(true);
+src/pages/members/components/BulkNotifyModal.tsx:78:      setSubject('');
+src/pages/members/components/BulkNotifyModal.tsx:79:      setMessage('');
+src/pages/members/components/BulkNotifyModal.tsx:86:      setIsSending(false);
+src/pages/members/components/TagEditorModal.tsx:29:       setTags(tags.filter(t => t !== tag));
+src/pages/members/components/TagEditorModal.tsx:31:       setTags([...tags, tag]);
+src/pages/members/components/TagEditorModal.tsx:40:       setTags([...tags, tag]);
+src/pages/members/components/TagEditorModal.tsx:42:    setCustomTag('');
+src/pages/members/components/BulkTransferModal.tsx:43:         setTargetDistrictId(profile.districtId);
+src/pages/members/components/BulkTransferModal.tsx:54:       setDistricts(data);
+src/pages/members/components/BulkTransferModal.tsx:62:    setIsLoadingLocations(true);
+src/pages/members/components/BulkTransferModal.tsx:67:      setBranches(data);
+src/pages/members/components/BulkTransferModal.tsx:71:      setIsLoadingLocations(false);
+src/pages/members/components/BulkTransferModal.tsx:76:    setTargetDistrictId(value);
+src/pages/members/components/BulkTransferModal.tsx:77:    setTargetBranchId('');
+src/pages/members/components/BulkTransferModal.tsx:92:    setIsTransferring(true);
+src/pages/members/components/BulkTransferModal.tsx:187:      setIsTransferring(false);
+src/pages/members/MemberManagementPage.tsx:46:    setSelectedIds([]);
+src/pages/members/MemberManagementPage.tsx:56:          setDistrictMaps(dMap);
+src/pages/members/MemberManagementPage.tsx:70:          setBranchMaps(bMap);
+src/pages/members/MemberManagementPage.tsx:71:          setBranchOptions(bOpts);
+src/pages/members/MemberManagementPage.tsx:79:          setBranchMaps(bMap);
+src/pages/members/MemberManagementPage.tsx:181:    setSelectedIds(prev => prev.includes(id) ? prev.filter(selectedId => selectedId !== id) : [...prev, id]);
+src/pages/members/MemberManagementPage.tsx:186:      setSelectedIds([]);
+src/pages/members/MemberManagementPage.tsx:188:      setSelectedIds(filteredMembers.map(m => m.id));
+src/pages/members/MemberManagementPage.tsx:197:    doc.setFontSize(20);
+src/pages/members/MemberManagementPage.tsx:198:    doc.setTextColor(15, 23, 42); 
+src/pages/members/MemberManagementPage.tsx:201:    doc.setFontSize(10);
+src/pages/members/MemberManagementPage.tsx:202:    doc.setTextColor(100, 116, 139); 
+src/pages/members/MemberManagementPage.tsx:227:      setSelectedIds([]);
+src/pages/members/MemberManagementPage.tsx:250:    link.setAttribute("href", url);
+src/pages/members/MemberManagementPage.tsx:251:    link.setAttribute("download", `members_export_${new Date().getTime()}.csv`);
+src/pages/members/MemberManagementPage.tsx:258:      setSelectedIds([]);
+src/pages/members/MemberManagementPage.tsx:275:      setSelectedIds([]);
+src/pages/members/MemberManagementPage.tsx:295:      setSelectedIds([]);
+src/pages/members/MemberManagementPage.tsx:353:            onImport={() => setShowImportModal(true)}
+src/pages/members/MemberManagementPage.tsx:459:          onClose={() => setShowNotifyModal(false)}
+src/pages/members/MemberManagementPage.tsx:461:          onSuccess={() => setSelectedIds([])}
+src/pages/members/MemberManagementPage.tsx:468:          onClose={() => setShowImportModal(false)}
+src/pages/members/MemberManagementPage.tsx:476:          onClose={() => setShowTransferModal(false)}
+src/pages/members/MemberManagementPage.tsx:478:          onSuccess={() => setSelectedIds([])}
+src/pages/Settings.tsx:67:      setProfileData({
+src/pages/Settings.tsx:74:      setAvailability({
+src/pages/Settings.tsx:82:      setVisibility(profile.visibility);
+src/pages/Settings.tsx:85:      setNotificationPrefs({
+src/pages/Settings.tsx:96:    setIsSaving(true);
+src/pages/Settings.tsx:108:      setIsSaving(false);
+src/pages/Settings.tsx:114:    setIsSaving(true);
+src/pages/Settings.tsx:124:      setIsSaving(false);
+src/pages/Settings.tsx:130:    setIsSaving(true);
+src/pages/Settings.tsx:140:      setIsSaving(false);
+src/pages/Settings.tsx:146:    setIsSaving(true);
+src/pages/Settings.tsx:156:      setIsSaving(false);
+src/pages/Settings.tsx:161:    setAvailability(prev => ({
+src/pages/MinistryDashboard.tsx:147:      setActiveTab(location.state.initialTab);
+src/pages/MinistryDashboard.tsx:180:      setPrograms(docs);
+src/pages/MinistryDashboard.tsx:899:                  setIsAddMemberModalOpen(false);
+src/pages/MinistryDashboard.tsx:900:                  setMemberForm({ name: '', email: '', phone: '', role: 'Member', committee: '-' });
+src/pages/MinistryDashboard.tsx:1359:  const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
+src/pages/MinistryDashboard.tsx:1360:  const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
+src/pages/MinistryDashboard.tsx:1363:    setSelectedDate(date || new Date());
+src/pages/MinistryDashboard.tsx:1364:    setNewEventForm({ title: '', time: '', location: '', type: 'Service' });
+src/pages/MinistryDashboard.tsx:1365:    setIsEventModalOpen(true);
+src/pages/MinistryDashboard.tsx:1370:    setEvents([...events, {
+src/pages/MinistryDashboard.tsx:1378:    setIsEventModalOpen(false);
+src/pages/MinistryDashboard.tsx:1445:    .filter(e => e.date >= new Date(new Date().setHours(0,0,0,0)) && (filter === 'All' || e.type === filter))
+src/pages/MinistryDashboard.tsx:1572:                         setSelectedDate(d);
+src/pages/SystemAlerts.tsx:123:    setSelectedAlerts(prev => prev.includes(id) ? prev.filter(aid => aid !== id) : [...prev, id]);
+src/pages/SystemAlerts.tsx:127:    setAlerts(prev => prev.map(a => selectedAlerts.includes(a.id) ? { ...a, status: 'resolved' } : a));
+src/pages/SystemAlerts.tsx:128:    setSelectedAlerts([]);
+src/pages/SystemAlerts.tsx:132:    setAlerts(prev => prev.filter(a => !selectedAlerts.includes(a.id)));
+src/pages/SystemAlerts.tsx:133:    setSelectedAlerts([]);
+src/pages/SystemAlerts.tsx:137:    setExpandedAlerts(prev => 
+src/pages/SystemAlerts.tsx:144:    setAlerts(prev => prev.map(a => a.id === id ? { ...a, status: 'resolved' } : a));
+src/pages/SystemAlerts.tsx:148:    setAlerts(prev => prev.map(a => ({ ...a, status: 'resolved' })));
+src/pages/SystemAlerts.tsx:152:    setAlerts(prev => prev.filter(a => a.status !== 'resolved'));
+src/pages/SystemAlerts.tsx:181:      setSelectedAlerts([]);
+src/pages/SystemAlerts.tsx:183:      setSelectedAlerts(filteredAlerts.map(a => a.id));
+src/pages/SystemAlerts.tsx:213:    setIsRefreshing(true);
+src/pages/SystemAlerts.tsx:214:    setTimeout(() => {
+src/pages/SystemAlerts.tsx:215:      setIsRefreshing(false);
+src/pages/SystemAlerts.tsx:593:        onClose={() => setIsSettingsModalOpen(false)}
+src/pages/DirectMessages.tsx:169:        setShowChatMenu(false);
+src/pages/DirectMessages.tsx:172:        setShowAttachmentMenu(false);
+src/pages/DirectMessages.tsx:200:    setActiveChatId(chatId || null);
+src/pages/DirectMessages.tsx:244:        if (isMounted) setIsInitializingChat(false);
+src/pages/DirectMessages.tsx:349:            setChats(prev => {
+src/pages/DirectMessages.tsx:398:            setMessagesByChat(prev => ({
+src/pages/DirectMessages.tsx:445:    setPendingAttachment({
+src/pages/DirectMessages.tsx:454:    setShowAttachmentMenu(false);
+src/pages/DirectMessages.tsx:465:      if (newSelected.size === 0) setIsSelectionMode(false);
+src/pages/DirectMessages.tsx:469:    setSelectedMessages(newSelected);
+src/pages/DirectMessages.tsx:481:    setIsSelectionMode(false);
+src/pages/DirectMessages.tsx:482:    setSelectedMessages(new Set());
+src/pages/DirectMessages.tsx:486:    setDeleteConfirmInfo({ type: 'single', id: messageId });
+src/pages/DirectMessages.tsx:505:      setDeleteConfirmInfo(null);
+src/pages/DirectMessages.tsx:524:      setIsSelectionMode(false);
+src/pages/DirectMessages.tsx:525:      setSelectedMessages(new Set());
+src/pages/DirectMessages.tsx:529:      setDeleteConfirmInfo(null);
+src/pages/DirectMessages.tsx:537:    setIsSubmitting(true);
+src/pages/DirectMessages.tsx:581:      setIsForwardModalOpen(false);
+src/pages/DirectMessages.tsx:582:      setIsSelectionMode(false);
+src/pages/DirectMessages.tsx:583:      setSelectedMessages(new Set());
+src/pages/DirectMessages.tsx:584:      setForwardChatId('');
+src/pages/DirectMessages.tsx:585:      setForwardContext('');
+src/pages/DirectMessages.tsx:591:      setIsSubmitting(false);
+src/pages/DirectMessages.tsx:597:    setReplyingToMessage({
+src/pages/DirectMessages.tsx:627:    setShowAttachmentMenu(false);
+src/pages/DirectMessages.tsx:638:        setPendingAttachment({
+src/pages/DirectMessages.tsx:658:    setPendingAttachment(null);
+src/pages/DirectMessages.tsx:668:    setIsSubmitting(true);
+src/pages/DirectMessages.tsx:692:        setShowPollModal(false);
+src/pages/DirectMessages.tsx:697:        setIsSubmitting(false);
+src/pages/DirectMessages.tsx:704:    setIsSubmitting(true);
+src/pages/DirectMessages.tsx:728:        setShowEventModal(false);
+src/pages/DirectMessages.tsx:733:        setIsSubmitting(false);
+src/pages/DirectMessages.tsx:738:    setShowCallModal(type);
+src/pages/DirectMessages.tsx:771:    setIsSubmitting(true);
+src/pages/DirectMessages.tsx:797:            setEditingMessageId(null);
+src/pages/DirectMessages.tsx:838:        setMessageText('');
+src/pages/DirectMessages.tsx:839:        setReplyingToMessage(null);
+src/pages/DirectMessages.tsx:845:        setIsSubmitting(false);
+src/pages/DirectMessages.tsx:891:        setAllUsers(users);
+src/pages/DirectMessages.tsx:1084:                           setIsSelectionMode(true);
+src/pages/DirectMessages.tsx:1142:                                setShowCallModal(msg.callData.type);
+src/pages/DirectMessages.tsx:1153:                          onScriptureClick={(ref) => setViewScripture(ref)} 
+src/pages/DirectMessages.tsx:1178:                               setActiveMessageId(null);
+src/pages/DirectMessages.tsx:1188:                             setEmojiDrawerMessageId(msg.id);
+src/pages/DirectMessages.tsx:1189:                             setActiveMessageId(null);
+src/pages/DirectMessages.tsx:1277:                                      setShowMessageStatsId(msgId);
+src/pages/DirectMessages.tsx:1278:                                      setIsSelectionMode(false);
+src/pages/DirectMessages.tsx:1279:                                      setSelectedMessages(new Set());
+src/pages/DirectMessages.tsx:1280:                                      setShowSelectionMenu(false);
+src/pages/DirectMessages.tsx:1292:                                    setEditingMessageId(msg.id);
+src/pages/DirectMessages.tsx:1293:                                    setMessageText(msg.text);
+src/pages/DirectMessages.tsx:1294:                                    setIsSelectionMode(false);
+src/pages/DirectMessages.tsx:1295:                                    setSelectedMessages(new Set());
+src/pages/DirectMessages.tsx:1296:                                    setShowSelectionMenu(false);
+src/pages/DirectMessages.tsx:1503:                        setMessageText(val);
+src/pages/DirectMessages.tsx:1508:                          setShowQuickReplyModal(true);
+src/pages/DirectMessages.tsx:1509:                          setMessageText('');
+src/pages/DirectMessages.tsx:1559:                        setPendingAttachment({
+src/pages/DirectMessages.tsx:1611:        <Modal isOpen={true} onClose={() => setPreviewFile(null)} title="Attachment Viewer">
+src/pages/DirectMessages.tsx:1634:        onClose={() => setShowPollModal(false)}
+src/pages/DirectMessages.tsx:1640:        onClose={() => setShowEventModal(false)}
+src/pages/DirectMessages.tsx:1646:        onClose={() => setShowQuickReplyModal(false)}
+src/pages/DirectMessages.tsx:1648:          setMessageText(reply);
+src/pages/DirectMessages.tsx:1655:        onClose={() => setShowNewChatModal(false)}
+src/pages/DirectMessages.tsx:1662:        onClose={() => setShowCallModal(false)}
+src/pages/DirectMessages.tsx:1670:      <Modal isOpen={!!showMessageStatsId} onClose={() => setShowMessageStatsId(null)} title="Message Info">
+src/pages/DirectMessages.tsx:1693:      <Modal isOpen={!!deleteConfirmInfo} onClose={() => setDeleteConfirmInfo(null)} title="Delete Message">
+src/pages/DirectMessages.tsx:1738:        <Modal isOpen={isChatInfoOpen} onClose={() => setIsChatInfoOpen(false)} title="Contact Info">
+src/pages/DirectMessages.tsx:1772:      <Modal isOpen={isForwardModalOpen} onClose={() => { setIsForwardModalOpen(false); setForwardChatId(''); setForwardContext(''); }} title="Forward Messages">
+src/pages/DirectMessages.tsx:1850:                               setMessageText(prev => prev + emoji);
+src/pages/DirectMessages.tsx:1854:                             setEmojiDrawerMessageId(null);
+src/pages/DirectMessages.tsx:1873:        onClose={() => setViewScripture(null)} 
+src/pages/Events.tsx:279:      until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/pages/Events.tsx:316:      setEvents(docs);
+src/pages/Events.tsx:317:      setLoading(false);
+src/pages/Events.tsx:320:      setLoading(false);
+src/pages/Events.tsx:328:      setEditingEvent(null);
+src/pages/Events.tsx:329:      setEventForm({
+src/pages/Events.tsx:347:          until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/pages/Events.tsx:350:      setShowModal(true);
+src/pages/Events.tsx:357:    setEditingEvent(null);
+src/pages/Events.tsx:358:    setEventForm({
+src/pages/Events.tsx:376:        until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/pages/Events.tsx:379:    setShowModal(true);
+src/pages/Events.tsx:384:    setEditingEvent(event);
+src/pages/Events.tsx:385:    setEventForm({
+src/pages/Events.tsx:402:        until: event.recurrence.until || format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/pages/Events.tsx:406:        until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/pages/Events.tsx:409:    setShowModal(true);
+src/pages/Events.tsx:414:    setEditingEvent(null);
+src/pages/Events.tsx:415:    setEventForm({
+src/pages/Events.tsx:434:        until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/pages/Events.tsx:437:    setShowModal(true);
+src/pages/Events.tsx:448:    setIsSaving(true);
+src/pages/Events.tsx:488:      setShowModal(false);
+src/pages/Events.tsx:492:      setIsSaving(false);
+src/pages/Events.tsx:1106:                                  const defaultFuture = format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd');
+src/pages/Events.tsx:1107:                                  setEventForm({
+src/pages/NewConvert.tsx:34:        setBranches(list);
+src/pages/NewConvert.tsx:66:    setIsSaving(true);
+src/pages/NewConvert.tsx:104:        callDate.setDate(callDate.getDate() + 1);
+src/pages/NewConvert.tsx:122:        visitDate.setDate(visitDate.getDate() + 7);
+src/pages/NewConvert.tsx:149:      setIsSaving(false);
+src/pages/Rosters.tsx:104:    setRosters(prev => prev.map(r => r.id === rosterId ? { ...r, status: 'Published' as const } : r));
+src/pages/Rosters.tsx:320:                    setIsCreateModalOpen(false);
+src/pages/MinistryChannels.tsx:190:    setShowAttachmentMenu(false);
+src/pages/MinistryChannels.tsx:201:        setPendingAttachment({
+src/pages/MinistryChannels.tsx:226:    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+src/pages/MinistryChannels.tsx:280:        setShowChannelMenu(false);
+src/pages/MinistryChannels.tsx:283:        setShowAttachmentMenu(false);
+src/pages/MinistryChannels.tsx:366:       setMuteUserTarget(null);
+src/pages/MinistryChannels.tsx:388:    setIsAddingMembers(true);
+src/pages/MinistryChannels.tsx:404:      setIsAddingMembers(false);
+src/pages/MinistryChannels.tsx:410:    setIsAddingMembers(true);
+src/pages/MinistryChannels.tsx:415:      await setDoc(memberRef, {
+src/pages/MinistryChannels.tsx:432:      setIsInviteModalOpen(false);
+src/pages/MinistryChannels.tsx:437:      setIsAddingMembers(false);
+src/pages/MinistryChannels.tsx:504:            setChannels(fetchedChannels);
+src/pages/MinistryChannels.tsx:519:        setMessages([]);
+src/pages/MinistryChannels.tsx:576:          setMessages(fetchedMessages);
+src/pages/MinistryChannels.tsx:590:        setActiveMembers([]);
+src/pages/MinistryChannels.tsx:603:          setActiveMembers(fetchedMembers);
+src/pages/MinistryChannels.tsx:622:          setSelectedProfileData({ id: docSnap.id, ...docSnap.data() });
+src/pages/MinistryChannels.tsx:633:        setIsFriend(friends);
+src/pages/MinistryChannels.tsx:650:      setIsFriend(true);
+src/pages/MinistryChannels.tsx:665:        setAllUsers(users);
+src/pages/MinistryChannels.tsx:684:          await setDoc(memberRef, {
+src/pages/MinistryChannels.tsx:723:        setReadCounts(prev => {
+src/pages/MinistryChannels.tsx:725:          localStorage.setItem('channelReadCounts', JSON.stringify(newCounts));
+src/pages/MinistryChannels.tsx:746:    setPendingAttachment({
+src/pages/MinistryChannels.tsx:754:    setShowAttachmentMenu(false);
+src/pages/MinistryChannels.tsx:767:    setIsSubmitting(true);
+src/pages/MinistryChannels.tsx:793:        setShowPollModal(false);
+src/pages/MinistryChannels.tsx:798:        setIsSubmitting(false);
+src/pages/MinistryChannels.tsx:806:    setIsSubmitting(true);
+src/pages/MinistryChannels.tsx:830:        setShowEventModal(false);
+src/pages/MinistryChannels.tsx:835:        setIsSubmitting(false);
+src/pages/MinistryChannels.tsx:869:    setShowCallModal(true);
+src/pages/MinistryChannels.tsx:909:    setIsSubmitting(true);
+src/pages/MinistryChannels.tsx:920:        setEditingMessageId(null);
+src/pages/MinistryChannels.tsx:972:      setNewMessage('');
+src/pages/MinistryChannels.tsx:973:      setIsPrayerRequest(false);
+src/pages/MinistryChannels.tsx:974:      setPendingAttachment(null);
+src/pages/MinistryChannels.tsx:975:      setReplyingToMessage(null);
+src/pages/MinistryChannels.tsx:980:      setIsSubmitting(false);
+src/pages/MinistryChannels.tsx:989:    setIsSubmitting(true);
+src/pages/MinistryChannels.tsx:1018:      setIsSubmitting(false);
+src/pages/MinistryChannels.tsx:1035:    typingTimeoutRef.current = setTimeout(() => {
+src/pages/MinistryChannels.tsx:1043:    setEditingMessageId(msg.id);
+src/pages/MinistryChannels.tsx:1044:    setNewMessage(msg.content);
+src/pages/MinistryChannels.tsx:1045:    setReplyingToMessage(null);
+src/pages/MinistryChannels.tsx:1050:    setActiveThreadMessage(msg);
+src/pages/MinistryChannels.tsx:1051:    setEditingMessageId(null);
+src/pages/MinistryChannels.tsx:1052:    setReplyingToMessage(null);
+src/pages/MinistryChannels.tsx:1053:    setShowDetails(false);
+src/pages/MinistryChannels.tsx:1057:    setDeleteConfirmInfo({ type: 'single', id: messageId });
+src/pages/MinistryChannels.tsx:1075:      setDeleteConfirmInfo(null);
+src/pages/MinistryChannels.tsx:1082:    setActiveMessageId(null);
+src/pages/MinistryChannels.tsx:1093:    setIsSelectionMode(false);
+src/pages/MinistryChannels.tsx:1094:    setSelectedMessages(new Set());
+src/pages/MinistryChannels.tsx:1098:    setDeleteConfirmInfo({ type: 'multiple' });
+src/pages/MinistryChannels.tsx:1131:      setActiveChannelId(null);
+src/pages/MinistryChannels.tsx:1149:    setMutedChannels(newMuted);
+src/pages/MinistryChannels.tsx:1150:    localStorage.setItem('mutedChannels', JSON.stringify(newMuted));
+src/pages/MinistryChannels.tsx:1151:    setShowMuteModal(false);
+src/pages/MinistryChannels.tsx:1158:    setMutedChannels(newMuted);
+src/pages/MinistryChannels.tsx:1159:    localStorage.setItem('mutedChannels', JSON.stringify(newMuted));
+src/pages/MinistryChannels.tsx:1180:      setIsSelectionMode(false);
+src/pages/MinistryChannels.tsx:1181:      setSelectedMessages(new Set());
+src/pages/MinistryChannels.tsx:1182:      setDeleteConfirmInfo(null);
+src/pages/MinistryChannels.tsx:1190:      if (newSelected.size === 0) setIsSelectionMode(false);
+src/pages/MinistryChannels.tsx:1194:    setSelectedMessages(newSelected);
+src/pages/MinistryChannels.tsx:1198:    setMessageToForward(msg);
+src/pages/MinistryChannels.tsx:1199:    setIsForwardModalOpen(true);
+src/pages/MinistryChannels.tsx:1200:    setForwardChannelId('');
+src/pages/MinistryChannels.tsx:1201:    setForwardComment('');
+src/pages/MinistryChannels.tsx:1208:    setIsSubmitting(true);
+src/pages/MinistryChannels.tsx:1232:      setIsForwardModalOpen(false);
+src/pages/MinistryChannels.tsx:1233:      setMessageToForward(null);
+src/pages/MinistryChannels.tsx:1234:      setForwardComment('');
+src/pages/MinistryChannels.tsx:1235:      setForwardChannelId('');
+src/pages/MinistryChannels.tsx:1241:      setIsSubmitting(false);
+src/pages/MinistryChannels.tsx:1247:    setEditChannelName(activeChannel.name || '');
+src/pages/MinistryChannels.tsx:1248:    setEditChannelDescription(activeChannel.description || '');
+src/pages/MinistryChannels.tsx:1249:    setEditChannelType(activeChannel.type || 'general');
+src/pages/MinistryChannels.tsx:1250:    setEditChannelLevel(activeChannel.level || 'branch');
+src/pages/MinistryChannels.tsx:1251:    setEditChannelSlowMode(activeChannel.slowModeCooldown || 0);
+src/pages/MinistryChannels.tsx:1252:    setIsEditModalOpen(true);
+src/pages/MinistryChannels.tsx:1258:    setIsEditingChannel(true);
+src/pages/MinistryChannels.tsx:1269:      setIsEditModalOpen(false);
+src/pages/MinistryChannels.tsx:1275:      setIsEditingChannel(false);
+src/pages/MinistryChannels.tsx:1300:      setActiveChannelId(null);
+src/pages/MinistryChannels.tsx:1301:      setShowDetails(false);
+src/pages/MinistryChannels.tsx:1406:            { id: 'branch', title: 'Branch level', items: branchChannels, isExpanded: isBranchExpanded, toggle: () => setIsBranchExpanded(!isBranchExpanded) },
+src/pages/MinistryChannels.tsx:1407:            { id: 'district', title: 'District level', items: districtChannels, isExpanded: isDistrictExpanded, toggle: () => setIsDistrictExpanded(!isDistrictExpanded) },
+src/pages/MinistryChannels.tsx:1408:            { id: 'global', title: 'Global', items: globalChannels, isExpanded: isGlobalExpanded, toggle: () => setIsGlobalExpanded(!isGlobalExpanded) }
+src/pages/MinistryChannels.tsx:1497:                       setIsSelectionMode(false);
+src/pages/MinistryChannels.tsx:1498:                       setSelectedMessages(new Set());
+src/pages/MinistryChannels.tsx:1532:                                   setMessageStatisticsId(msg.id);
+src/pages/MinistryChannels.tsx:1533:                                   setIsSelectionMode(false);
+src/pages/MinistryChannels.tsx:1534:                                   setSelectedMessages(new Set());
+src/pages/MinistryChannels.tsx:1535:                                   setShowSelectionMenu(false);
+src/pages/MinistryChannels.tsx:1544:                                   setIsSelectionMode(false);
+src/pages/MinistryChannels.tsx:1545:                                   setSelectedMessages(new Set());
+src/pages/MinistryChannels.tsx:1546:                                   setShowSelectionMenu(false);
+src/pages/MinistryChannels.tsx:1554:                             setDeleteConfirmInfo({ type: 'multiple' });
+src/pages/MinistryChannels.tsx:1555:                             setShowSelectionMenu(false);
+src/pages/MinistryChannels.tsx:1637:                                   setShowMuteModal(true);
+src/pages/MinistryChannels.tsx:1639:                               setShowChannelMenu(false); 
+src/pages/MinistryChannels.tsx:1714:                             setTimeout(() => element.classList.remove('bg-indigo-50'), 2000);
+src/pages/MinistryChannels.tsx:1798:                    longPressTimer.current = setTimeout(() => {
+src/pages/MinistryChannels.tsx:1799:                      setIsSelectionMode(true);
+src/pages/MinistryChannels.tsx:1811:                    longPressTimer.current = setTimeout(() => {
+src/pages/MinistryChannels.tsx:1812:                      setIsSelectionMode(true);
+src/pages/MinistryChannels.tsx:1829:                      if (msg.author.avatar) setPreviewFile({url: msg.author.avatar, type: 'image/jpeg', name: msg.author.name});
+src/pages/MinistryChannels.tsx:1856:                            setSelectedProfileId(msg.author.id);
+src/pages/MinistryChannels.tsx:1912:                              setShowCallModal(true);
+src/pages/MinistryChannels.tsx:1927:                             onScriptureClick={(ref) => setViewScripture(ref)}
+src/pages/MinistryChannels.tsx:1945:                               setActiveMessageId(null);
+src/pages/MinistryChannels.tsx:1956:                               setEmojiDrawerMessageId(msg.id);
+src/pages/MinistryChannels.tsx:1957:                               setActiveMessageId(null);
+src/pages/MinistryChannels.tsx:1968:                             setIsForwardModalOpen(true);
+src/pages/MinistryChannels.tsx:1969:                             setMessageToForward({
+src/pages/MinistryChannels.tsx:1974:                             setActiveMessageId(null);
+src/pages/MinistryChannels.tsx:1985:                             setActiveMessageId(null);
+src/pages/MinistryChannels.tsx:1997:                               setActiveMessageId(null);
+src/pages/MinistryChannels.tsx:2009:                               setEditingMessageId(msg.id);
+src/pages/MinistryChannels.tsx:2010:                               setNewMessage(msg.content);
+src/pages/MinistryChannels.tsx:2011:                               setActiveMessageId(null);
+src/pages/MinistryChannels.tsx:2023:                               setDeleteConfirmInfo({ type: 'single', id: msg.id });
+src/pages/MinistryChannels.tsx:2024:                               setActiveMessageId(null);
+src/pages/MinistryChannels.tsx:2126:                     setEditingMessageId(null);
+src/pages/MinistryChannels.tsx:2127:                     setReplyingToMessage(null);
+src/pages/MinistryChannels.tsx:2128:                     if (editingMessageId) setNewMessage('');
+src/pages/MinistryChannels.tsx:2270:                                      setNewMessage(`${textBeforeMention}@${member.fullName} ${textAfterCursor}`);
+src/pages/MinistryChannels.tsx:2271:                                      setShowMentions(false);
+src/pages/MinistryChannels.tsx:2272:                                      setTimeout(() => inputRef.current?.focus(), 0);
+src/pages/MinistryChannels.tsx:2291:                    setNewMessage(val);
+src/pages/MinistryChannels.tsx:2297:                      setShowQuickReplyModal(true);
+src/pages/MinistryChannels.tsx:2298:                      setNewMessage('');
+src/pages/MinistryChannels.tsx:2307:                      setShowMentions(true);
+src/pages/MinistryChannels.tsx:2308:                      setMentionTerm(mentionMatch[1]);
+src/pages/MinistryChannels.tsx:2310:                      setShowMentions(false);
+src/pages/MinistryChannels.tsx:2360:                    setPendingAttachment({
+src/pages/MinistryChannels.tsx:2468:                                 setPreviewFile({
+src/pages/MinistryChannels.tsx:2801:                               setNewMessage(prev => prev + emoji);
+src/pages/MinistryChannels.tsx:2805:                             setEmojiDrawerMessageId(null);
+src/pages/MinistryChannels.tsx:2822:      <Modal isOpen={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} title="Manage Members">
+src/pages/MinistryChannels.tsx:2878:      <Modal isOpen={isCreateModalOpen} onClose={() => !isCreatingChannel && setIsCreateModalOpen(false)} title="Create Ministry Channel">
+src/pages/MinistryChannels.tsx:2884:            setIsCreatingChannel(true);
+src/pages/MinistryChannels.tsx:2903:                await setDoc(memberRef, {
+src/pages/MinistryChannels.tsx:2914:              setIsCreateModalOpen(false);
+src/pages/MinistryChannels.tsx:2915:              setNewChannelName('');
+src/pages/MinistryChannels.tsx:2916:              setNewChannelDescription('');
+src/pages/MinistryChannels.tsx:2917:              setNewChannelType('general');
+src/pages/MinistryChannels.tsx:2918:              setNewChannelLevel('branch');
+src/pages/MinistryChannels.tsx:2919:              setActiveChannelId(docRef.id);
+src/pages/MinistryChannels.tsx:2924:              setIsCreatingChannel(false);
+src/pages/MinistryChannels.tsx:3000:      <Modal isOpen={isEditModalOpen} onClose={() => !isEditingChannel && setIsEditModalOpen(false)} title="Edit Ministry Channel">
+src/pages/MinistryChannels.tsx:3090:      <Modal isOpen={isForwardModalOpen} onClose={() => !isSubmitting && setIsForwardModalOpen(false)} title="Forward Message">
+src/pages/MinistryChannels.tsx:3143:      <Modal isOpen={!!deleteConfirmInfo} onClose={() => setDeleteConfirmInfo(null)} title="Delete Message">
+src/pages/MinistryChannels.tsx:3308:                             setSelectedProfileId(null);
+src/pages/MinistryChannels.tsx:3325:      <Modal isOpen={!!messageStatisticsId} onClose={() => setMessageStatisticsId(null)} title="Message Info">
+src/pages/MinistryChannels.tsx:3344:                      onScriptureClick={(ref) => setViewScripture(ref)}
+src/pages/MinistryChannels.tsx:3400:      <Modal isOpen={showReportModal} onClose={() => setShowReportModal(false)} title="Report Channel">
+src/pages/MinistryChannels.tsx:3405:          setShowReportModal(false);
+src/pages/MinistryChannels.tsx:3406:          setReportReason('');
+src/pages/MinistryChannels.tsx:3440:      <Modal isOpen={showMuteModal} onClose={() => setShowMuteModal(false)} title="Mute Notifications">
+src/pages/MinistryChannels.tsx:3462:      <Modal isOpen={!!muteUserTarget} onClose={() => setMuteUserTarget(null)} title="Mute User">
+src/pages/MinistryChannels.tsx:3486:        onClose={() => setPreviewFile(null)}
+src/pages/MinistryChannels.tsx:3553:                  setPendingAttachment(null);
+src/pages/MinistryChannels.tsx:3629:        onClose={() => setShowPollModal(false)}
+src/pages/MinistryChannels.tsx:3635:        onClose={() => setShowEventModal(false)}
+src/pages/MinistryChannels.tsx:3641:        onClose={() => setShowQuickReplyModal(false)}
+src/pages/MinistryChannels.tsx:3643:          setNewMessage(reply);
+src/pages/MinistryChannels.tsx:3650:        onClose={() => setShowCallModal(false)}
+src/pages/MinistryChannels.tsx:3661:        onClose={() => setViewScripture(null)} 
+src/pages/Members.tsx:91:      setMembers(docs);
+src/pages/Members.tsx:92:      setLoading(false);
+src/pages/Members.tsx:95:      setLoading(false);
+src/pages/Members.tsx:122:      setSelectedIds(filteredMembers.map(m => m.id));
+src/pages/Members.tsx:124:      setSelectedIds([]);
+src/pages/Members.tsx:129:    setSelectedIds(prev => 
+src/pages/Members.tsx:136:    setIsBulkUpdating(true);
+src/pages/Members.tsx:147:      setSelectedIds([]);
+src/pages/Members.tsx:151:      setIsBulkUpdating(false);
+src/pages/Members.tsx:175:    link.setAttribute('href', url);
+src/pages/Members.tsx:176:    link.setAttribute('download', `members_export_${new Date().toISOString().split('T')[0]}.csv`);
+src/pages/MemberPortal.tsx:41:    setShowScanner(true);
+src/pages/MemberPortal.tsx:42:    setTimeout(() => {
+src/pages/MemberPortal.tsx:44:      setScannerInstance(html5QrCode);
+src/pages/MemberPortal.tsx:57:              setShowScanner(false);
+src/pages/MemberPortal.tsx:88:        await setDoc(doc(attendanceRef, profile.uid), {
+src/pages/MemberPortal.tsx:131:      setUpcomingSessions(sessions);
+src/pages/MemberPortal.tsx:132:      setLoading(false);
+src/pages/MemberPortal.tsx:135:      setLoading(false);
+src/pages/MemberPortal.tsx:149:            return eventDate >= new Date(new Date().setHours(0,0,0,0));
+src/pages/MemberPortal.tsx:151:        setUpcomingEvents(futureEvts);
+src/pages/MemberPortal.tsx:537:                   setShowScanner(false);
+src/pages/MemberPortal.tsx:566:        onClose={() => setShowTransferModal(false)}
+src/pages/CommunityFeed.tsx:11:    const listener = () => setMatches(media.matches);
+src/pages/CommunityFeed.tsx:139:      setTimeout(() => {
+src/pages/CommunityFeed.tsx:144:          setTimeout(() => el.classList.remove('ring-4', 'ring-indigo-500', 'ring-offset-4', 'transition-all', 'duration-1000'), 2000);
+src/pages/CommunityFeed.tsx:177:      setFriendIds(friends);
+src/pages/CommunityFeed.tsx:178:      setFriendRequests(pending);
+src/pages/CommunityFeed.tsx:242:        setPosts(fetchedPosts);
+src/pages/CommunityFeed.tsx:250:               setPosts(prev => prev.map(p => p.id === postDoc.id ? { ...p, isLiked: true } : p));
+src/pages/CommunityFeed.tsx:264:      setMinistryChannels(snap.docs.map(d => ({ id: d.id, name: d.data().name, membersCount: d.data().membersCount || 0 })).slice(0, 4));
+src/pages/CommunityFeed.tsx:316:    setPosts(prev => prev.map(post => {
+src/pages/CommunityFeed.tsx:337:        await setDoc(likeRef, { createdAt: serverTimestamp() });
+src/pages/CommunityFeed.tsx:401:      setNewPostImages(prev => [...prev, ...newImages].slice(0, 4));
+src/pages/CommunityFeed.tsx:417:    setIsSubmitting(true);
+src/pages/CommunityFeed.tsx:458:      setNewPostContent('');
+src/pages/CommunityFeed.tsx:459:      setNewPostImages([]);
+src/pages/CommunityFeed.tsx:460:      setGifUrl('');
+src/pages/CommunityFeed.tsx:461:      setShowPollBuilder(false);
+src/pages/CommunityFeed.tsx:462:      setPollQuestion('');
+src/pages/CommunityFeed.tsx:463:      setPollOptions([{id: '1', text: ''}, {id: '2', text: ''}]);
+src/pages/CommunityFeed.tsx:464:      setShowEmojiPicker(false);
+src/pages/CommunityFeed.tsx:472:      setIsSubmitting(false);
+src/pages/CommunityFeed.tsx:483:      setEditingPostId(null);
+src/pages/CommunityFeed.tsx:484:      setEditingPostContent('');
+src/pages/CommunityFeed.tsx:497:      setPrivacyModalPost(null);
+src/pages/CommunityFeed.tsx:510:      setCommentPrivacyModalPost(null);
+src/pages/CommunityFeed.tsx:662:              onClose={() => setActiveCommentPostId(null)}
+src/pages/CommunityFeed.tsx:671:                onClose={() => setActiveSharePost(null)}
+src/pages/CommunityFeed.tsx:847:      <Modal isOpen={!!editingPostId} onClose={() => setEditingPostId(null)} title="Edit Post">
+src/pages/CommunityFeed.tsx:862:      <Modal isOpen={!!privacyModalPost} onClose={() => setPrivacyModalPost(null)} title="Who can see this?">
+src/pages/CommunityFeed.tsx:889:      <Modal isOpen={!!commentPrivacyModalPost} onClose={() => setCommentPrivacyModalPost(null)} title="Who can comment?">
+src/pages/CommunityFeed.tsx:938:                      setShowComposer(false);
+src/pages/CommunityFeed.tsx:1042:                                setPollOptions(newOpts);
+src/pages/CommunityFeed.tsx:1199:                          setNewPostContent(prev => prev + emoji);
+src/pages/CommunityFeed.tsx:1200:                          setShowEmojiPicker(false);
+src/pages/CommunityFeed.tsx:1264:        setComments(fetched);
+src/pages/CommunityFeed.tsx:1279:    setIsSubmitting(true);
+src/pages/CommunityFeed.tsx:1317:      setNewComment('');
+src/pages/CommunityFeed.tsx:1318:      setReplyTo(null);
+src/pages/CommunityFeed.tsx:1323:      setIsSubmitting(false);
+src/pages/CommunityFeed.tsx:1337:              onReply={(c: any) => setReplyTo(c)} 
+src/pages/CommunityFeed.tsx:1358:              onFocus={() => setIsInputFocused(true)}
+src/pages/CommunityFeed.tsx:1359:              onBlur={() => setTimeout(() => setIsInputFocused(false), 200)}
+src/pages/CommunityFeed.tsx:1396:      if (snap.exists()) setUserData(snap.data());
+src/pages/CommunityFeed.tsx:1438:    getDoc(likeRef).then(snap => setIsLiked(snap.exists())).catch(() => {});
+src/pages/CommunityFeed.tsx:1460:      setReplies(fetched);
+src/pages/CommunityFeed.tsx:1470:    setIsLiked(!isLiked);
+src/pages/CommunityFeed.tsx:1471:    setLikes((prev: number) => isLiked ? prev - 1 : prev + 1);
+src/pages/CommunityFeed.tsx:1478:        await setDoc(likeRef, { createdAt: serverTimestamp() });
+src/pages/CommunityFeed.tsx:1482:      setIsLiked(isLiked);
+src/pages/CommunityFeed.tsx:1483:      setLikes((prev: number) => !isLiked ? prev - 1 : prev + 1);
+src/pages/ServiceAttendance.tsx:75:      setAllMembers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Member)));
+src/pages/ServiceAttendance.tsx:88:      setRecentEvents(events);
+src/pages/ServiceAttendance.tsx:90:        setActiveEvent(events[0]);
+src/pages/ServiceAttendance.tsx:92:      setLoading(false);
+src/pages/ServiceAttendance.tsx:110:      setAttendance(records);
+src/pages/ServiceAttendance.tsx:111:      setStats({ total: allMembers.length, present: snap.size });
+src/pages/ServiceAttendance.tsx:128:        await setDoc(docRef, {
+src/pages/ServiceAttendance.tsx:144:    setIsScanning(true);
+src/pages/ServiceAttendance.tsx:145:    setTimeout(() => {
+src/pages/ServiceAttendance.tsx:171:    setIsScanning(false);
+src/pages/CellManagement.tsx:75:      setCells(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Cell)));
+src/pages/CellManagement.tsx:76:      setLoading(false);
+src/pages/CellManagement.tsx:79:      setLoading(false);
+src/pages/CellManagement.tsx:105:      setIsModalOpen(false);
+src/pages/CellManagement.tsx:123:    setSelectedCell(cell);
+src/pages/CellManagement.tsx:124:    setIsAssignModalOpen(true);
+src/pages/CellManagement.tsx:125:    setLoadingMembers(true);
+src/pages/CellManagement.tsx:129:      setAvailableMembers(members);
+src/pages/CellManagement.tsx:133:      setSelectedMembers(inCell);
+src/pages/CellManagement.tsx:137:      setLoadingMembers(false);
+src/pages/CellManagement.tsx:144:    setLoadingMembers(true);
+src/pages/CellManagement.tsx:169:      setIsAssignModalOpen(false);
+src/pages/CellManagement.tsx:173:      setLoadingMembers(false);
+src/pages/CellManagement.tsx:178:    setFormData({
+src/pages/CellManagement.tsx:186:    setSelectedCell(null);
+src/pages/CellManagement.tsx:342:        onClose={() => setIsModalOpen(false)} 
+src/pages/CellManagement.tsx:427:        onClose={() => setIsAssignModalOpen(false)} 
+src/pages/CellManagement.tsx:452:                        setSelectedMembers(prev => 
+src/pages/AccessManagement.tsx:44:      setAccessList(results);
+src/pages/AccessManagement.tsx:45:      if (!requests.length) setLoading(false);
+src/pages/AccessManagement.tsx:56:      setRequests(results.filter(r => r.status === 'pending_approval'));
+src/pages/AccessManagement.tsx:57:      setLoading(false);
+src/pages/AccessManagement.tsx:70:      setSaving(true);
+src/pages/AccessManagement.tsx:83:      await setDoc(doc(db, 'accessControl', emailLower), payload);
+src/pages/AccessManagement.tsx:85:      await setDoc(doc(db, 'adminRequests', request.id), {
+src/pages/AccessManagement.tsx:94:      setSaving(false);
+src/pages/AccessManagement.tsx:112:      setSaving(true);
+src/pages/AccessManagement.tsx:133:      await setDoc(doc(db, 'accessControl', emailLower), payload);
+src/pages/AccessManagement.tsx:143:          await setDoc(memberRef, {
+src/pages/AccessManagement.tsx:157:      setShowModal(false);
+src/pages/AccessManagement.tsx:158:      setNewEmail('');
+src/pages/AccessManagement.tsx:159:      setSaving(false);
+src/pages/AccessManagement.tsx:162:      setSaving(false);
+src/pages/AdminDistricts.tsx:196:          setDistricts(districtsList);
+src/pages/AdminDistricts.tsx:197:          setIsLoading(false);
+src/pages/AdminDistricts.tsx:204:      if (isMounted) setIsLoading(false);
+src/pages/AdminDistricts.tsx:215:    setIsCreating(true);
+src/pages/AdminDistricts.tsx:237:      setIsDistrictModalOpen(false);
+src/pages/AdminDistricts.tsx:238:      setEditingDistrictId(null);
+src/pages/AdminDistricts.tsx:239:      setNewDistrict({
+src/pages/AdminDistricts.tsx:249:      setIsCreating(false);
+src/pages/AdminDistricts.tsx:254:    setEditingDistrictId(district.id);
+src/pages/AdminDistricts.tsx:255:    setNewDistrict({
+src/pages/AdminDistricts.tsx:262:    setIsDistrictModalOpen(true);
+src/pages/AdminDistricts.tsx:413:          setIsDistrictModalOpen(false);
+src/pages/AdminDistricts.tsx:414:          setEditingDistrictId(null);
+src/pages/AdminDistricts.tsx:415:          setNewDistrict({
+src/pages/CommunicationHub.tsx:64:       setMembersCount(1248); 
+src/pages/CommunicationHub.tsx:97:        setBroadcasts(fetched);
+src/pages/CommunicationHub.tsx:112:    setIsSubmitting(true);
+src/pages/CommunicationHub.tsx:126:      setIsComposeOpen(false);
+src/pages/CommunicationHub.tsx:127:      setMessageTitle('');
+src/pages/CommunicationHub.tsx:128:      setMessageBody('');
+src/pages/CommunicationHub.tsx:133:      setIsSubmitting(false);
+src/pages/CommunicationHub.tsx:138:    setMessageTitle(template.title);
+src/pages/CommunicationHub.tsx:139:    setMessageBody(template.body);
+src/pages/CommunicationHub.tsx:140:    setSelectedChannel(template.type);
+src/pages/CommunicationHub.tsx:141:    setIsComposeOpen(true);
+src/pages/CommunicationHub.tsx:193:              setSelectedChannel('Email');
+src/pages/CommunicationHub.tsx:194:              setIsComposeOpen(true);
+src/pages/CommunicationHub.tsx:195:              setShowTemplates(true);
+src/pages/CommunicationHub.tsx:306:                  onToggle={() => setAutomations(prev => ({ ...prev, birthdays: !prev.birthdays }))}
+src/pages/CommunicationHub.tsx:314:                  onToggle={() => setAutomations(prev => ({ ...prev, anniversaries: !prev.anniversaries }))}
+src/pages/CommunicationHub.tsx:322:                  onToggle={() => setAutomations(prev => ({ ...prev, spiritualMilestones: !prev.spiritualMilestones }))}
+src/pages/CommunicationHub.tsx:330:                  onToggle={() => setAutomations(prev => ({ ...prev, firstTimers: !prev.firstTimers }))}
+src/pages/CommunicationHub.tsx:398:        onClose={() => setIsComposeOpen(false)} 
+src/pages/CommunicationHub.tsx:474:                             setActiveTemplate(t.name);
+src/pages/CommunicationHub.tsx:475:                             setShowTemplates(false);
+src/pages/CommunicationHub.tsx:616:                     setSelectedMessage(null);
+src/pages/Calendar.tsx:147:    setExpandedSections(prev => 
+src/pages/Calendar.tsx:153:    setSelectedCategories(prev => 
+src/pages/Calendar.tsx:168:    until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/pages/Calendar.tsx:213:       setBookableStaff(staff);
+src/pages/Calendar.tsx:263:    setAvailableSlots(generateSlots());
+src/pages/Calendar.tsx:264:    setSelectedSlot(null);
+src/pages/Calendar.tsx:278:      setStaffNotes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+src/pages/Calendar.tsx:312:          sessionStorage.setItem(key, 'notified');
+src/pages/Calendar.tsx:319:    const interval = setInterval(checkReminders, 60 * 1000);
+src/pages/Calendar.tsx:340:      setNewGrowthStep('');
+src/pages/Calendar.tsx:342:      setSelectedAppointment({
+src/pages/Calendar.tsx:365:      setSelectedAppointment({ ...selectedAppointment, growthSteps: steps });
+src/pages/Calendar.tsx:373:    setIsSavingNote(true);
+src/pages/Calendar.tsx:381:      setNewStaffNote('');
+src/pages/Calendar.tsx:386:      setIsSavingNote(false);
+src/pages/Calendar.tsx:573:      setEvents(docs);
+src/pages/Calendar.tsx:574:      setLoading(false);
+src/pages/Calendar.tsx:577:      setLoading(false);
+src/pages/Calendar.tsx:602:    setLoadingAppts(true);
+src/pages/Calendar.tsx:605:      setAppointments(data);
+src/pages/Calendar.tsx:606:      setLoadingAppts(false);
+src/pages/Calendar.tsx:610:      setLoadingAppts(false);
+src/pages/Calendar.tsx:619:    setLoadingReminders(true);
+src/pages/Calendar.tsx:622:      setReminders(data);
+src/pages/Calendar.tsx:623:      setLoadingReminders(false);
+src/pages/Calendar.tsx:626:      setLoadingReminders(false);
+src/pages/Calendar.tsx:635:    setIsSaving(true);
+src/pages/Calendar.tsx:660:      setShowReminderModal(false);
+src/pages/Calendar.tsx:661:      setEditingReminder(null);
+src/pages/Calendar.tsx:662:      setReminderForm({
+src/pages/Calendar.tsx:672:      setIsSaving(false);
+src/pages/Calendar.tsx:702:    setIsSaving(true);
+src/pages/Calendar.tsx:726:      setShowAppointmentModal(false);
+src/pages/Calendar.tsx:727:      setAppointmentForm({
+src/pages/Calendar.tsx:737:      setIsSaving(false);
+src/pages/Calendar.tsx:755:                      setCurrentDate(cloneDay);
+src/pages/Calendar.tsx:756:                      if (viewMode === 'year') setViewMode('month');
+src/pages/Calendar.tsx:773:    setEditingEvent(null);
+src/pages/Calendar.tsx:774:    setEventForm({
+src/pages/Calendar.tsx:783:      until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/pages/Calendar.tsx:785:    setShowModal(true);
+src/pages/Calendar.tsx:790:    setEditingEvent(event);
+src/pages/Calendar.tsx:791:    setEventForm({
+src/pages/Calendar.tsx:800:      until: event.recurrence?.until || format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/pages/Calendar.tsx:802:    setShowModal(true);
+src/pages/Calendar.tsx:812:    setIsSaving(true);
+src/pages/Calendar.tsx:848:      setShowModal(false);
+src/pages/Calendar.tsx:852:      setIsSaving(false);
+src/pages/Calendar.tsx:875:        setCurrentDate(direction === 'next' ? addYears(currentDate, 1) : subYears(currentDate, 1));
+src/pages/Calendar.tsx:878:        setCurrentDate(direction === 'next' ? addMonths(currentDate, 1) : subMonths(currentDate, 1));
+src/pages/Calendar.tsx:881:        setCurrentDate(direction === 'next' ? addWeeks(currentDate, 1) : subWeeks(currentDate, 1));
+src/pages/Calendar.tsx:884:        setCurrentDate(direction === 'next' ? addDays(currentDate, 1) : subDays(currentDate, 1));
+src/pages/Calendar.tsx:902:                setCurrentDate(month);
+src/pages/Calendar.tsx:903:                setViewMode('month');
+src/pages/Calendar.tsx:928:                        setCurrentDate(cloneDay);
+src/pages/Calendar.tsx:929:                        setViewMode('day');
+src/pages/Calendar.tsx:961:      setSelectedDay(clickedDay);
+src/pages/Calendar.tsx:962:      setShowDayDetail(true);
+src/pages/Calendar.tsx:995:                        setEditingReminder(item.original);
+src/pages/Calendar.tsx:996:                        setReminderForm({
+src/pages/Calendar.tsx:1003:                        setShowReminderModal(true);
+src/pages/Calendar.tsx:1061:                setCurrentDate(day);
+src/pages/Calendar.tsx:1062:                setViewMode('day');
+src/pages/Calendar.tsx:1090:                          setEditingReminder(item.original as any);
+src/pages/Calendar.tsx:1091:                          setReminderForm({
+src/pages/Calendar.tsx:1098:                          setShowReminderModal(true);
+src/pages/Calendar.tsx:1149:                  setEditingReminder(null);
+src/pages/Calendar.tsx:1150:                  setReminderForm({
+src/pages/Calendar.tsx:1157:                  setShowReminderModal(true);
+src/pages/Calendar.tsx:1186:                      setEditingReminder(item.original);
+src/pages/Calendar.tsx:1187:                      setReminderForm({
+src/pages/Calendar.tsx:1194:                      setShowReminderModal(true);
+src/pages/Calendar.tsx:1416:                                  setActingOnId(null);
+src/pages/Calendar.tsx:1417:                                  setApptFeedback('');
+src/pages/Calendar.tsx:1427:                                  setActingOnId(null);
+src/pages/Calendar.tsx:1428:                                  setApptFeedback('');
+src/pages/Calendar.tsx:1487:                      setSelectedAppointment(appt);
+src/pages/Calendar.tsx:1488:                      setShowAppointmentDetail(true);
+src/pages/Calendar.tsx:1539:              setEditingReminder(null);
+src/pages/Calendar.tsx:1540:              setReminderForm({
+src/pages/Calendar.tsx:1547:              setShowReminderModal(true);
+src/pages/Calendar.tsx:1597:                        setEditingReminder(rem);
+src/pages/Calendar.tsx:1598:                        setReminderForm({
+src/pages/Calendar.tsx:1605:                        setShowReminderModal(true);
+src/pages/Calendar.tsx:1835:                        setViewMode('appointments');
+src/pages/Calendar.tsx:1836:                        setIsActionMenuOpen(false);
+src/pages/Calendar.tsx:1847:                        setViewMode('reminders');
+src/pages/Calendar.tsx:1848:                        setIsActionMenuOpen(false);
+src/pages/Calendar.tsx:1859:                        setShowBookingModal(true);
+src/pages/Calendar.tsx:1860:                        setIsActionMenuOpen(false);
+src/pages/Calendar.tsx:1873:                          setIsActionMenuOpen(false);
+src/pages/Calendar.tsx:2136:                    setIsSaving(true);
+src/pages/Calendar.tsx:2174:                      setShowBookingModal(false);
+src/pages/Calendar.tsx:2176:                      setSelectedStaff(null);
+src/pages/Calendar.tsx:2177:                      setSelectedSlot(null);
+src/pages/Calendar.tsx:2181:                      setIsSaving(false);
+src/pages/Calendar.tsx:2236:                              setEditingReminder(item.original as any);
+src/pages/Calendar.tsx:2237:                              setReminderForm({
+src/pages/Calendar.tsx:2244:                              setShowReminderModal(true);
+src/pages/Calendar.tsx:2248:                            setShowDayDetail(false);
+src/pages/Calendar.tsx:2309:                      setShowDayDetail(false);
+src/pages/Calendar.tsx:2766:                                const defaultFuture = format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd');
+src/pages/Calendar.tsx:2767:                                setEventForm({
+src/pages/NewMember.tsx:181:      setShowCamera(true);
+src/pages/NewMember.tsx:183:      setTimeout(async () => {
+src/pages/NewMember.tsx:200:      setShowCamera(false);
+src/pages/NewMember.tsx:206:    setCameraFacingMode(newMode);
+src/pages/NewMember.tsx:217:    setShowCamera(false);
+src/pages/NewMember.tsx:230:        form.setValue('photoUrl', dataUrl);
+src/pages/NewMember.tsx:241:        form.setValue('photoUrl', reader.result as string);
+src/pages/NewMember.tsx:353:        setBranches(snap.docs.map(d => ({ id: d.id, name: d.data().name })));
+src/pages/NewMember.tsx:369:          setDepartments(deptsSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+src/pages/NewMember.tsx:372:          setCells(cellsSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+src/pages/NewMember.tsx:405:    setIsSaving(true);
+src/pages/NewMember.tsx:464:             await setDoc(doc(db, 'users', userUid), {
+src/pages/NewMember.tsx:482:           await setDoc(doc(db, 'accessControl', data.email.toLowerCase().trim()), {
+src/pages/NewMember.tsx:499:           await setDoc(doc(db, 'accessControl', data.email.toLowerCase().trim()), {
+src/pages/NewMember.tsx:513:      setSaveSuccess(true);
+src/pages/NewMember.tsx:518:      setIsSaving(false);
+src/pages/NewMember.tsx:617:                 if (currentIndex > 0) setActiveTab(tabs[currentIndex - 1]);
+src/pages/NewMember.tsx:629:                 if (currentIndex < tabs.length - 1) setActiveTab(tabs[currentIndex + 1]);
+src/pages/NewMember.tsx:945:                          setEditingChildIndex(null);
+src/pages/NewMember.tsx:946:                          setTempChild({ name: '', dateOfBirth: '', gender: 'male', notes: '' });
+src/pages/NewMember.tsx:947:                          setShowChildDialog(true);
+src/pages/NewMember.tsx:981:                                setEditingChildIndex(index);
+src/pages/NewMember.tsx:982:                                setTempChild({ 
+src/pages/NewMember.tsx:988:                                setShowChildDialog(true);
+src/pages/NewMember.tsx:1029:                              onValueChange={(val) => setTempChild({ ...tempChild, gender: val as 'male' | 'female' })}
+src/pages/NewMember.tsx:1066:                                form.setValue(`children.${editingChildIndex}`, { id: fields[editingChildIndex].id, ...tempChild });
+src/pages/NewMember.tsx:1068:                              setShowChildDialog(false);
+src/pages/BaptismInterviewPanel.tsx:64:      setActiveTab("hq");
+src/pages/BaptismInterviewPanel.tsx:76:      setPrograms(data);
+src/pages/BaptismInterviewPanel.tsx:77:      if (data.length > 0 && !selectedProgram) setSelectedProgram(data[0]);
+src/pages/BaptismInterviewPanel.tsx:84:    setLoadingCandidates(true);
+src/pages/BaptismInterviewPanel.tsx:114:      setCandidates(relevant);
+src/pages/BaptismInterviewPanel.tsx:115:      setLoadingCandidates(false);
+src/pages/BaptismInterviewPanel.tsx:122:    setSelectedCandidate(c);
+src/pages/BaptismInterviewPanel.tsx:123:    setDoctrineScore(c.interviewScores?.doctrine || 5);
+src/pages/BaptismInterviewPanel.tsx:124:    setTestimonyScore(c.interviewScores?.testimony || 5);
+src/pages/BaptismInterviewPanel.tsx:125:    setReadinessScore(c.interviewScores?.readiness || 5);
+src/pages/BaptismInterviewPanel.tsx:126:    setRemarks(c.interviewRemarks || "");
+src/pages/BaptismInterviewPanel.tsx:147:      setDistrictStaff(
+src/pages/BaptismInterviewPanel.tsx:174:    setIsSubmitting(true);
+src/pages/BaptismInterviewPanel.tsx:210:      setSelectedCandidate(null);
+src/pages/BaptismInterviewPanel.tsx:215:    setIsSubmitting(false);
+src/pages/BaptismInterviewPanel.tsx:271:              setSelectedProgram(programs.find((p) => p.id === e.target.value))
+src/pages/BaptismInterviewPanel.tsx:288:              setActiveTab("district");
+src/pages/BaptismInterviewPanel.tsx:289:              setSelectedCandidate(null);
+src/pages/BaptismInterviewPanel.tsx:301:              setActiveTab("hq");
+src/pages/BaptismInterviewPanel.tsx:302:              setSelectedCandidate(null);
+src/pages/BaptismInterviewPanel.tsx:470:                          setSelectedCandidate({
+src/pages/BaptismInterviewPanel.tsx:534:                        setDoctrineScore(parseInt(e.target.value))
+src/pages/BaptismInterviewPanel.tsx:569:                        setTestimonyScore(parseInt(e.target.value))
+src/pages/BaptismInterviewPanel.tsx:604:                        setReadinessScore(parseInt(e.target.value))
+src/pages/BaptismInterviewPanel.tsx:706:        onClose={() => setIsManagePanelOpen(false)}
+src/pages/Ministries.tsx:79:    setMinistries([...ministries, newMinistry]);
+src/pages/Ministries.tsx:80:    setIsNewMinistryModalOpen(false);
+src/pages/Ministries.tsx:81:    setFormData({ name: '', category: '', leader: '', email: '', description: '' });
+src/pages/ProgramDashboard.tsx:135:          setEventDetails({ id: snap.id, ...snap.data() });
+src/pages/ProgramDashboard.tsx:153:    setModules(prev => prev.map(m => m.id === id ? { ...m, enabled: !m.enabled } : m));
+src/pages/ProgramDashboard.tsx:180:    setTeamMembers(prev => [...prev, member]);
+src/pages/ProgramDashboard.tsx:181:    setIsDeployModalOpen(false);
+src/pages/ProgramDashboard.tsx:185:    setModules(prev => prev.map(m => m.id === moduleId ? { ...m, stations: newStations } : m));
+src/pages/ProgramDashboard.tsx:221:            link.setAttribute('download', `${activeModule}_data_${new Date().getTime()}.csv`);
+src/pages/ProgramDashboard.tsx:384:                    onManageStations={() => { setModuleToEditStations(mod); setIsStationModalOpen(true); }}
+src/pages/ProgramDashboard.tsx:410:                onDeploy={() => setIsDeployModalOpen(true)}
+src/pages/ProgramDashboard.tsx:464:      onClose={() => setIsMarketplaceOpen(false)} 
+src/pages/ProgramDashboard.tsx:471:      onClose={() => setIsDeployModalOpen(false)}
+src/pages/ProgramDashboard.tsx:509:                    setIsDeleteModalOpen(false);
+src/pages/ProgramDashboard.tsx:519:                      localStorage.setItem(storageKey, JSON.stringify(filtered));
+src/pages/ProgramDashboard.tsx:524:                  setIsDeleteModalOpen(false);
+src/pages/ProgramDashboard.tsx:539:      onClose={() => setIsStationModalOpen(false)}
+src/pages/ProgramDashboard.tsx:552:    if (module) setStations(module.stations || []);
+src/pages/ProgramDashboard.tsx:1285:                        setBatchDeployments(newBatch);
+src/pages/ProgramDashboard.tsx:1293:                        setBatchDeployments(newBatch);
+src/pages/ProgramDashboard.tsx:1300:                          setBatchDeployments(newBatch);
+src/pages/ProgramDashboard.tsx:1311:                          setBatchDeployments(newBatch);
+src/pages/ProgramDashboard.tsx:1463:        setPublicRegistrants(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })));
+src/pages/ProgramDashboard.tsx:1471:        setInternalRegistrants(rsvpRecords);
+src/pages/ProgramDashboard.tsx:1472:        setLoading(false);
+src/pages/ProgramDashboard.tsx:1494:        setIsAddManualModalOpen(false);
+src/pages/ProgramDashboard.tsx:1495:        setNewMember({ fullName: '', email: '', phone: '', gender: 'Male', status: 'Active', level: 'Convert' });
+src/pages/ProgramDashboard.tsx:1519:    link.setAttribute('download', `${view.toLowerCase()}_registrants_${new Date().getTime()}.csv`);
+src/pages/ProgramDashboard.tsx:1626:                        onView={() => setSelectedMember(item)}
+src/pages/ProgramDashboard.tsx:1786:    setFields([...fields, newField]);
+src/pages/ProgramDashboard.tsx:1790:    setFields(fields.filter(f => f.id !== id));
+src/pages/ProgramDashboard.tsx:1845:                        setFields(newFields);
+src/pages/ProgramDashboard.tsx:1938:        setMembers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+src/pages/ProgramDashboard.tsx:1939:        setLoading(false);
+src/pages/ProgramDashboard.tsx:1943:        setAttendanceRecords(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+src/pages/ProgramDashboard.tsx:1980:            await setDoc(ref, payload);
+src/pages/ProgramDashboard.tsx:1981:            await setDoc(memberAttendanceRef, payload);
+src/pages/ProgramDashboard.tsx:1996:         setScannedResult(`Checked in: ${attendee.name}`);
+src/pages/ProgramDashboard.tsx:1998:         setScannedResult(`${attendee.name} is already checked in.`);
+src/pages/ProgramDashboard.tsx:2001:       setScannedResult(`Attendee not found: ${code}`);
+src/pages/ProgramDashboard.tsx:2009:    setKioskCode('');
+src/pages/ProgramDashboard.tsx:2210:        setQueueEntries(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+src/pages/ProgramDashboard.tsx:2211:        setLoading(false);
+src/pages/ProgramDashboard.tsx:2228:         await setDoc(ref, {
+src/pages/ProgramDashboard.tsx:2247:         try { await setDoc(currRef, { status: 'completed' }, { merge: true }); } catch (err) {}
+src/pages/ProgramDashboard.tsx:2251:         await setDoc(ref, {
+src/pages/NewDepartment.tsx:31:    setSaving(true);
+src/pages/NewDepartment.tsx:46:      setSaving(false);
+src/pages/PublicUserProfile.tsx:54:          setProfile({ id: docSnap.id, ...data });
+src/pages/PublicUserProfile.tsx:60:              if (dSnap.exists()) setDistrictName(dSnap.data().name || data.districtId);
+src/pages/PublicUserProfile.tsx:67:                if (bSnap.exists()) setBranchName(bSnap.data().name || data.branchId);
+src/pages/PublicUserProfile.tsx:141:            setRecentPosts(fetchedPosts);
+src/pages/PublicUserProfile.tsx:170:               setFriendsList(loadedFriends);
+src/pages/PublicUserProfile.tsx:182:        setLoading(false);
+src/pages/PublicUserProfile.tsx:211:              setFriendshipStatus('friends');
+src/pages/PublicUserProfile.tsx:213:              setFriendshipStatus('pending');
+src/pages/PublicUserProfile.tsx:217:        if (!found) setFriendshipStatus('none');
+src/pages/PublicUserProfile.tsx:273:      setFriendshipStatus('pending');
+src/pages/PublicUserProfile.tsx:571:        onClose={() => setViewerOpen(false)}
+src/pages/Dashboard.tsx:53:      setDeferredPrompt(e);
+src/pages/Dashboard.tsx:54:      setShowInstallBanner(true);
+src/pages/Dashboard.tsx:65:      setShowInstallBanner(false);
+src/pages/Dashboard.tsx:67:    setDeferredPrompt(null);
+src/pages/Dashboard.tsx:98:      setPendingApprovals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+src/pages/Dashboard.tsx:123:        setBranchName('Branch Overview');
+src/pages/Dashboard.tsx:129:          setBranchName(branchSnap.data().name);
+src/pages/Dashboard.tsx:131:          setBranchName('Branch Overview');
+src/pages/Dashboard.tsx:134:        setBranchName('Branch Overview');
+src/pages/Dashboard.tsx:147:      setRecentMembers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+src/pages/Dashboard.tsx:168:        setFollowUpAlerts(alerts);
+src/pages/Dashboard.tsx:183:      setMyTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+src/pages/Dashboard.tsx:184:      setLoadingTasks(false);
+src/pages/Dashboard.tsx:187:       setLoadingTasks(false);
+src/pages/Dashboard.tsx:194:        setUsers(usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() })));
+src/pages/Dashboard.tsx:213:    setIsSavingTask(true);
+src/pages/Dashboard.tsx:231:      setIsTaskModalOpen(false);
+src/pages/Dashboard.tsx:232:      setTaskForm({
+src/pages/Dashboard.tsx:244:      setIsSavingTask(false);
+src/pages/Dashboard.tsx:249:    setTaskForm(prev => ({ 
+src/pages/Dashboard.tsx:254:    setIsTaskModalOpen(true);
+src/pages/Dashboard.tsx:630:        onClose={() => setIsTaskModalOpen(false)} 
+src/pages/AdminRegistration.tsx:47:        setInviteError("No invitation code provided. Please use the link sent to you.");
+src/pages/AdminRegistration.tsx:48:        setLoading(false);
+src/pages/AdminRegistration.tsx:57:          setInviteError("Invalid or expired invitation code.");
+src/pages/AdminRegistration.tsx:61:            setInviteError("This invitation has already been used or revoked.");
+src/pages/AdminRegistration.tsx:63:            setInviteData(data);
+src/pages/AdminRegistration.tsx:67:        setInviteError("Failed to verify invitation: " + err.message);
+src/pages/AdminRegistration.tsx:69:        setLoading(false);
+src/pages/AdminRegistration.tsx:78:    setSubmitError(null);
+src/pages/AdminRegistration.tsx:81:      setSubmitError("Passwords do not match.");
+src/pages/AdminRegistration.tsx:86:      setSubmitError("Password must be at least 6 characters long.");
+src/pages/AdminRegistration.tsx:92:      setSubmitError(`This invitation was sent to ${inviteData.email}. Please use that email to register.`);
+src/pages/AdminRegistration.tsx:96:    setSubmitting(true);
+src/pages/AdminRegistration.tsx:110:      await setDoc(doc(db, 'users', uid), {
+src/pages/AdminRegistration.tsx:128:      setIsPreAuthorized(preAuthorized);
+src/pages/AdminRegistration.tsx:149:        await setDoc(accessRef, {
+src/pages/AdminRegistration.tsx:159:      await setDoc(inviteRef, { ...inviteData, status: 'used', usedAt: serverTimestamp(), usedBy: uid });
+src/pages/AdminRegistration.tsx:161:      setSuccess(true);
+src/pages/AdminRegistration.tsx:164:      setSubmitError(translateAuthError(err));
+src/pages/AdminRegistration.tsx:166:      setSubmitting(false);
+src/pages/DepartmentMemberProfile.tsx:56:        if (deptSnap.exists()) setDepartment({ id: deptSnap.id, ...deptSnap.data() });
+src/pages/DepartmentMemberProfile.tsx:57:        if (memberSnap.exists()) setMember({ id: memberSnap.id, ...memberSnap.data() });
+src/pages/DepartmentMemberProfile.tsx:61:        setLoading(false);
+src/pages/DistrictDashboard.tsx:194:    setSaving(true);
+src/pages/DistrictDashboard.tsx:206:      setSelectedMembers([]);
+src/pages/DistrictDashboard.tsx:207:      setIsBulkRoleModalOpen(false);
+src/pages/DistrictDashboard.tsx:211:      setSaving(false);
+src/pages/DistrictDashboard.tsx:217:    setSaving(true);
+src/pages/DistrictDashboard.tsx:229:      setSelectedMembers([]);
+src/pages/DistrictDashboard.tsx:230:      setIsBulkStatusModalOpen(false);
+src/pages/DistrictDashboard.tsx:234:      setSaving(false);
+src/pages/DistrictDashboard.tsx:263:    link.setAttribute("href", encodedUri);
+src/pages/DistrictDashboard.tsx:264:    link.setAttribute("download", `members_export_${new Date().getTime()}.csv`);
+src/pages/DistrictDashboard.tsx:283:        setBranches(results);
+src/pages/DistrictDashboard.tsx:297:          setDistrictData({ id: doc.id, ...data });
+src/pages/DistrictDashboard.tsx:298:          setDistrictForm({
+src/pages/DistrictDashboard.tsx:326:        setLeaders(results);
+src/pages/DistrictDashboard.tsx:352:        setMembers(results);
+src/pages/DistrictDashboard.tsx:375:        setBaptismRequests(results);
+src/pages/DistrictDashboard.tsx:401:    setSaving(true);
+src/pages/DistrictDashboard.tsx:425:      setIsBranchModalOpen(false);
+src/pages/DistrictDashboard.tsx:426:      setEditingBranchId(null);
+src/pages/DistrictDashboard.tsx:427:      setBranchForm({ name: "", location: "", capacity: "" });
+src/pages/DistrictDashboard.tsx:435:      setSaving(false);
+src/pages/DistrictDashboard.tsx:440:    setEditingBranchId(branch.id);
+src/pages/DistrictDashboard.tsx:441:    setBranchForm({
+src/pages/DistrictDashboard.tsx:446:    setIsBranchModalOpen(true);
+src/pages/DistrictDashboard.tsx:467:    setSaving(true);
+src/pages/DistrictDashboard.tsx:473:      setIsDistrictEditModalOpen(false);
+src/pages/DistrictDashboard.tsx:477:      setSaving(false);
+src/pages/DistrictDashboard.tsx:485:    setSaving(true);
+src/pages/DistrictDashboard.tsx:526:      await setDoc(doc(db, 'users', finalUid), {
+src/pages/DistrictDashboard.tsx:541:      await setDoc(doc(db, 'accessControl', emailLower), {
+src/pages/DistrictDashboard.tsx:552:      setIsLeadershipModalOpen(false);
+src/pages/DistrictDashboard.tsx:553:      setLeaderForm({
+src/pages/DistrictDashboard.tsx:567:      setSaving(false);
+src/pages/DistrictDashboard.tsx:657:              setEditingBranchId(null);
+src/pages/DistrictDashboard.tsx:658:              setBranchForm({ name: "", location: "", capacity: "" });
+src/pages/DistrictDashboard.tsx:659:              setIsBranchModalOpen(true);
+src/pages/DistrictDashboard.tsx:974:                            setSelectedBranch(branch);
+src/pages/DistrictDashboard.tsx:975:                            setIsLeadershipModalOpen(true);
+src/pages/DistrictDashboard.tsx:1102:                            setSelectedMembers(
+src/pages/DistrictDashboard.tsx:1178:                                    setSelectedMembers([
+src/pages/DistrictDashboard.tsx:1183:                                    setSelectedMembers(
+src/pages/DistrictDashboard.tsx:1409:                    setLeaderForm({
+src/pages/DistrictDashboard.tsx:1418:                    setProvisionType('existing');
+src/pages/DistrictDashboard.tsx:1419:                    setIsLeadershipModalOpen(true);
+src/pages/DistrictDashboard.tsx:1514:        onClose={() => setIsBranchModalOpen(false)}
+src/pages/DistrictDashboard.tsx:1526:                setBranchForm({ ...branchForm, name: e.target.value })
+src/pages/DistrictDashboard.tsx:1541:                setBranchForm({ ...branchForm, location: e.target.value })
+src/pages/DistrictDashboard.tsx:1556:                setBranchForm({ ...branchForm, capacity: e.target.value })
+src/pages/DistrictDashboard.tsx:1578:        onClose={() => setIsLeadershipModalOpen(false)}
+src/pages/DistrictDashboard.tsx:1617:                      setLeaderForm({
+src/pages/DistrictDashboard.tsx:1625:                      setLeaderForm({...leaderForm, selectedMemberId: ''});
+src/pages/DistrictDashboard.tsx:1697:                    setLeaderForm({...leaderForm, position: pos, role});
+src/pages/DistrictDashboard.tsx:1868:        setIsOpen(false);
+src/pages/DistrictDashboard.tsx:1895:                setIsOpen(false);
+src/pages/DistrictDashboard.tsx:1905:                setIsOpen(false);
+src/pages/DistrictDashboard.tsx:1916:                setIsOpen(false);
+src/pages/BaptismManagement.tsx:87:        setDistrictNames(dNames);
+src/pages/BaptismManagement.tsx:94:        setBranchNames(bNames);
+src/pages/BaptismManagement.tsx:381:        setDistrictNames(names);
+src/pages/BaptismManagement.tsx:438:        setPrograms(data);
+src/pages/BaptismManagement.tsx:439:        if (data.length > 0 && !selectedProgram) setSelectedProgram(data[0]);
+src/pages/BaptismManagement.tsx:440:        setLoading(false);
+src/pages/BaptismManagement.tsx:444:        setLoading(false);
+src/pages/BaptismManagement.tsx:453:    setLoadingCandidates(true);
+src/pages/BaptismManagement.tsx:479:        setCandidates(
+src/pages/BaptismManagement.tsx:486:        setLoadingCandidates(false);
+src/pages/BaptismManagement.tsx:490:        setLoadingCandidates(false);
+src/pages/BaptismManagement.tsx:499:    setLoadingAnalytics(true);
+src/pages/BaptismManagement.tsx:524:        setAnalyticsData(
+src/pages/BaptismManagement.tsx:527:        setLoadingAnalytics(false);
+src/pages/BaptismManagement.tsx:531:        setLoadingAnalytics(false);
+src/pages/BaptismManagement.tsx:547:      setEditingProgram(false);
+src/pages/BaptismManagement.tsx:548:      setNewProgram({
+src/pages/BaptismManagement.tsx:584:      setEligibleMembers(eligible);
+src/pages/BaptismManagement.tsx:592:    setEnrolling(true);
+src/pages/BaptismManagement.tsx:608:      setShowEnrollModal(false);
+src/pages/BaptismManagement.tsx:609:      setSelectedToEnroll([]);
+src/pages/BaptismManagement.tsx:613:      setEnrolling(false);
+src/pages/BaptismManagement.tsx:741:                      setNewProgram({ ...newProgram, title: e.target.value })
+src/pages/BaptismManagement.tsx:750:                      setNewProgram({
+src/pages/BaptismManagement.tsx:762:                      setNewProgram({
+src/pages/BaptismManagement.tsx:774:                      setNewProgram({
+src/pages/BaptismManagement.tsx:786:                      setNewProgram({
+src/pages/BaptismManagement.tsx:797:                      setNewProgram({
+src/pages/BaptismManagement.tsx:950:                              setShowEnrollModal(true);
+src/pages/BaptismManagement.tsx:1019:                                setActivePipelineStage(stage.id as any)
+src/pages/BaptismManagement.tsx:1380:                            setSelectedToEnroll([
+src/pages/BaptismManagement.tsx:1385:                            setSelectedToEnroll(
+src/pages/SuperadminDashboard.tsx:72:    setSaving(true);
+src/pages/SuperadminDashboard.tsx:119:      await setDoc(doc(db, 'users', finalUid), {
+src/pages/SuperadminDashboard.tsx:134:      await setDoc(doc(db, 'accessControl', emailLower), {
+src/pages/SuperadminDashboard.tsx:145:      setIsLeadershipModalOpen(false);
+src/pages/SuperadminDashboard.tsx:146:      setLeaderForm({
+src/pages/SuperadminDashboard.tsx:160:      setSaving(false);
+src/pages/SuperadminDashboard.tsx:182:      setDistricts(districtsList);
+src/pages/SuperadminDashboard.tsx:183:      setIsLoading(false);
+src/pages/SuperadminDashboard.tsx:186:      setIsLoading(false);
+src/pages/SuperadminDashboard.tsx:195:      setLeaders(leadersList);
+src/pages/SuperadminDashboard.tsx:213:      setBaptismRequests(results);
+src/pages/SuperadminDashboard.tsx:223:      setGlobalRemittances(items);
+src/pages/SuperadminDashboard.tsx:238:            setLeaderFormBranches(snap.docs.map(d => ({ id: d.id, name: d.data().name })));
+src/pages/SuperadminDashboard.tsx:242:      setLeaderFormBranches([]);
+src/pages/SuperadminDashboard.tsx:249:    setIsCreating(true);
+src/pages/SuperadminDashboard.tsx:271:      setIsDistrictModalOpen(false);
+src/pages/SuperadminDashboard.tsx:272:      setEditingDistrictId(null);
+src/pages/SuperadminDashboard.tsx:273:      setNewDistrict({
+src/pages/SuperadminDashboard.tsx:283:      setIsCreating(false);
+src/pages/SuperadminDashboard.tsx:288:    setEditingDistrictId(district.id);
+src/pages/SuperadminDashboard.tsx:289:    setNewDistrict({
+src/pages/SuperadminDashboard.tsx:296:    setIsDistrictModalOpen(true);
+src/pages/SuperadminDashboard.tsx:331:              setLeaderForm({
+src/pages/SuperadminDashboard.tsx:340:              setIsLeadershipModalOpen(true);
+src/pages/SuperadminDashboard.tsx:361:          setIsDistrictModalOpen(false);
+src/pages/SuperadminDashboard.tsx:362:          setEditingDistrictId(null);
+src/pages/SuperadminDashboard.tsx:363:          setNewDistrict({
+src/pages/SuperadminDashboard.tsx:459:        onClose={() => setIsLeadershipModalOpen(false)} 
+src/pages/SuperadminDashboard.tsx:527:                    setLeaderForm({...leaderForm, position: pos, role});
+src/pages/Login.tsx:21:    setErrorMsg('');
+src/pages/Login.tsx:22:    setSuccessMsg('');
+src/pages/Login.tsx:26:    setIsAuthenticating(true);
+src/pages/Login.tsx:33:      setErrorMsg(translated);
+src/pages/Login.tsx:36:      setIsAuthenticating(false);
+src/pages/Login.tsx:43:      setErrorMsg('Please enter your email address.');
+src/pages/Login.tsx:48:      setIsAuthenticating(true);
+src/pages/Login.tsx:52:        setSuccessMsg('A password reset link has been sent to your email.');
+src/pages/Login.tsx:53:        setIsForgotPassword(false);
+src/pages/Login.tsx:55:        setErrorMsg(translateAuthError(err));
+src/pages/Login.tsx:57:        setIsAuthenticating(false);
+src/pages/Login.tsx:63:      setErrorMsg('Please enter your password.');
+src/pages/Login.tsx:67:    setIsAuthenticating(true);
+src/pages/Login.tsx:78:      setErrorMsg(translated);
+src/pages/Login.tsx:81:      setIsAuthenticating(false);
+src/pages/Login.tsx:114:    setIsForgotPassword(mode === 'forgot');
+src/pages/Login.tsx:115:    setIsSignUp(mode === 'signup');
+src/pages/Login.tsx:116:    setPassword('');
+src/pages/Tasks.tsx:83:      setTasks(docs);
+src/pages/Tasks.tsx:84:      setLoading(false);
+src/pages/Tasks.tsx:87:      setLoading(false);
+src/pages/Tasks.tsx:101:        setUsers(usersList);
+src/pages/Tasks.tsx:105:           setTaskForm(prev => ({ ...prev, assigneeId: profile.uid || '', assigneeName: profile.fullName || '' }));
+src/pages/Tasks.tsx:144:    setIsSaving(true);
+src/pages/Tasks.tsx:188:      setShowModal(false);
+src/pages/Tasks.tsx:189:      setEditingTask(null);
+src/pages/Tasks.tsx:193:      setIsSaving(false);
+src/pages/Tasks.tsx:232:    today.setHours(0,0,0,0);
+src/pages/Tasks.tsx:277:              setEditingTask(null);
+src/pages/Tasks.tsx:278:              setTaskForm({
+src/pages/Tasks.tsx:287:              setShowModal(true);
+src/pages/Tasks.tsx:343:                                      setEditingTask(task);
+src/pages/Tasks.tsx:344:                                      setTaskForm({
+src/pages/Tasks.tsx:353:                                      setShowModal(true);
+src/pages/NewFirstTimer.tsx:36:        setBranches(branchList);
+src/pages/NewFirstTimer.tsx:44:        setMembers(memberList);
+src/pages/NewFirstTimer.tsx:54:    setIsSaving(true);
+src/pages/NewFirstTimer.tsx:96:        callDate.setDate(callDate.getDate() + 1);
+src/pages/NewFirstTimer.tsx:114:        visitDate.setDate(visitDate.getDate() + 3);
+src/pages/NewFirstTimer.tsx:143:      setIsSaving(false);
+src/pages/Directory.tsx:58:    setLoading(true);
+src/pages/Directory.tsx:76:      setEntries(prev => {
+src/pages/Directory.tsx:80:      setLoading(false);
+src/pages/Directory.tsx:83:      setLoading(false);
+src/pages/Directory.tsx:103:      setEntries(prev => {
+src/pages/Directory.tsx:247:    setIsConnecting(true);
+src/pages/Directory.tsx:277:      setIsConnecting(false);
+src/pages/Directory.tsx:313:      onMouseEnter={() => setIsHovered(true)}
+src/pages/Directory.tsx:314:      onMouseLeave={() => setIsHovered(false)}
+src/providers/ScannerProvider.tsx:32:    setConfig(options);
+src/providers/ScannerProvider.tsx:33:    setIsOpen(true);
+src/providers/ScannerProvider.tsx:37:    setIsOpen(false);
+src/providers/ScannerProvider.tsx:39:    setTimeout(() => setConfig(null), 300);
+src/components/NewGroupChatModal.tsx:31:    setSelectedUsers(newSet);
+src/components/NewGroupChatModal.tsx:41:    setSelectedUsers(newSet => new Set());
+src/components/NewGroupChatModal.tsx:42:    setGroupName('');
+src/components/NewGroupChatModal.tsx:43:    setSearch('');
+src/components/ThemeProvider.tsx:54:      localStorage.setItem(storageKey, theme);
+src/components/ThemeProvider.tsx:55:      setTheme(theme);
+src/components/ConvertForm.tsx:88:      form.setValue('branchId', branches[0].id);
+src/components/ConvertForm.tsx:96:      setShowCamera(true);
+src/components/ConvertForm.tsx:97:      setTimeout(async () => {
+src/components/ConvertForm.tsx:106:      setShowCamera(false);
+src/components/ConvertForm.tsx:112:    setCameraFacingMode(newMode);
+src/components/ConvertForm.tsx:123:    setShowCamera(false);
+src/components/ConvertForm.tsx:136:        form.setValue('photoUrl', dataUrl);
+src/components/ConvertForm.tsx:147:        form.setValue('photoUrl', reader.result as string);
+src/components/IDCardGenerator.tsx:49:              setOrientation(orientation === 'portrait' ? 'landscape' : 'portrait');
+src/components/IDCardGenerator.tsx:50:              setSide('front');
+src/components/ShareModal.tsx:51:          setFriends(friendsData);
+src/components/ShareModal.tsx:62:    setIsSubmitting(true);
+src/components/ShareModal.tsx:115:      setContent('');
+src/components/ShareModal.tsx:121:      setIsSubmitting(false);
+src/components/ShareModal.tsx:127:    setIsSubmitting(true);
+src/components/ShareModal.tsx:148:      setContent('');
+src/components/ShareModal.tsx:153:      setIsSubmitting(false);
+src/components/CreateEventModal.tsx:51:      setErrorMsg('Please provide an event name and start time.');
+src/components/CreateEventModal.tsx:74:    setName('');
+src/components/CreateEventModal.tsx:75:    setDescription('');
+src/components/CreateEventModal.tsx:76:    setStartDate('');
+src/components/CreateEventModal.tsx:77:    setStartTime('');
+src/components/CreateEventModal.tsx:78:    setEndDate('');
+src/components/CreateEventModal.tsx:79:    setEndTime('');
+src/components/CreateEventModal.tsx:80:    setShowEndTime(false);
+src/components/CreateEventModal.tsx:81:    setLocation('');
+src/components/CreateEventModal.tsx:82:    setWhatsappCallLink(false);
+src/components/CreateEventModal.tsx:83:    setReminder('1 hour before');
+src/components/CreateEventModal.tsx:84:    setAllowGuests(false);
+src/components/CreateEventModal.tsx:85:    setErrorMsg('');
+src/components/Layout.tsx:140:        setNotifications(data);
+src/components/Layout.tsx:141:        setUnreadCount(snapshot.size);
+src/components/Layout.tsx:154:    setShowNotifications(false);
+src/components/Layout.tsx:179:      setShowUserMenu(false);
+src/components/Layout.tsx:180:      setShowNotifications(false);
+src/components/Layout.tsx:181:      setShowRoleMenu(false);
+src/components/Layout.tsx:610:                    setShowNotifications(!showNotifications);
+src/components/Layout.tsx:611:                    setShowUserMenu(false);
+src/components/Layout.tsx:738:                          setShowNotifications(false);
+src/components/Layout.tsx:770:                    setShowUserMenu(!showUserMenu);
+src/components/Layout.tsx:771:                    setShowNotifications(false);
+src/components/Layout.tsx:821:                          setShowUserMenu(false);
+src/components/Layout.tsx:832:                          setShowUserMenu(false);
+src/components/PostCard.tsx:173:          setPost({
+src/components/PostCard.tsx:191:        setIsLoading(false);
+src/components/PostCard.tsx:193:        setIsLoading(false);
+src/components/PostCard.tsx:197:      setIsLoading(false);
+src/components/PostCard.tsx:241:        onImageClick={(idx) => { setViewerIndex(idx); setViewerOpen(true); }}
+src/components/PostCard.tsx:249:        onClose={() => setViewerOpen(false)} 
+src/components/PostCard.tsx:262:    const listener = () => setMatches(media.matches);
+src/components/PostCard.tsx:286:    setLikes(post.likes);
+src/components/PostCard.tsx:287:    setIsLiked(post.isLiked || false);
+src/components/PostCard.tsx:288:    setIsBookmarked(post.bookmarkedBy?.includes(user?.uid || '') || false);
+src/components/PostCard.tsx:294:    setIsBookmarked(!isCurrentlyBookmarked);
+src/components/PostCard.tsx:307:      setIsBookmarked(isCurrentlyBookmarked);
+src/components/PostCard.tsx:319:    setIsLiked(!isCurrentlyLiked);
+src/components/PostCard.tsx:320:    setLikes(prev => isCurrentlyLiked ? prev - 1 : prev + 1);
+src/components/PostCard.tsx:329:        await setDoc(likeRef, { createdAt: serverTimestamp() });
+src/components/PostCard.tsx:333:      setIsLiked(isCurrentlyLiked);
+src/components/PostCard.tsx:334:      setLikes(prev => isCurrentlyLiked ? prev + 1 : prev - 1);
+src/components/PostCard.tsx:389:                    onClose={() => setActiveMenu(false)}
+src/components/PostCard.tsx:390:                    onReport={() => setIsReportModalOpen(true)}
+src/components/PostCard.tsx:398:        <Modal isOpen={activeMenu && isMobile} onClose={() => setActiveMenu(false)} title="Post Options">
+src/components/PostCard.tsx:403:              onClose={() => setActiveMenu(false)}
+src/components/PostCard.tsx:404:              onReport={() => setIsReportModalOpen(true)}
+src/components/PostCard.tsx:415:          onImageClick={(idx) => { setViewerIndex(idx); setViewerOpen(true); }}
+src/components/PostCard.tsx:515:          onClose={() => setViewerOpen(false)} 
+src/components/PostCard.tsx:553:        onClose={() => setActiveComments(false)}
+src/components/PostCard.tsx:561:        onClose={() => setIsShareModalOpen(false)}
+src/components/PostCard.tsx:568:          setIsReportModalOpen(false);
+src/components/PostCard.tsx:569:          setReportReason('');
+src/components/PostCard.tsx:584:                setIsReportModalOpen(false);
+src/components/PostCard.tsx:585:                setReportReason('');
+src/components/PostCard.tsx:595:                setIsReporting(true);
+src/components/PostCard.tsx:602:                  setIsReportModalOpen(false);
+src/components/PostCard.tsx:603:                  setReportReason('');
+src/components/PostCard.tsx:608:                  setIsReporting(false);
+src/components/PostCard.tsx:741:        setComments(fetched);
+src/components/PostCard.tsx:752:    setIsSubmitting(true);
+src/components/PostCard.tsx:785:      setNewComment('');
+src/components/PostCard.tsx:786:      setReplyTo(null);
+src/components/PostCard.tsx:790:      setIsSubmitting(false);
+src/components/PostCard.tsx:804:              onReply={(c: any) => setReplyTo(c)} 
+src/components/PostCard.tsx:825:              onFocus={() => setIsInputFocused(true)}
+src/components/PostCard.tsx:826:              onBlur={() => setTimeout(() => setIsInputFocused(false), 200)}
+src/components/PostCard.tsx:867:    getDoc(likeRef).then(snap => setIsLiked(snap.exists())).catch(() => {});
+src/components/PostCard.tsx:889:      setReplies(fetched);
+src/components/PostCard.tsx:899:    setIsLiked(!isLiked);
+src/components/PostCard.tsx:900:    setLikes((prev: number) => isLiked ? prev - 1 : prev + 1);
+src/components/PostCard.tsx:907:        await setDoc(likeRef, { createdAt: serverTimestamp() });
+src/components/PostCard.tsx:911:      setIsLiked(isLiked);
+src/components/PostCard.tsx:912:      setLikes((prev: number) => !isLiked ? prev - 1 : prev + 1);
+src/components/ResolveTransferModal.tsx:35:      if (initialDistrictId && initialDistrictId !== 'undecided') setDistrictId(initialDistrictId);
+src/components/ResolveTransferModal.tsx:36:      if (initialBranchId && initialBranchId !== 'undecided') setBranchId(initialBranchId);
+src/components/ResolveTransferModal.tsx:45:      setBranches([]);
+src/components/ResolveTransferModal.tsx:46:      setBranchId('');
+src/components/ResolveTransferModal.tsx:52:    setDistricts(dSnap.docs.map(d => ({ id: d.id, name: d.data().name })));
+src/components/ResolveTransferModal.tsx:56:    setLoading(true);
+src/components/ResolveTransferModal.tsx:58:    setBranches(bSnap.docs.map(b => ({ id: b.id, name: b.data().name })));
+src/components/ResolveTransferModal.tsx:59:    setLoading(false);
+src/components/AudioPlayer.tsx:20:      setDuration(audio.duration);
+src/components/AudioPlayer.tsx:24:      setProgress((audio.currentTime / audio.duration) * 100);
+src/components/AudioPlayer.tsx:28:      setIsPlaying(false);
+src/components/AudioPlayer.tsx:29:      setProgress(0);
+src/components/AudioPlayer.tsx:52:    setIsPlaying(!isPlaying);
+src/components/AudioPlayer.tsx:61:    setProgress(Number(e.target.value));
+src/components/VerseOfTheDay.tsx:32:              setVerse(cachedVerse.data);
+src/components/VerseOfTheDay.tsx:33:              setLoading(false);
+src/components/VerseOfTheDay.tsx:46:        setVerse(verseData);
+src/components/VerseOfTheDay.tsx:47:        localStorage.setItem('verseOfTheDay', JSON.stringify({
+src/components/VerseOfTheDay.tsx:55:        setLoading(false);
+src/components/MemberTransferModal.tsx:44:      setBranches([]);
+src/components/MemberTransferModal.tsx:45:      setTargetBranchId('');
+src/components/MemberTransferModal.tsx:50:    setLoadingDistricts(true);
+src/components/MemberTransferModal.tsx:54:      setDistricts(snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+src/components/MemberTransferModal.tsx:59:      setLoadingDistricts(false);
+src/components/MemberTransferModal.tsx:64:    setLoadingBranches(true);
+src/components/MemberTransferModal.tsx:68:      setBranches(snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+src/components/MemberTransferModal.tsx:73:      setLoadingBranches(false);
+src/components/MemberTransferModal.tsx:90:    setIsSubmitting(true);
+src/components/MemberTransferModal.tsx:125:      setIsSubmitting(false);
+src/components/ScannerModal.tsx:22:      setManualInput('');
+src/components/ScannerModal.tsx:91:                  setManualInput('');
+src/components/ScriptureText.tsx:87:    setLoading(true);
+src/components/ScriptureText.tsx:88:    setError(null);
+src/components/ScriptureText.tsx:89:    setText(null);
+src/components/ScriptureText.tsx:98:            setText(data.text);
+src/components/ScriptureText.tsx:99:            setTranslation(data.translation_name);
+src/components/ScriptureText.tsx:100:            setLoading(false);
+src/components/ScriptureText.tsx:105:            setError(err.message);
+src/components/ScriptureText.tsx:106:            setLoading(false);
+src/components/CreatePollModal.tsx:26:    setOptions(options.map(opt => opt.id === id ? { ...opt, text } : opt));
+src/components/CreatePollModal.tsx:27:    setErrorMsg('');
+src/components/CreatePollModal.tsx:31:    setOptions([...options, { id: Math.random().toString(36).substr(2, 9), text: '' }]);
+src/components/CreatePollModal.tsx:37:      setErrorMsg('Please provide a question and at least two options.');
+src/components/CreatePollModal.tsx:45:    setQuestion('');
+src/components/CreatePollModal.tsx:46:    setOptions([{ id: '1', text: '' }, { id: '2', text: '' }]);
+src/components/CreatePollModal.tsx:47:    setAllowMultipleAnswers(false);
+src/components/CreatePollModal.tsx:48:    setErrorMsg('');
+src/components/NotificationManager.tsx:37:      setReminders(data);
+src/components/NotificationManager.tsx:135:    const interval = setInterval(checkApptReminders, 60000); // Check every minute
+src/components/NotificationManager.tsx:230:    const interval = setInterval(checkReminders, 10000); // Check every 10s to be responsive but not heavy
+src/components/PDFPreview.tsx:18:    setNumPages(numPages);
+src/components/PDFPreview.tsx:19:    setLoading(false);
+src/components/PDFPreview.tsx:24:    setError(err.message);
+src/components/PDFPreview.tsx:25:    setLoading(false);
+src/components/PDFPreview.tsx:28:  const previousPage = () => setPageNumber(prev => Math.max(prev - 1, 1));
+src/components/PDFPreview.tsx:29:  const nextPage = () => setPageNumber(prev => Math.min(prev + 1, numPages || 1));
+src/components/FirebaseProvider.tsx:87:      setIsOnline(true);
+src/components/FirebaseProvider.tsx:91:      setIsOnline(false);
+src/components/FirebaseProvider.tsx:99:      setUser(currentUser);
+src/components/FirebaseProvider.tsx:101:        setProfile(null);
+src/components/FirebaseProvider.tsx:102:        setLoading(false);
+src/components/FirebaseProvider.tsx:122:          setProfile(profileData);
+src/components/FirebaseProvider.tsx:144:                setMemberProfile({ id: mSnap.docs[0].id, ...mSnap.docs[0].data() });
+src/components/FirebaseProvider.tsx:146:                setMemberProfile(null);
+src/components/FirebaseProvider.tsx:148:              setLoading(false);
+src/components/FirebaseProvider.tsx:156:              setLoading(false);
+src/components/FirebaseProvider.tsx:159:            setLoading(false);
+src/components/FirebaseProvider.tsx:167:            setLoading(false);
+src/components/FirebaseProvider.tsx:168:            setProvisioningStatus('Registration requires an active connection. Please go online to continue.');
+src/components/FirebaseProvider.tsx:199:      setProvisioningStatus('Verifying registration and permissions...');
+src/components/FirebaseProvider.tsx:212:            setTimeout(() => attemptProvisioning(authUser, retryCount + 1), 2000);
+src/components/FirebaseProvider.tsx:230:        setProvisioningStatus('Finalizing your administrator profile...');
+src/components/FirebaseProvider.tsx:245:            await setDoc(userRef, newProfile);
+src/components/FirebaseProvider.tsx:250:              await new Promise(resolve => setTimeout(resolve, 2000));
+src/components/FirebaseProvider.tsx:261:            setProvisioningStatus('Synchronizing with member registry...');
+src/components/FirebaseProvider.tsx:303:                await setDoc(memberRef, memberData);
+src/components/FirebaseProvider.tsx:314:        setProvisioningStatus(null);
+src/components/FirebaseProvider.tsx:317:          setProvisioningStatus('Waiting for registration approval (Retrying)...');
+src/components/FirebaseProvider.tsx:319:          setTimeout(() => attemptProvisioning(authUser, retryCount + 1), 3000);
+src/components/FirebaseProvider.tsx:322:        setProvisioningStatus(null);
+src/components/FirebaseProvider.tsx:323:        setLoading(false);
+src/components/FirebaseProvider.tsx:328:      setProvisioningStatus(null);
+src/components/FirebaseProvider.tsx:329:      setLoading(false);

@@ -339,6 +339,26 @@ service cloud.firestore {
           allow write: if (isBranchAdmin(districtId, branchId) || hasUserRole("finance")) && isVerified() && isValidRemittance(incoming());
         }
 
+        match /accountingAccounts/{accountId} {
+          allow read, list: if isBranchAdmin(districtId, branchId) || isSuperAdmin() || isDistrictLeader(districtId);
+          allow write: if isBranchAdmin(districtId, branchId) && isVerified();
+        }
+
+        match /accountingFunds/{fundId} {
+          allow read, list: if isBranchAdmin(districtId, branchId) || isSuperAdmin() || isDistrictLeader(districtId);
+          allow write: if isBranchAdmin(districtId, branchId) && isVerified();
+        }
+
+        match /journalEntries/{journalId} {
+          allow read, list: if isBranchAdmin(districtId, branchId) || isSuperAdmin() || isDistrictLeader(districtId);
+          allow write: if isBranchAdmin(districtId, branchId) && isVerified();
+        }
+
+        match /accountingBudgets/{budgetId} {
+          allow read, list: if isBranchAdmin(districtId, branchId) || isSuperAdmin() || isDistrictLeader(districtId);
+          allow write: if isBranchAdmin(districtId, branchId) && isVerified();
+        }
+
         match /fundRequests/{requestId} {
           allow read, list: if isBranchAdmin(districtId, branchId) || isSuperAdmin() || isDistrictLeader(districtId);
           allow write, update: if (isBranchAdmin(districtId, branchId) || isDistrictLeader(districtId) || isSuperAdmin()) && isVerified();
