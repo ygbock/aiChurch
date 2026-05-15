@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   ArrowUpRight, 
   ArrowDownRight, 
@@ -18,6 +18,8 @@ import {
   Tooltip, 
   ResponsiveContainer 
 } from 'recharts';
+import { useTenant } from '../../../core/tenant/useTenant';
+import { analytics } from '../../../core/analytics/AnalyticsService';
 
 const mockChartData = [
   { name: 'Jan', income: 4000, expenses: 2400 },
@@ -30,6 +32,19 @@ const mockChartData = [
 ];
 
 export default function FinanceDashboard() {
+  const { currentBranch, currentOrganization } = useTenant();
+
+  useEffect(() => {
+    analytics.track({
+        eventName: 'dashboard_viewed',
+        payload: {
+          dashboard: 'finance'
+        },
+        tenantId: currentOrganization?.id,
+        branchId: currentBranch?.id
+    });
+  }, [currentOrganization, currentBranch]);
+
   return (
     <div className="p-6 md:p-8 lg:p-10 max-w-7xl mx-auto space-y-8 pb-32">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

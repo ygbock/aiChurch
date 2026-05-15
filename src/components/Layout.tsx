@@ -45,7 +45,7 @@ import {
 import { APP_MODULES, Role } from "../constants/modules";
 import { useFirebase } from "./FirebaseProvider";
 import { useTheme } from "./ThemeProvider";
-import Login from "../pages/Login";
+import Login from "../modules/administration/pages/Login";
 import {
   setDoc,
   doc,
@@ -60,7 +60,7 @@ import {
 import { db, handleFirestoreError, OperationType } from "../lib/firebase";
 import NotificationManager from "./NotificationManager";
 import { format } from "date-fns";
-import ForcePasswordChange from '../pages/ForcePasswordChange';
+import ForcePasswordChange from '../modules/administration/pages/ForcePasswordChange';
 
 interface RoleContextType {
   role: Role;
@@ -74,6 +74,10 @@ export function useRole() {
   if (!context) throw new Error("useRole must be used within a RoleProvider");
   return context;
 }
+
+import { usePermissions } from '../core/permissions/usePermissions';
+import { useFeatureFlags } from '../core/feature-flags/useFeatureFlags';
+import { platformRegistry } from '../core/platform/registry';
 
 export default function Layout() {
   const location = useLocation();
@@ -90,9 +94,14 @@ export default function Layout() {
     signUpWithEmail,
     logout,
   } = useFirebase();
+  
+  const { hasPermission, hasAnyPermission } = usePermissions();
+  const { isModuleEnabled } = useFeatureFlags();
+
   const rawRole = profile?.role || "member";
   const role = rawRole === "branch_admin" ? "admin" : rawRole;
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -307,54 +316,26 @@ export default function Layout() {
                   isCollapsed={isCollapsed}
                   onClick={() => setIsSidebarOpen(false)}
                 />
-                <NavItem
-                  to="/members"
-                  icon={<Users size={18} />}
-                  label="Members"
-                  active={location.pathname.startsWith("/members")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/cells"
-                  icon={<Users size={18} />}
-                  label="Home Cells"
-                  active={location.pathname.startsWith("/cells")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/follow-ups"
-                  icon={<UserCheck size={18} />}
-                  label="Follow-ups"
-                  active={location.pathname.startsWith("/follow-ups")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/attendance-tracker"
-                  icon={<Scan size={18} />}
-                  label="Scan Attendance"
-                  active={location.pathname.startsWith("/attendance-tracker")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/departments"
-                  icon={<Building2 size={18} />}
-                  label="Departments"
-                  active={location.pathname.startsWith("/departments")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/ministries"
-                  icon={<Network size={18} />}
-                  label="Ministries"
-                  active={location.pathname.startsWith("/ministries")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
+
+                {platformRegistry.getAllModules()
+                  .filter(m => isModuleEnabled(m.id))
+                  .flatMap(m => m.navigation?.map(n => ({...n, effectiveCategory: n.category || m.category || 'core'})) || [])
+                  .filter(n => n.effectiveCategory === 'core')
+                  .filter(n => !n.permission || hasPermission(n.permission as any))
+                  .map(nav => {
+                    const Icon = nav.icon || LayoutDashboard;
+                    return (
+                      <NavItem
+                        key={nav.path}
+                        to={nav.path}
+                        icon={<Icon size={18} />}
+                        label={nav.label}
+                        active={location.pathname.startsWith(nav.path)}
+                        isCollapsed={isCollapsed}
+                        onClick={() => setIsSidebarOpen(false)}
+                      />
+                    );
+                  })}
               </nav>
             </div>
 
@@ -366,66 +347,25 @@ export default function Layout() {
                 </p>
               )}
               <nav className="space-y-0.5">
-                <NavItem
-                  to="/calendar"
-                  icon={<Calendar size={18} />}
-                  label="Calendar"
-                  active={location.pathname === "/calendar"}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/events"
-                  icon={<Flame size={18} />}
-                  label="Live Events"
-                  active={location.pathname === "/events"}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/kiosk"
-                  icon={<QrCode size={18} />}
-                  label="Kiosk Mode"
-                  active={location.pathname === "/kiosk"}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/baptism"
-                  icon={<Droplets size={18} />}
-                  label="Baptism Workflows"
-                  active={location.pathname === "/baptism"}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                {(memberProfile?.isBaptismInterviewer ||
-                  profile?.role === "superadmin" ||
-                  profile?.role === "district") && (
-                  <NavItem
-                    to="/baptism/interviews"
-                    icon={<ClipboardList size={18} />}
-                    label="Interview Portal"
-                    active={location.pathname === "/baptism/interviews"}
-                    isCollapsed={isCollapsed}
-                    onClick={() => setIsSidebarOpen(false)}
-                  />
-                )}
-                <NavItem
-                  to="/bible-school"
-                  icon={<BookOpen size={18} />}
-                  label="Bible School"
-                  active={location.pathname.startsWith("/bible-school")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/streaming"
-                  icon={<Video size={18} />}
-                  label="Live Stream"
-                  active={location.pathname.startsWith("/streaming")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
+                {platformRegistry.getAllModules()
+                  .filter(m => isModuleEnabled(m.id))
+                  .flatMap(m => m.navigation?.map(n => ({...n, effectiveCategory: n.category || m.category || 'core'})) || [])
+                  .filter(n => n.effectiveCategory === 'spiritual')
+                  .filter(n => !n.permission || hasPermission(n.permission as any))
+                  .map(nav => {
+                    const Icon = nav.icon || LayoutDashboard;
+                    return (
+                      <NavItem
+                        key={nav.path}
+                        to={nav.path}
+                        icon={<Icon size={18} />}
+                        label={nav.label}
+                        active={location.pathname.startsWith(nav.path)}
+                        isCollapsed={isCollapsed}
+                        onClick={() => setIsSidebarOpen(false)}
+                      />
+                    );
+                  })}
               </nav>
             </div>
 
@@ -437,63 +377,25 @@ export default function Layout() {
                 </p>
               )}
               <nav className="space-y-0.5">
-                <NavItem
-                  to="/finance"
-                  icon={<Banknote size={18} />}
-                  label="Financials"
-                  active={location.pathname.startsWith("/finance")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/service-reports"
-                  icon={<ClipboardList size={18} />}
-                  label="Service Reports"
-                  active={location.pathname.startsWith("/service-reports")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/volunteers"
-                  icon={<Heart size={18} />}
-                  label="Volunteers"
-                  active={location.pathname.startsWith("/volunteers")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/rosters"
-                  icon={<CalendarDays size={18} />}
-                  label="Ministry Rosters"
-                  active={location.pathname.startsWith("/rosters")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/tasks"
-                  icon={<CheckSquare size={18} />}
-                  label="Tasks"
-                  active={location.pathname.startsWith("/tasks")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
-                <NavItem
-                  to="/communication"
-                  icon={<MessageSquare size={18} />}
-                  label="Announcements"
-                  active={location.pathname.startsWith("/communication")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                  className="hidden md:flex"
-                />
-                <NavItem
-                  to="/community-feed"
-                  icon={<Globe size={18} />}
-                  label="Social Hub"
-                  active={location.pathname.startsWith("/community-feed") || location.pathname.startsWith("/ministry-channels") || location.pathname.startsWith("/direct-messages")}
-                  isCollapsed={isCollapsed}
-                  onClick={() => setIsSidebarOpen(false)}
-                />
+                {platformRegistry.getAllModules()
+                  .filter(m => isModuleEnabled(m.id))
+                  .flatMap(m => m.navigation?.map(n => ({...n, effectiveCategory: n.category || m.category || 'core'})) || [])
+                  .filter(n => n.effectiveCategory === 'operations')
+                  .filter(n => !n.permission || hasPermission(n.permission as any))
+                  .map(nav => {
+                    const Icon = nav.icon || LayoutDashboard;
+                    return (
+                      <NavItem
+                        key={nav.path}
+                        to={nav.path}
+                        icon={<Icon size={18} />}
+                        label={nav.label}
+                        active={location.pathname.startsWith(nav.path)}
+                        isCollapsed={isCollapsed}
+                        onClick={() => setIsSidebarOpen(false)}
+                      />
+                    );
+                  })}
               </nav>
             </div>
 
@@ -506,48 +408,25 @@ export default function Layout() {
                   </p>
                 )}
                 <nav className="space-y-0.5">
-                  {role === 'superadmin' && (
-                    <NavItem
-                      to="/districts"
-                      icon={<Map size={18} />}
-                      label="Districts"
-                      active={location.pathname.startsWith("/districts")}
-                      isCollapsed={isCollapsed}
-                      onClick={() => setIsSidebarOpen(false)}
-                    />
-                  )}
-                  <NavItem
-                    to="/transfers"
-                    icon={<ArrowLeftRight size={18} />}
-                    label="Transfers"
-                    active={location.pathname.startsWith("/transfers")}
-                    isCollapsed={isCollapsed}
-                    onClick={() => setIsSidebarOpen(false)}
-                  />
-                  <NavItem
-                    to="/cms"
-                    icon={<Globe size={18} />}
-                    label="CMS"
-                    active={location.pathname.startsWith("/cms")}
-                    isCollapsed={isCollapsed}
-                    onClick={() => setIsSidebarOpen(false)}
-                  />
-                  <NavItem
-                    to="/reports"
-                    icon={<BarChart3 size={18} />}
-                    label="Reports"
-                    active={location.pathname.startsWith("/reports")}
-                    isCollapsed={isCollapsed}
-                    onClick={() => setIsSidebarOpen(false)}
-                  />
-                  <NavItem
-                    to="/settings"
-                    icon={<Settings size={18} />}
-                    label="Settings"
-                    active={location.pathname.startsWith("/settings")}
-                    isCollapsed={isCollapsed}
-                    onClick={() => setIsSidebarOpen(false)}
-                  />
+                  {platformRegistry.getAllModules()
+                    .filter(m => isModuleEnabled(m.id))
+                    .flatMap(m => m.navigation?.map(n => ({...n, effectiveCategory: n.category || m.category || 'core'})) || [])
+                    .filter(n => n.effectiveCategory === 'admin')
+                    .filter(n => !n.permission || hasPermission(n.permission as any))
+                    .map(nav => {
+                      const Icon = nav.icon || LayoutDashboard;
+                      return (
+                        <NavItem
+                          key={nav.path}
+                          to={nav.path}
+                          icon={<Icon size={18} />}
+                          label={nav.label}
+                          active={location.pathname.startsWith(nav.path)}
+                          isCollapsed={isCollapsed}
+                          onClick={() => setIsSidebarOpen(false)}
+                        />
+                      );
+                    })}
                 </nav>
               </div>
             )}

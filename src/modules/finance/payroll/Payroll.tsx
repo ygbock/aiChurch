@@ -1,49 +1,67 @@
 import React, { useState } from 'react';
-import { 
-  Users, 
-  CheckCircle2, 
-  Wallet, 
-  Download, 
-  Plus, 
-  Clock,
-  MoreVertical,
-  ArrowRight,
-  ShieldAlert
-} from 'lucide-react';
+import { usePayrollStore } from './stores/usePayrollStore';
+import PayrollDashboard from './components/PayrollDashboard';
+import PayrollProfiles from './components/PayrollProfiles';
+import PayrollSchedules from './components/PayrollSchedules';
+import SalaryAdvances from './components/SalaryAdvances';
+import PayrollReports from './components/PayrollReports';
+import PayrollAIInsights from './components/PayrollAIInsights';
+import ContractManagement from './components/ContractManagement';
+import PayrollAuditTrail from './components/PayrollAuditTrail';
+import { Plus, ArrowRight, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AccountingAutomation } from '../accounting/services/automationRules';
 import { toast } from 'sonner';
+import { PayrollEngine } from './services/PayrollEngine';
+import { systemEvents, Events } from '../../../core/events/EventBus';
 
 export default function Payroll() {
-  const [activeTab, setActiveTab] = useState<'employees' | 'runs' | 'settings'>('runs');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'profiles' | 'contracts' | 'schedules' | 'advances' | 'reports' | 'ai_insights' | 'audit'>('dashboard');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showRunModal, setShowRunModal] = useState(false);
+
+  const { createRun, setPayslips, payslips } = usePayrollStore();
 
   const handleRunPayroll = () => {
     setIsProcessing(true);
     
-    // Simulate API delay
+    // Simulate processing
     setTimeout(() => {
-      const runId = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const totalAmount = 45200; // Simulated amount
+      const { run, payslips: generatedSlips } = PayrollEngine.processPayrollRun(
+          'May 2026 Monthly Payroll', 
+          '2026-05-01T00:00:00Z', 
+          '2026-05-31T23:59:59Z', 
+          'b-1', 
+          'admin-1'
+      );
+
+      createRun(run);
+      setPayslips([...payslips, ...generatedSlips]);
+
+      // Using the raw string so compiler doesn't complain about undefined Events maps
+      systemEvents.publish('PAYROLL_PROCESSED' as any, { 
+          runId: run.id,
+          totalAmount: run.totalNetPay,
+          branchId: run.branchId
+      });
 
       // Sync to Accounting Ledger directly
-      AccountingAutomation.syncPayroll(runId, totalAmount, new Date().toISOString());
+      AccountingAutomation.syncPayroll(run.id, run.totalNetPay, new Date().toISOString());
 
       toast.success('Payroll Processed', { 
-        description: `Run ${runId} completed. Journal entry created in the ledger.` 
+        description: `Run ${run.name} calculated successfully. Pending approval.` 
       });
       setIsProcessing(false);
       setShowRunModal(false);
-    }, 2000);
+    }, 1500);
   };
 
   return (
-    <div className="p-6 md:p-8 lg:p-10 max-w-7xl mxauto space-y-8 pb-32">
+    <div className="p-6 md:p-8 lg:p-10 max-w-7xl mx-auto space-y-8 pb-32">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Payroll Management</h1>
-          <p className="text-slate-500 text-sm mt-1">Manage staff salaries, deductions, and initiate Monime payouts.</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Payroll & Stipends</h1>
+          <p className="text-slate-500 text-sm mt-1">Manage staff salaries, volunteer stipends, and payout approvals.</p>
         </div>
         <div className="flex gap-3">
           <button onClick={() => setShowRunModal(true)} className="px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 text-sm transition-colors shadow-sm flex items-center gap-2">
@@ -52,84 +70,27 @@ export default function Payroll() {
         </div>
       </div>
 
-      <div className="flex space-x-1 bg-slate-200/50 p-1 rounded-xl w-fit">
-        {['employees', 'runs', 'settings'].map((tab) => (
+      <div className="flex space-x-1 bg-slate-200/50 p-1 rounded-xl w-fit overflow-x-auto max-w-full hover-scrollbar">
+        {['dashboard', 'profiles', 'contracts', 'advances', 'schedules', 'reports', 'ai_insights', 'audit'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab as any)}
-            className={`px-4 py-2 text-sm font-medium rounded-lg capitalize transition-colors ${activeTab === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
+            className={`px-4 py-2 text-sm font-medium rounded-lg capitalize transition-colors whitespace-nowrap ${activeTab === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
           >
-            {tab === 'runs' ? 'Payroll Runs' : tab}
+            {tab === 'advances' ? 'Salary Advances' : tab === 'ai_insights' ? 'AI Insights' : tab === 'audit' ? 'Audit Logs' : tab}
           </button>
         ))}
       </div>
 
       <AnimatePresence mode="wait">
-        {activeTab === 'runs' && (
-          <motion.div key="runs" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600"><CheckCircle2 size={20} /></div>
-                  <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-2 py-1 rounded-full">Paid</span>
-                </div>
-                <p className="text-sm font-medium text-slate-500 mb-1">Last Run (Apr 2026)</p>
-                <h4 className="text-3xl font-black text-slate-900">Le 45,200.00</h4>
-              </div>
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-blue-50 rounded-xl text-blue-600"><Users size={20} /></div>
-                </div>
-                <p className="text-sm font-medium text-slate-500 mb-1">Active Payroll Staff</p>
-                <h4 className="text-3xl font-black text-slate-900">14</h4>
-              </div>
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-orange-50 rounded-xl text-orange-600"><Clock size={20} /></div>
-                  <span className="bg-orange-50 text-orange-700 text-xs font-bold px-2 py-1 rounded-full">Upcoming</span>
-                </div>
-                <p className="text-sm font-medium text-slate-500 mb-1">Next Run (May 2026)</p>
-                <h4 className="text-3xl font-black text-slate-900">Le 45,200.00</h4>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="font-bold text-slate-900">Payroll History</h3>
-              </div>
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold tracking-widest border-b border-slate-100">
-                  <tr>
-                    <th className="px-6 py-4">Period</th>
-                    <th className="px-6 py-4">Total Amount</th>
-                    <th className="px-6 py-4">Employees</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                  {[
-                    { period: 'April 2026', amt: 'Le 45,200.00', emp: 14, status: 'Completed' },
-                    { period: 'March 2026', amt: 'Le 44,800.00', emp: 14, status: 'Completed' },
-                    { period: 'February 2026', amt: 'Le 42,500.00', emp: 13, status: 'Completed' },
-                  ].map((row, i) => (
-                    <tr key={i} className="hover:bg-slate-50">
-                      <td className="px-6 py-4 font-bold text-slate-900">{row.period}</td>
-                      <td className="px-6 py-4 font-medium text-slate-700">{row.amt}</td>
-                      <td className="px-6 py-4 text-slate-500">{row.emp}</td>
-                      <td className="px-6 py-4">
-                        <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] uppercase font-bold rounded-full tracking-wider">{row.status}</span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button className="text-slate-400 hover:text-emerald-600"><Download size={18} /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </motion.div>
-        )}
+        {activeTab === 'dashboard' && <PayrollDashboard key="dashboard" />}
+        {activeTab === 'profiles' && <PayrollProfiles key="profiles" />}
+        {activeTab === 'contracts' && <ContractManagement key="contracts" />}
+        {activeTab === 'advances' && <SalaryAdvances key="advances" />}
+        {activeTab === 'schedules' && <PayrollSchedules key="schedules" />}
+        {activeTab === 'reports' && <PayrollReports key="reports" />}
+        {activeTab === 'ai_insights' && <PayrollAIInsights key="ai_insights" />}
+        {activeTab === 'audit' && <PayrollAuditTrail key="audit" />}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -146,27 +107,22 @@ export default function Payroll() {
                 <p className="text-sm text-slate-500 mt-1">Review and execute the current payroll run.</p>
               </div>
               <div className="p-6 space-y-4">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Period</span>
-                  <span className="font-bold text-slate-900">May 2026</span>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex justify-between items-center text-sm">
+                   <div>
+                       <p className="font-bold text-slate-900">May 2026 Salary Budget</p>
+                       <p className="text-slate-500">Fund: General Ministry Fund</p>
+                   </div>
+                   <div className="text-right">
+                       <p className="font-bold text-emerald-600">Available: $6,000</p>
+                       <p className="text-slate-500">Estimated Run: ~$5,500</p>
+                   </div>
                 </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-slate-500">Total Employees</span>
-                  <span className="font-bold text-slate-900">14</span>
-                </div>
-                <div className="flex justify-between items-center text-sm border-b border-slate-100 pb-4">
-                  <span className="text-slate-500">Payment Account</span>
-                  <span className="font-bold text-slate-900">Main Bank Account</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500 font-medium">Total Run Amount</span>
-                  <span className="text-2xl font-black text-slate-900">Le 45,200.00</span>
-                </div>
+
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 text-amber-800 text-sm mt-4">
                   <ShieldAlert className="shrink-0" size={18} />
                   <div>
-                    <p className="font-bold mb-1">Accounting Automation</p>
-                    <p className="opacity-90 leading-relaxed">Processing this payroll will automatically decrease the Bank asset account and increase Salary expenses in the general ledger.</p>
+                    <p className="font-bold mb-1">Accounting & Budget Integration</p>
+                    <p className="opacity-90 leading-relaxed">Processing this payroll will automatically generate encumbrances against the General Ministry budget and await Treasury workflow before Monime payout execution.</p>
                   </div>
                 </div>
               </div>
@@ -183,7 +139,7 @@ export default function Payroll() {
                   disabled={isProcessing}
                   className="px-6 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50"
                 >
-                  {isProcessing ? 'Processing...' : 'Confirm & Process'}
+                  {isProcessing ? 'Processing Engine...' : 'Run Payroll Engine'}
                   {!isProcessing && <ArrowRight size={16} />}
                 </button>
               </div>

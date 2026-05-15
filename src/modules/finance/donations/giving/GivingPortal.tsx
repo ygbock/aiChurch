@@ -5,6 +5,7 @@ import { CreditCard, Smartphone, Building, QrCode, User, Calendar, CheckCircle2,
 import { toast } from 'sonner';
 import { AccountingAutomation } from '../../accounting/services/automationRules';
 import { SMSService } from '../services/sms.service';
+import { systemEvents, Events } from '../../../../core/events/EventBus';
 
 export default function GivingPortal() {
   const { categories, currencies, addTransaction } = useDonationStore();
@@ -76,6 +77,15 @@ export default function GivingPortal() {
       if (sendReceipt && phone) {
         await SMSService.sendReceipt(phone, Number(amount), selectedCurrency, category.name, txId);
       }
+
+      // 3. Event-driven architecture publish
+      systemEvents.publish(Events.DONATION_COMPLETED, {
+         txId,
+         amount: Number(amount),
+         currency: selectedCurrency,
+         category: category.name,
+         donorName: isAnonymous ? 'Anonymous' : donorName || 'Guest User'
+      });
 
       toast.success('Donation Successful', { description: `Successfully processed ${selectedCurrency} ${amount} for ${category.name}` });
       setIsProcessing(false);

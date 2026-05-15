@@ -4,6 +4,9 @@ import { doc, onSnapshot, getDoc, setDoc, collection, query, where, getDocs, col
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Role } from '../constants/modules';
 import { toast } from 'sonner';
+import { usePermissions } from '../core/permissions/usePermissions';
+import { getPermissionsForRole } from '../core/permissions/policies';
+import { useTenant } from '../core/tenant/useTenant';
 
 interface UserProfile {
   uid: string;
@@ -99,6 +102,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
       if (!currentUser) {
         setProfile(null);
+        usePermissions.getState().setPermissions([]);
+        useTenant.getState().setDistrict(null);
+        useTenant.getState().setBranch(null);
         setLoading(false);
       }
     });
@@ -120,6 +126,13 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
         if (snapshot.exists()) {
           const profileData = snapshot.data() as UserProfile;
           setProfile(profileData);
+          usePermissions.getState().setPermissions(getPermissionsForRole(profileData.role));
+          if (profileData.districtId) {
+            useTenant.getState().setDistrict({ id: profileData.districtId, organizationId: 'org_1', name: `District ${profileData.districtId}` });
+          }
+          if (profileData.branchId && profileData.districtId) {
+            useTenant.getState().setBranch({ id: profileData.branchId, districtId: profileData.districtId, name: `Branch ${profileData.branchId}`, timezone: 'UTC', currency: 'USD' });
+          }
           
           if (snapshot.metadata.fromCache) {
             console.log("Profile loaded from local cache.");
@@ -140,8 +153,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
             );
             
             unsubscribeMembers = onSnapshot(membersQuery, (mSnap) => {
-              if (!mSnap.empty) {
-                setMemberProfile({ id: mSnap.docs[0].id, ...mSnap.docs[0].data() });
+              const validDocs = mSnap.docs.filter(d => d.ref.path.includes('districts/'));
+              if (validDocs.length > 0) {
+                setMemberProfile({ id: validDocs[0].id, ...validDocs[0].data() });
               } else {
                 setMemberProfile(null);
               }
@@ -267,8 +281,9 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
               limit(1)
             );
             const memberSnap = await getDocs(membersQuery);
+            const validDocs = memberSnap.docs.filter(d => d.ref.path.includes('districts/'));
 
-            if (memberSnap.empty) {
+            if (validDocs.length === 0) {
               console.log('Creating initial member registry record...');
               
               let targetBranchId = branchId;
@@ -374,7 +389,12 @@ export function FirebaseProvider({ children }: { children: React.ReactNode }) {
       const sanitizedEmail = email.trim();
       if (!sanitizedEmail) throw new Error("Email is required.");
       // Create user credential (user will be automatically logged in)
-      await createUserWithEmailAndPassword(auth, sanitizedEmail, pass);
+      const userCred = await createUserWithEmailAndPassword(auth, sanitizedEmail, pass);
+      import('firebase/auth').then(({ sendEmailVerification }) => {
+         sendEmailVerification(userCred.user).catch(console.error);
+      });
+      // Optionally alert them
+      alert('A verification email has been sent. Please verify your email before modifying data.');
     } catch (error) {
       console.error('Email Signup failed', error);
       throw error;

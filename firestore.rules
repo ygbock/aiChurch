@@ -390,7 +390,7 @@ service cloud.firestore {
         }
 
         match /tasks/{taskId} {
-          allow read: if isSignedIn();
+          allow read, list: if isSignedIn();
           allow create: if isSignedIn() && isVerified();
           allow update: if isSignedIn() && isVerified() && (
             isBranchAdmin(districtId, branchId) || 
@@ -426,14 +426,15 @@ service cloud.firestore {
     }
 
     match /chats/{chatId} {
-      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow read: if isSignedIn() && resource.data.participants.hasAny([request.auth.uid]);
+      allow list: if isSignedIn() && resource.data.participants.hasAny([request.auth.uid]);
       allow create: if isSignedIn() && isVerified() && isValidChat(incoming());
-      allow update: if isSignedIn() && request.auth.uid in resource.data.participants && isVerified() &&
+      allow update: if isSignedIn() && resource.data.participants.hasAny([request.auth.uid]) && isVerified() &&
                     incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageAt', 'updatedAt']);
 
       match /messages/{messageId} {
-        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-        allow create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants && isValidMessage(incoming());
+        allow read, list: if isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.participants.hasAny([request.auth.uid]);
+        allow create: if isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.participants.hasAny([request.auth.uid]) && isValidMessage(incoming());
       }
     }
 
@@ -452,7 +453,8 @@ service cloud.firestore {
 
     match /adminRequests/{requestId} {
       allow create: if true;
-      allow read: if isSuperAdmin() || isDistrictLeader('any');
+      allow read: if isSuperAdmin() || isDistrictLeader('any') || (isSignedIn() && request.auth.uid == resource.data.requesterId);
+      allow list: if isSuperAdmin() || isDistrictLeader('any') || (isSignedIn() && request.auth.uid == resource.data.requesterId);
       allow write: if (isSuperAdmin() || isDistrictLeader('any')) && isVerified();
     }
 
@@ -596,17 +598,17 @@ service cloud.firestore {
     }
 
     match /directMessageChats/{chatId} {
-      allow read, list: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow read, list: if isSignedIn() && resource.data.participants.hasAny([request.auth.uid]);
       allow create: if isSignedIn() && isVerified() && isValidDirectMessageChat(incoming());
-      allow update: if isSignedIn() && isVerified() && request.auth.uid in existing().participants && (
+      allow update: if isSignedIn() && isVerified() && existing().participants.hasAny([request.auth.uid]) && (
         incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastMessageTime', 'updatedAt']) &&
         incoming().updatedAt == request.time
       );
       
       match /messages/{messageId} {
-        allow read, list: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/directMessageChats/$(chatId)).data.participants;
-        allow create: if isSignedIn() && isVerified() && request.auth.uid in get(/databases/$(database)/documents/directMessageChats/$(chatId)).data.participants && isValidDirectMessage(incoming());
-        allow update: if isSignedIn() && isVerified() && request.auth.uid in get(/databases/$(database)/documents/directMessageChats/$(chatId)).data.participants && (
+        allow read, list: if isSignedIn() && get(/databases/$(database)/documents/directMessageChats/$(chatId)).data.participants.hasAny([request.auth.uid]);
+        allow create: if isSignedIn() && isVerified() && get(/databases/$(database)/documents/directMessageChats/$(chatId)).data.participants.hasAny([request.auth.uid]) && isValidDirectMessage(incoming());
+        allow update: if isSignedIn() && isVerified() && get(/databases/$(database)/documents/directMessageChats/$(chatId)).data.participants.hasAny([request.auth.uid]) && (
            (incoming().diff(existing()).affectedKeys().hasOnly(['status']) && existing().senderId != request.auth.uid) ||
            (incoming().diff(existing()).affectedKeys().hasOnly(['poll'])) ||
            (incoming().diff(existing()).affectedKeys().hasOnly(['event'])) ||
@@ -673,20 +675,20 @@ service cloud.firestore {
 
     match /departments/{deptId} {
       allow read, list: if isSignedIn();
-      allow create, update: if isSignedIn() && isVerified() && hasUserRole('superadmin') && isValidDepartment(incoming());
+      allow create, update: if isSignedIn() && isVerified() && isSuperAdmin() && isValidDepartment(incoming());
       allow delete: if false; // Only soft delete or not delete
     }
 
     match /departmentMembers/{membershipId} {
       allow read, list: if isSignedIn();
       allow create: if isSignedIn() && isVerified() && (
-        hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor')
+        isSuperAdmin() || hasUserRole('admin') || hasUserRole('pastor')
       ) && isValidDepartmentMember(incoming());
       allow update: if isSignedIn() && isVerified() && (
-        hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor') || request.auth.uid == existing().userId
+        isSuperAdmin() || hasUserRole('admin') || hasUserRole('pastor') || request.auth.uid == existing().userId
       ) && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'optOutDistrict', 'optOutGlobal']);
       allow delete: if isSignedIn() && isVerified() && (
-        hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor')
+        isSuperAdmin() || hasUserRole('admin') || hasUserRole('pastor')
       );
     }
 
@@ -697,21 +699,21 @@ service cloud.firestore {
       allow update: if isSignedIn() && isVerified() && (
         incoming().diff(existing()).affectedKeys().hasOnly(['membersCount', 'memberIds', 'messagesCount']) ||
         (
-          (hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor')) &&
+          (isSuperAdmin() || hasUserRole('admin') || hasUserRole('pastor')) &&
           incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'type', 'level', 'messagesCount'])
         )
       );
       allow delete: if isSignedIn() && isVerified() && (
-        hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor')
+        isSuperAdmin() || hasUserRole('admin') || hasUserRole('pastor')
       );
       
       match /members/{memberId} {
         allow read, list: if isSignedIn();
-        allow create: if isSignedIn() && isVerified() && (memberId == request.auth.uid || hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor')) && isValidMinistryChannelMember(incoming());
+        allow create: if isSignedIn() && isVerified() && (memberId == request.auth.uid || isSuperAdmin() || hasUserRole('admin') || hasUserRole('pastor')) && isValidMinistryChannelMember(incoming());
         allow update: if isSignedIn() && isVerified() && memberId == request.auth.uid && (
           incoming().diff(existing()).affectedKeys().hasOnly(['lastActive', 'isTyping'])
         );
-        allow delete: if isSignedIn() && isVerified() && (memberId == request.auth.uid || hasUserRole('superadmin') || hasUserRole('admin') || hasUserRole('pastor'));
+        allow delete: if isSignedIn() && isVerified() && (memberId == request.auth.uid || isSuperAdmin() || hasUserRole('admin') || hasUserRole('pastor'));
       }
 
       
@@ -784,8 +786,8 @@ service cloud.firestore {
 
     // Collection Group Helpers for safety
     match /{path=**}/members/{memberId} {
-      allow read: if isSignedIn() && (request.auth.uid == memberId || isBranchAdmin('any', 'any'));
-      allow list: if isSuperAdmin() || isDistrictLeader('any') || isBranchAdmin('any', 'any') || (isSignedIn() && (resource.data.uid == request.auth.uid || resource.data.memberId == request.auth.uid || resource.data.id == request.auth.uid));
+      allow read: if isSignedIn();
+      allow list: if isSignedIn();
     }
 
     match /{path=**}/activities/{activityId} {
@@ -807,6 +809,10 @@ service cloud.firestore {
 
     match /{path=**}/queueEntries/{entryId} {
       allow read, list: if isBranchAdmin('any', 'any');
+    }
+
+    match /{path=**}/cells/{cellId} {
+      allow read, list: if isSignedIn();
     }
 
     match /{path=**}/remittances/{remittanceId} {

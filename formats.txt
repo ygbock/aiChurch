@@ -1,0 +1,89 @@
+src/modules/membership/pages/MemberProfile.tsx:64:      return format(date, formatStr);
+src/modules/membership/pages/MemberProfile.tsx:313:                  member.createdAt.toDate ? format(member.createdAt.toDate(), 'MMM d, yyyy') : 
+src/modules/membership/pages/MemberProfile.tsx:314:                  member.createdAt instanceof Date ? format(member.createdAt, 'MMM d, yyyy') :
+src/modules/membership/pages/MemberProfile.tsx:315:                  typeof member.createdAt === 'string' ? format(new Date(member.createdAt), 'MMM d, yyyy') :
+src/modules/membership/pages/MemberProfile.tsx:452:                             {format(new Date(act.timestamp), 'MMM d, yyyy - h:mm a')}
+src/modules/membership/pages/FollowUpManagement.tsx:235:                          <span className="text-[10px] font-bold uppercase">Visited: {format(new Date(visitor.firstVisit?.toDate ? visitor.firstVisit.toDate() : visitor.firstVisit || Date.now()), 'MMM d, yyyy')}</span>
+src/modules/membership/pages/FollowUpManagement.tsx:282:                            <span className="text-[9px] font-bold text-slate-400">{log.date ? format(log.date.toDate(), 'MMM d, h:mm a') : 'Now'}</span>
+src/modules/membership/pages/MemberPortal.tsx:275:                      <span className="text-[10px] leading-none uppercase">{format(parseISO(session.date), 'MMM')}</span>
+src/modules/membership/pages/MemberPortal.tsx:276:                      <span className="text-lg leading-none">{format(parseISO(session.date), 'dd')}</span>
+src/modules/membership/pages/MemberPortal.tsx:333:                        <span className="text-[10px] uppercase leading-none opacity-80">{event.date ? format(new Date(event.date.seconds ? event.date.toMillis() : event.date), 'MMM') : ''}</span>
+src/modules/membership/pages/MemberPortal.tsx:334:                        <span className="text-sm leading-tight">{event.date ? format(new Date(event.date.seconds ? event.date.toMillis() : event.date), 'dd') : ''}</span>
+src/modules/membership/registry/components/MemberAttendanceTab.tsx:124:                               return format(d, 'MMM d, yyyy');
+src/modules/membership/registry/components/MemberSignalTab.tsx:214:                                  {event.date ? format(new Date(event.date), 'MMM d') : 'No Date'}
+src/modules/membership/registry/components/MemberBioTab.tsx:22:      return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(d);
+src/modules/membership/registry/components/MemberGivingTab.tsx:46:  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+src/modules/membership/registry/components/MemberGivingTab.tsx:107:      setDate(format(new Date(), 'yyyy-MM-dd'));
+src/modules/membership/registry/components/MemberGivingTab.tsx:143:    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+src/modules/membership/registry/components/MemberGivingTab.tsx:263:                                return format(d, 'MMM d, yyyy');
+src/modules/membership/registry/components/MemberTable.tsx:108:      return format(date, formatStr);
+src/modules/membership/registry/components/PastoralCareTab.tsx:253:                             {note.date ? format(note.date.toDate(), 'MMM d, yyyy') : 'Recently'}
+src/modules/attendance/pages/ServiceAttendance.tsx:205:                <Calendar size={16} /> {activeEvent.title} — {format(new Date(activeEvent.date?.toDate ? activeEvent.date.toDate() : activeEvent.date || Date.now()), 'EEEE, MMM d')}
+src/modules/attendance/pages/ServiceAttendance.tsx:242:                     <p className="text-[10px] font-medium text-slate-500">{format(new Date(event.date?.toDate ? event.date.toDate() : event.date || Date.now()), 'MMM d, yyyy')}</p>
+src/modules/events/pages/Events.tsx:264:    date: format(new Date(), 'yyyy-MM-dd'),
+src/modules/events/pages/Events.tsx:279:      until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/modules/events/pages/Events.tsx:332:        date: format(new Date(), 'yyyy-MM-dd'),
+src/modules/events/pages/Events.tsx:347:          until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/modules/events/pages/Events.tsx:361:      date: format(new Date(), 'yyyy-MM-dd'),
+src/modules/events/pages/Events.tsx:376:        until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/modules/events/pages/Events.tsx:388:      date: format(event.date, 'yyyy-MM-dd'),
+src/modules/events/pages/Events.tsx:402:        until: event.recurrence.until || format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/modules/events/pages/Events.tsx:406:        until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/modules/events/pages/Events.tsx:418:      date: format(new Date(), 'yyyy-MM-dd'),
+src/modules/events/pages/Events.tsx:434:        until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/modules/events/pages/Events.tsx:802:                        <span className="truncate">{format(evt.date, 'yyyy-MM-dd')}</span>
+src/modules/events/pages/Events.tsx:1105:                                  const farFuture = format(addYears(new Date(), 50), 'yyyy-MM-dd');
+src/modules/events/pages/Events.tsx:1106:                                  const defaultFuture = format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd');
+src/modules/events/pages/PublicEventRegistration.tsx:132:               <p className="text-slate-400 text-xs mb-6 relative z-10">{format(new Date(event.date.seconds ? event.date.toMillis() : event.date), 'MMMM do, yyyy')} • {event.time}</p>
+src/modules/events/pages/PublicEventRegistration.tsx:180:                     <p className="text-sm font-bold text-slate-900">{format(new Date(event.date.seconds ? event.date.toMillis() : event.date), 'MMMM do, yyyy')}</p>
+src/modules/events/pages/Calendar.tsx:162:    date: format(new Date(), 'yyyy-MM-dd'),
+src/modules/events/pages/Calendar.tsx:168:    until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/modules/events/pages/Calendar.tsx:175:    date: format(new Date(), 'yyyy-MM-dd'),
+src/modules/events/pages/Calendar.tsx:186:    date: format(new Date(), 'yyyy-MM-dd'),
+src/modules/events/pages/Calendar.tsx:195:  const [bookingDate, setBookingDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+src/modules/events/pages/Calendar.tsx:232:      const dayName = format(parseISO(bookingDate), 'EEEE');
+src/modules/events/pages/Calendar.tsx:331:        dueDate: format(addDays(new Date(), 7), 'yyyy-MM-dd')
+src/modules/events/pages/Calendar.tsx:441:            id: `${evt.id}-${format(current, 'yyyy-MM-dd')}`
+src/modules/events/pages/Calendar.tsx:491:        where('date', '==', format(event.date, 'yyyy-MM-dd'))
+src/modules/events/pages/Calendar.tsx:503:        date: format(event.date, 'yyyy-MM-dd'),
+src/modules/events/pages/Calendar.tsx:665:        date: format(new Date(), 'yyyy-MM-dd'),
+src/modules/events/pages/Calendar.tsx:729:        date: format(new Date(), 'yyyy-MM-dd'),
+src/modules/events/pages/Calendar.tsx:760:                    {format(day, 'd')}
+src/modules/events/pages/Calendar.tsx:777:      date: date ? format(date, 'yyyy-MM-dd') : format(currentDate, 'yyyy-MM-dd'),
+src/modules/events/pages/Calendar.tsx:783:      until: format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/modules/events/pages/Calendar.tsx:794:      date: format(event.date, 'yyyy-MM-dd'),
+src/modules/events/pages/Calendar.tsx:800:      until: event.recurrence?.until || format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd')
+src/modules/events/pages/Calendar.tsx:907:              {format(month, 'MMMM')}
+src/modules/events/pages/Calendar.tsx:933:                      {format(day, 'd')}
+src/modules/events/pages/Calendar.tsx:968:        const formattedDate = format(day, "d");
+src/modules/events/pages/Calendar.tsx:1066:              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{format(day, 'EEE')}</p>
+src/modules/events/pages/Calendar.tsx:1067:              <p className={`text-lg font-bold ${isToday(day) ? 'text-[#2563EB]' : 'text-slate-800'}`}>{format(day, 'd')}</p>
+src/modules/events/pages/Calendar.tsx:1138:                <span className="text-[10px] font-black uppercase tracking-widest opacity-80">{format(currentDate, 'MMM')}</span>
+src/modules/events/pages/Calendar.tsx:1139:                <span className="text-2xl font-bold leading-none">{format(currentDate, 'd')}</span>
+src/modules/events/pages/Calendar.tsx:1142:                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">{format(currentDate, 'EEEE')}</h2>
+src/modules/events/pages/Calendar.tsx:1143:                <p className="text-slate-500 font-medium">Protocol Schedule for {format(currentDate, 'LLLL d, yyyy')}</p>
+src/modules/events/pages/Calendar.tsx:1153:                    date: format(currentDate, 'yyyy-MM-dd'),
+src/modules/events/pages/Calendar.tsx:1314:      const todayStr = format(new Date(), 'yyyy-MM-dd');
+src/modules/events/pages/Calendar.tsx:1477:                      <span className="text-[13px] font-medium">{format(parseISO(appt.date), 'EEE, MMM d, yyyy')}</span>
+src/modules/events/pages/Calendar.tsx:1543:                date: format(new Date(), 'yyyy-MM-dd'),
+src/modules/events/pages/Calendar.tsx:1585:                        <span>{format(parseISO(rem.date), 'MMM d')}</span>
+src/modules/events/pages/Calendar.tsx:1667:                  {format(new Date(), 'd')}
+src/modules/events/pages/Calendar.tsx:1692:                {viewMode === 'year' ? format(currentDate, 'yyyy') : format(currentDate, 'MMMM yyyy')}
+src/modules/events/pages/Calendar.tsx:1954:                          const dayName = format(parseISO(bookingDate), 'EEEE');
+src/modules/events/pages/Calendar.tsx:2034:                            min={format(new Date(), 'yyyy-MM-dd')}
+src/modules/events/pages/Calendar.tsx:2128:                      <span>{format(parseISO(bookingDate), 'MMM d')} @ {selectedSlot}</span>
+src/modules/events/pages/Calendar.tsx:2207:                    <span className="text-[10px] font-black uppercase tracking-widest">{format(selectedDay, 'EEE')}</span>
+src/modules/events/pages/Calendar.tsx:2208:                    <span className="text-xl font-bold leading-none">{format(selectedDay, 'd')}</span>
+src/modules/events/pages/Calendar.tsx:2211:                    <h3 className="text-lg font-bold text-slate-900">{format(selectedDay, 'MMMM d, yyyy')}</h3>
+src/modules/events/pages/Calendar.tsx:2516:                        <span className="text-sm font-bold">{format(parseISO(selectedAppointment.date), 'PPPP')}</span>
+src/modules/events/pages/Calendar.tsx:2624:                                  {note.createdAt?.seconds ? format(new Date(note.createdAt.seconds * 1000), 'MMM d, h:mm a') : 'Just now'}
+src/modules/events/pages/Calendar.tsx:2765:                                const farFuture = format(addYears(new Date(), 50), 'yyyy-MM-dd');
+src/modules/events/pages/Calendar.tsx:2766:                                const defaultFuture = format(new Date(new Date().setMonth(new Date().getMonth() + 3)), 'yyyy-MM-dd');
+src/modules/ministries/pages/MinistryDashboard.tsx:1395:        formattedDate = format(day, dateFormat);
+src/modules/ministries/pages/MinistryDashboard.tsx:1462:             <h4 className="font-bold text-slate-900 text-lg">{format(currentMonth, 'MMMM yyyy')}</h4>
+src/modules/ministries/pages/MinistryDashboard.tsx:1511:                            <span className="text-xs font-bold uppercase">{format(evt.date, 'MMM')}</span>
+src/modules/ministries/pages/MinistryDashboard.tsx:1512:                            <span className="text-lg font-black leading-none">{format(evt.date, 'd')}</span>
+src/modules/ministries/pages/MinistryDashboard.tsx:1568:                    value={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
+src/components/Layout.tsx:662:                                        ? format(
+src/components/NotificationManager.tsx:26:    const todayStr = format(new Date(), 'yyyy-MM-dd');
+src/components/NotificationManager.tsx:98:        where('date', '==', format(now, 'yyyy-MM-dd'))
