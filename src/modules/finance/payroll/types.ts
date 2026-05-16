@@ -1,5 +1,6 @@
 export type EmploymentType = 'full_time' | 'part_time' | 'contract' | 'volunteer' | 'honorarium';
 export type PaymentMethod = 'bank_transfer' | 'mobile_money' | 'cash' | 'wallet' | 'split';
+export type CompensationModel = 'fixed_salary' | 'pastor_stipend' | 'volunteer_allowance' | 'per_service' | 'hourly' | 'contract_rate';
 
 export type AdvanceStatus = 'pending_approval' | 'approved' | 'paid' | 'repaying' | 'repaid' | 'rejected';
 export type ContractStatus = 'active' | 'expired' | 'terminated' | 'pending_renewal';
@@ -57,13 +58,16 @@ export interface PensionScheme {
 export interface PayrollProfile {
   id: string;
   memberId?: string; // Optional, linking to membership module
+  employeeId?: string;
   firstName: string;
   lastName: string;
   role: string;
   employmentType: EmploymentType;
   departmentId?: string;
+  districtId?: string;
   branchId: string;
   currency: string;
+  compensationModel?: CompensationModel;
   baseSalary: number; // For non-stipend
   paymentMethod: PaymentMethod;
   splitAllocations?: SplitAllocation[];
@@ -77,11 +81,24 @@ export interface PayrollProfile {
     phoneNumber: string;
     accountName: string;
   };
+  taxProfile?: {
+    taxId: string;
+    taxBand: string;
+  };
+  pensionDetails?: {
+    providerId: string;
+    employeeContributionRate: number;
+    employerContributionRate: number;
+    pensionNumber: string;
+  };
+  allowances?: PayrollAllowance[];
+  deductions?: PayrollDeduction[];
   isActive: boolean;
 }
 
-export type AllowanceType = 'housing' | 'transport' | 'feeding' | 'welfare' | 'ministry' | 'risk' | 'custom';
-export type DeductionType = 'tax' | 'pension' | 'loan' | 'advance' | 'welfare' | 'disciplinary' | 'custom';
+export type AllowanceType = 'housing' | 'transportation' | 'feeding' | 'communication' | 'welfare' | 'ministry_support' | 'risk_allowance' | 'bonus' | 'overtime' | 'custom';
+export type DeductionType = 'tax' | 'pension' | 'loan' | 'advance' | 'welfare' | 'insurance' | 'disciplinary' | 'monthly_contribution' | 'custom';
+export type CalculationMethod = 'fixed' | 'percentage_of_basic';
 
 export interface PayrollAllowance {
   id: string;
@@ -89,8 +106,10 @@ export interface PayrollAllowance {
   type: AllowanceType;
   name: string;
   amount: number;
+  calculationMethod: CalculationMethod;
   isTaxable: boolean;
-  frequency: 'recurring' | 'one_time';
+  frequency: 'recurring' | 'one_time' | 'conditional';
+  conditionExpression?: string; // Optional condition for conditional allowances
 }
 
 export interface PayrollDeduction {
@@ -99,10 +118,12 @@ export interface PayrollDeduction {
   type: DeductionType;
   name: string;
   amount: number;
-  frequency: 'recurring' | 'one_time';
+  calculationMethod: CalculationMethod;
+  frequency: 'recurring' | 'one_time' | 'conditional';
+  conditionExpression?: string; // For formulas
 }
 
-export type ScheduleFrequency = 'weekly' | 'bi_weekly' | 'monthly' | 'quarterly' | 'event';
+export type ScheduleFrequency = 'weekly' | 'bi_weekly' | 'monthly' | 'quarterly' | 'event' | 'milestone';
 
 export interface PayrollSchedule {
   id: string;
@@ -111,10 +132,15 @@ export interface PayrollSchedule {
   branchId: string;
   nextRunDate: string;
   cutoffDate: string;
+  autoGenerate: boolean;
+  isLocked: boolean;
+  targetRoles?: string[];
+  targetEmploymentTypes?: EmploymentType[];
+  targetCompensationModels?: CompensationModel[];
   isActive: boolean;
 }
 
-export type PayrollRunStatus = 'draft' | 'calculated' | 'pending_approval' | 'approved' | 'paid' | 'reversed';
+export type PayrollRunStatus = 'draft' | 'calculated' | 'pending_approval' | 'approved' | 'paid' | 'reversed' | 'failed';
 
 export interface PayrollRun {
   id: string;

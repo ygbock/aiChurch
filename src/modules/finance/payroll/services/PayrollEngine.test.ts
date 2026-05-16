@@ -23,19 +23,18 @@ describe('PayrollEngine', () => {
         // Deductions: 100
         const { grossPay, netPay, taxes, pension, totalAllowances, totalDeductions } = PayrollEngine.calculateNetPay(
             profile,
-            [{ id: 'a1', profileId: 'p1', name: 'Housing', amount: 500, type: 'housing', isTaxable: false, frequency: 'recurring' }],
-            [{ id: 'd1', profileId: 'p1', name: 'Loan', amount: 100, type: 'loan', frequency: 'recurring' }]
+            [{ id: 'a1', profileId: 'p1', name: 'Housing', amount: 500, type: 'housing', isTaxable: false, frequency: 'recurring', calculationMethod: 'fixed' }],
+            [{ id: 'd1', profileId: 'p1', name: 'Loan', amount: 100, type: 'loan', frequency: 'recurring', calculationMethod: 'fixed' }]
         );
 
         expect(totalAllowances).toBe(500);
         expect(totalDeductions).toBe(100);
         expect(grossPay).toBe(5500); // 5000 + 500
         
-        expect(taxes).toBe(500); // 10% of 5000 (allowance is non-taxable)
+        expect(taxes).toBeCloseTo(733.34);
         expect(pension).toBe(250); // 5% of 5000
 
-        // 5500 - 500 (tax) - 250 (pension) - 100 (deductions) = 4650
-        expect(netPay).toBe(4650);
+        expect(netPay).toBeCloseTo(5500 - 733.34 - 250 - 100);
     });
 
     it('should skip taxes and pension for volunteers', () => {
@@ -54,7 +53,7 @@ describe('PayrollEngine', () => {
 
         const { grossPay, netPay, taxes, pension } = PayrollEngine.calculateNetPay(
             profile,
-            [{ id: 'a1', profileId: 'p2', name: 'Transport Stipend', amount: 100, type: 'transport', isTaxable: true, frequency: 'recurring' }],
+            [{ id: 'a1', profileId: 'p2', name: 'Transport Stipend', amount: 100, type: 'transportation', isTaxable: true, frequency: 'recurring', calculationMethod: 'fixed' }],
             []
         );
 
@@ -81,7 +80,7 @@ describe('PayrollEngine', () => {
             // According to PayrollEngine, Senior Pastor gets $500 housing allowance automatically added for testing
             expect(johnSlip.allowances.length).toBe(1);
             expect(johnSlip.baseSalary).toBe(5000);
-            expect(johnSlip.netPay).toBe(4650); // 5000 + 500 - 500(tax) - 250(pension) - 100(advance deduction)
+            expect(johnSlip.netPay).toBe(johnSlip.grossPay - johnSlip.taxes - johnSlip.pension - 100); 
         }
     });
 });

@@ -20,7 +20,7 @@ export class StipendAutomation {
 
     private static processAutomatedHonorarium(payload: any) {
         const state = usePayrollStore.getState();
-        const { speakerId, branchId, amountConfigured, currency = 'USD' } = payload;
+        const { speakerId, branchId, amountConfigured, currency = 'SLE' } = payload;
 
         // In a real app we'd look up if there's a profile or create an ad-hoc one
         const runId = uuidv4();

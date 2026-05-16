@@ -7,6 +7,7 @@ import SalaryAdvances from './components/SalaryAdvances';
 import PayrollReports from './components/PayrollReports';
 import PayrollAIInsights from './components/PayrollAIInsights';
 import ContractManagement from './components/ContractManagement';
+import StipendManagement from './components/StipendManagement';
 import PayrollAuditTrail from './components/PayrollAuditTrail';
 import { Plus, ArrowRight, ShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -16,7 +17,7 @@ import { PayrollEngine } from './services/PayrollEngine';
 import { systemEvents, Events } from '../../../core/events/EventBus';
 
 export default function Payroll() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'profiles' | 'contracts' | 'schedules' | 'advances' | 'reports' | 'ai_insights' | 'audit'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'profiles' | 'stipends' | 'contracts' | 'schedules' | 'advances' | 'reports' | 'ai_insights' | 'audit'>('dashboard');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showRunModal, setShowRunModal] = useState(false);
 
@@ -71,7 +72,7 @@ export default function Payroll() {
       </div>
 
       <div className="flex space-x-1 bg-slate-200/50 p-1 rounded-xl w-fit overflow-x-auto max-w-full hover-scrollbar">
-        {['dashboard', 'profiles', 'contracts', 'advances', 'schedules', 'reports', 'ai_insights', 'audit'].map((tab) => (
+        {['dashboard', 'profiles', 'stipends', 'contracts', 'advances', 'schedules', 'reports', 'ai_insights', 'audit'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab as any)}
@@ -85,6 +86,7 @@ export default function Payroll() {
       <AnimatePresence mode="wait">
         {activeTab === 'dashboard' && <PayrollDashboard key="dashboard" />}
         {activeTab === 'profiles' && <PayrollProfiles key="profiles" />}
+        {activeTab === 'stipends' && <StipendManagement key="stipends" />}
         {activeTab === 'contracts' && <ContractManagement key="contracts" />}
         {activeTab === 'advances' && <SalaryAdvances key="advances" />}
         {activeTab === 'schedules' && <PayrollSchedules key="schedules" />}

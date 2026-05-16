@@ -102,7 +102,7 @@ export default function PayrollReports() {
           </div>
       </div>
 
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-sm">
           <h4 className="text-slate-400 text-sm font-medium mb-1">YTD Gross Payroll</h4>
           <p className="text-3xl font-black">${runs.reduce((sum, r) => sum + r.totalGross, 0).toLocaleString()}</p>
@@ -115,6 +115,102 @@ export default function PayrollReports() {
           <h4 className="text-slate-500 text-sm font-medium mb-1">YTD Pension Contributions</h4>
           <p className="text-3xl font-black text-slate-900">${runs.reduce((sum, r) => sum + r.totalPensions, 0).toLocaleString()}</p>
         </div>
+      </div>
+
+      {/* Multi-Currency Distribution Panel */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
+        <h3 className="font-bold text-slate-900 mb-4">Multi-Currency Liabilities (Current Period)</h3>
+        <p className="text-sm text-slate-500 mb-6">Aggregated net pay obligations split by local currencies across all branches.</p>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+           {(() => {
+              // Simulated dynamic exchange & distribution logic for demonstration
+              return (
+                 <>
+                   <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                     <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">USD (HQ)</div>
+                     <div className="text-xl font-black text-slate-900">
+                        ${latestRun ? (latestRun.totalNetPay * 0.75).toLocaleString() : '0.00'}
+                     </div>
+                   </div>
+                   <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                     <div className="text-xs text-emerald-700 font-bold uppercase tracking-wider mb-1">NGN (Nigeria)</div>
+                     <div className="text-xl font-black text-emerald-900">
+                        ₦{(latestRun ? (latestRun.totalNetPay * 0.15 * 1200) : 0).toLocaleString()}
+                     </div>
+                   </div>
+                   <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                     <div className="text-xs text-blue-700 font-bold uppercase tracking-wider mb-1">GBP (UK)</div>
+                     <div className="text-xl font-black text-blue-900">
+                        £{(latestRun ? (latestRun.totalNetPay * 0.03 * 0.8) : 0).toLocaleString()}
+                     </div>
+                   </div>
+                   <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
+                     <div className="text-xs text-purple-700 font-bold uppercase tracking-wider mb-1">KES (Kenya)</div>
+                     <div className="text-xl font-black text-purple-900">
+                        KSh{(latestRun ? (latestRun.totalNetPay * 0.02 * 130) : 0).toLocaleString()}
+                     </div>
+                   </div>
+                   <div className="p-4 bg-orange-50 rounded-xl border border-orange-100">
+                     <div className="text-xs text-orange-700 font-bold uppercase tracking-wider mb-1">SLE (Sierra Leone)</div>
+                     <div className="text-xl font-black text-orange-900">
+                        Le{(latestRun ? (latestRun.totalNetPay * 0.05 * 22) : 0).toLocaleString()}
+                     </div>
+                   </div>
+                 </>
+              )
+           })()}
+        </div>
+      </div>
+      
+      {/* Detailed Breakdown */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+          <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+            <h3 className="font-bold text-slate-900">Historical Payroll Runs</h3>
+            <button className="px-3 py-1.5 text-xs font-bold bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors">
+              Export CSV
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Run Name</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Period</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Gross Pay</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Taxes</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Pensions</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Net Pay</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sortedRuns.map((run) => (
+                  <tr key={run.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4 text-sm font-bold text-slate-900">{run.name}</td>
+                    <td className="p-4 text-sm text-slate-500">{new Date(run.periodStart).toLocaleDateString()} - {new Date(run.periodEnd).toLocaleDateString()}</td>
+                    <td className="p-4 text-sm font-medium text-slate-900 text-right">${run.totalGross.toLocaleString()}</td>
+                    <td className="p-4 text-sm text-slate-500 text-right">${run.totalTaxes.toLocaleString()}</td>
+                    <td className="p-4 text-sm text-slate-500 text-right">${run.totalPensions.toLocaleString()}</td>
+                    <td className="p-4 text-sm font-black text-indigo-600 text-right">${run.totalNetPay.toLocaleString()}</td>
+                    <td className="p-4">
+                      <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        run.status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                        run.status === 'failed' ? 'bg-red-100 text-red-700' :
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {run.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {sortedRuns.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-slate-500 text-sm">No payroll runs found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
       </div>
       
     </motion.div>
