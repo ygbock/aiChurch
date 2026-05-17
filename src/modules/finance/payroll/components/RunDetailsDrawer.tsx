@@ -10,16 +10,35 @@ interface RunDetailsDrawerProps {
 }
 
 export default function RunDetailsDrawer({ runId, onClose }: RunDetailsDrawerProps) {
-  const { runs, payslips, updateRunStatus, profiles, reversePayrollRun, overridePayslip } = usePayrollStore();
+  const { runs, payslips, updateRunStatus, profiles, reversePayrollRun, overridePayslip, addRunApproval } = usePayrollStore();
   const [isPaying, setIsPaying] = useState(false);
   const [editingSlipId, setEditingSlipId] = useState<string | null>(null);
   const [overrideAmount, setOverrideAmount] = useState('');
   const [overrideReason, setOverrideReason] = useState('');
+  const [approvalComment, setApprovalComment] = useState('');
 
   const run = runs.find(r => r.id === runId);
   const runPayslips = payslips.filter(p => p.runId === runId);
 
   if (!run) return null;
+
+  const handleApproval = (stage: 'hr' | 'finance' | 'treasurer' | 'pastor' | 'completed', status: 'approved' | 'rejected') => {
+    if (status === 'rejected' && !approvalComment) {
+      toast.error('A comment is required when rejecting.');
+      return;
+    }
+    
+    addRunApproval(runId, {
+      stage: stage as any,
+      status,
+      approverId: 'current-user-id',
+      approverName: 'Admin User',
+      comment: approvalComment,
+      date: new Date().toISOString()
+    });
+    setApprovalComment('');
+    toast.success(`Payroll ${status} successfully.`);
+  };
 
   const handleInitiatePayout = async () => {
     setIsPaying(true);
@@ -207,6 +226,13 @@ export default function RunDetailsDrawer({ runId, onClose }: RunDetailsDrawerPro
     }, 250);
   };
 
+  const handleToggleLock = () => {
+    usePayrollStore.setState(state => ({
+       runs: state.runs.map(r => r.id === runId ? { ...r, isLocked: !r.isLocked } : r)
+    }));
+    toast.success(`Payroll run ${run.isLocked ? 'unlocked' : 'locked'}.`);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Backdrop */}
@@ -216,12 +242,22 @@ export default function RunDetailsDrawer({ runId, onClose }: RunDetailsDrawerPro
       <div className="w-full max-w-2xl bg-white h-full shadow-2xl relative z-10 flex flex-col animate-in slide-in-from-right">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">{run.name} details</h2>
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              {run.name} details
+              {run.isLocked && <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Locked</span>}
+            </h2>
             <p className="text-sm text-slate-500">Run ID: {run.id}</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full text-slate-500 transition-colors">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            {run.status === 'draft' || run.status === 'calculated' ? (
+              <button onClick={handleToggleLock} className={`text-xs px-3 py-1.5 font-medium rounded ${run.isLocked ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}`}>
+                 {run.isLocked ? 'Unlock Run' : 'Lock Run'}
+              </button>
+            ) : null}
+            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full text-slate-500 transition-colors">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="p-6 flex-1 overflow-y-auto">
@@ -239,6 +275,58 @@ export default function RunDetailsDrawer({ runId, onClose }: RunDetailsDrawerPro
               <span className="text-xs text-orange-600 uppercase font-bold tracking-wider">Deductions/Taxes</span>
               <p className="text-xl font-black text-orange-700 mt-1">${run.totalDeductions + run.totalTaxes}</p>
             </div>
+          </div>
+
+          <div className="mb-8 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+            <h3 className="font-bold text-slate-900 mb-3 text-sm">Approval Workflow</h3>
+            <div className="flex items-center gap-2 mb-4 text-sm font-medium text-slate-600">
+               State: <span className="px-2 py-0.5 bg-slate-200 rounded text-slate-800">{run.status.replace('_', ' ').toUpperCase()}</span>
+               {run.approvalStage && (
+                 <span>Stage: {run.approvalStage.toUpperCase()}</span>
+               )}
+            </div>
+
+            {run.approvals && run.approvals.length > 0 && (
+              <div className="mb-4 space-y-2">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">History</p>
+                {run.approvals.map((appr, idx) => (
+                  <div key={idx} className="text-xs p-2 bg-white rounded border border-slate-100 flex items-start gap-2">
+                     {appr.status === 'approved' ? <CheckCircle2 size={14} className="text-emerald-500 mt-0.5" /> : <AlertCircle size={14} className="text-rose-500 mt-0.5" />}
+                     <div>
+                       <p className="font-medium text-slate-900">{appr.approverName} ({appr.stage.toUpperCase()}) <span className="text-slate-400 font-normal">at {new Date(appr.date).toLocaleString()}</span></p>
+                       {appr.comment && <p className="text-slate-500 italic mt-0.5">"{appr.comment}"</p>}
+                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!['paid', 'reversed', 'approved', 'failed'].includes(run.status) && (
+               <div className="space-y-3">
+                 <input 
+                   type="text" 
+                   className="w-full text-sm p-2 border border-slate-200 rounded bg-white" 
+                   placeholder="Add a comment (required for rejection)..." 
+                   value={approvalComment}
+                   onChange={e => setApprovalComment(e.target.value)}
+                 />
+                 <div className="flex gap-2">
+                   {run.approvalStage === 'hr' || run.status === 'calculated' || !run.approvalStage ? (
+                      <button onClick={() => handleApproval('hr', 'approved')} className="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm font-medium hover:bg-indigo-700">Approve as HR</button>
+                   ) : null}
+                   {run.approvalStage === 'finance' && (
+                      <button onClick={() => handleApproval('finance', 'approved')} className="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm font-medium hover:bg-indigo-700">Approve as Finance</button>
+                   )}
+                   {run.approvalStage === 'treasurer' && (
+                      <button onClick={() => handleApproval('treasurer', 'approved')} className="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm font-medium hover:bg-indigo-700">Approve as Treasurer</button>
+                   )}
+                   {run.approvalStage === 'pastor' && (
+                      <button onClick={() => handleApproval('pastor', 'approved')} className="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm font-medium hover:bg-indigo-700">Approve as Senior Pastor</button>
+                   )}
+                   <button onClick={() => handleApproval(run.approvalStage || 'hr', 'rejected')} className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded text-sm font-medium">Reject</button>
+                 </div>
+               </div>
+            )}
           </div>
 
           <div className="mb-6 flex justify-between items-center">
@@ -291,20 +379,22 @@ export default function RunDetailsDrawer({ runId, onClose }: RunDetailsDrawerPro
                     <p className="font-black text-slate-900">${slip.netPay}</p>
                     {slip.taxes > 0 && <p className="text-[10px] text-slate-400">-${slip.taxes} Tax</p>}
                     {slip.payoutReference && <p className="text-[10px] text-emerald-600 font-mono">Ref: {slip.payoutReference}</p>}
-                    <button
-                      onClick={() => {
-                        const newNet = window.prompt(`Override net pay for ${slip.employeeName}:`, slip.netPay.toString());
-                        if (newNet && !isNaN(Number(newNet))) {
-                           const reason = window.prompt("Reason for manual override:");
-                           if (reason) {
-                              usePayrollStore.getState().overridePayslip(slip.id, { netPay: Number(newNet) }, reason, 'current-user-id');
-                           }
-                        }
-                      }}
-                      className="text-[10px] text-indigo-600 hover:underline mt-1 block"
-                    >
-                      Override
-                    </button>
+                    {run.status === 'calculated' && !run.isLocked && (
+                      <button
+                        onClick={() => {
+                          const newNet = window.prompt(`Override net pay for ${slip.employeeName}:`, slip.netPay.toString());
+                          if (newNet && !isNaN(Number(newNet))) {
+                             const reason = window.prompt("Reason for manual override:");
+                             if (reason) {
+                                usePayrollStore.getState().overridePayslip(slip.id, { netPay: Number(newNet) }, reason, 'current-user-id');
+                             }
+                          }
+                        }}
+                        className="text-[10px] text-indigo-600 hover:underline mt-1 block"
+                      >
+                        Override
+                      </button>
+                    )}
                     <button
                       onClick={() => exportPayslipAsPDF(slip)}
                       className="text-[10px] text-slate-500 hover:text-indigo-600 hover:underline mt-1 block flex items-center gap-1 justify-end ml-auto"

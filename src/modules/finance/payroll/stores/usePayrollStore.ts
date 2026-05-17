@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { PayrollProfile, PayrollRun, PayrollSchedule, Payslip, SalaryAdvance, AdvanceStatus, PensionScheme, EmploymentContract } from '../types';
+import { PayrollProfile, PayrollRun, PayrollSchedule, Payslip, SalaryAdvance, AdvanceStatus, PensionProvider, EmploymentContract, TaxRule, ApprovalRecord } from '../types';
 import { useAuditLogger } from '../../../../core/audit/useAuditLogger';
 
 interface PayrollState {
@@ -8,8 +8,9 @@ interface PayrollState {
   schedules: PayrollSchedule[];
   payslips: Payslip[];
   advances: SalaryAdvance[];
-  pensionSchemes: PensionScheme[];
+  pensionProviders: PensionProvider[];
   contracts: EmploymentContract[];
+  taxRules: TaxRule[];
   isLoading: boolean;
   error: string | null;
 
@@ -21,6 +22,8 @@ interface PayrollState {
   setSchedules: (schedules: PayrollSchedule[]) => void;
   setPayslips: (payslips: Payslip[]) => void;
   setContracts: (contracts: EmploymentContract[]) => void;
+  setTaxRules: (rules: TaxRule[]) => void;
+  setPensionProviders: (providers: PensionProvider[]) => void;
   
   overridePayslip: (slipId: string, updates: Partial<Payslip>, reason: string, userId: string) => void;
   recordPayoutReferences: (payouts: {payslipId: string, reference: string}[]) => void;
@@ -37,6 +40,13 @@ interface PayrollState {
 
   createRun: (run: Partial<PayrollRun>) => void;
   updateRunStatus: (runId: string, status: PayrollRun['status'], approvedBy?: string) => void;
+  addRunApproval: (runId: string, approval: ApprovalRecord) => void;
+  
+  createTaxRule: (rule: Omit<TaxRule, 'id'>) => void;
+  updateTaxRule: (rule: TaxRule) => void;
+
+  createPensionProvider: (provider: Omit<PensionProvider, 'id'>) => void;
+  updatePensionProvider: (provider: PensionProvider) => void;
 }
 
 export const usePayrollStore = create<PayrollState>((set) => ({
@@ -177,20 +187,24 @@ export const usePayrollStore = create<PayrollState>((set) => ({
           amountRequested: 1000,
           remainingBalance: 500,
           monthlyDeduction: 100,
+          repaymentMonths: 10,
           purpose: 'Emergency medical expenses',
+          isEmergency: true,
           status: 'repaying',
           requestDate: '2026-01-15T10:00:00Z',
-          approvedDate: '2026-01-16T14:30:00Z',
+          financeReviewedAt: '2026-01-15T12:00:00Z',
+          treasurerApprovedAt: '2026-01-16T14:30:00Z',
           paidDate: '2026-01-18T09:00:00Z'
       }
   ],
-  pensionSchemes: [
+  pensionProviders: [
       {
           id: 'pens-1',
-          name: 'National Social Security',
-          provider: 'NASSIT',
-          employeeContributionRate: 0.05,
-          employerContributionRate: 0.10
+          name: 'National Social Security (NASSIT)',
+          defaultEmployeeRate: 0.05,
+          defaultEmployerRate: 0.10,
+          calculationBasis: 'basic_salary',
+          isActive: true
       }
   ],
   contracts: [
@@ -214,6 +228,20 @@ export const usePayrollStore = create<PayrollState>((set) => ({
           notes: 'Contract expires soon.'
       }
   ],
+  taxRules: [
+      {
+          id: 'tr-sle-1',
+          country: 'SLE',
+          name: 'Sierra Leone Standard PAYE',
+          isActive: true,
+          brackets: [
+              { id: 'b1', minIncome: 0, maxIncome: 600, rate: 0 },
+              { id: 'b2', minIncome: 600, maxIncome: 1200, rate: 0.15 },
+              { id: 'b3', minIncome: 1200, maxIncome: 1800, rate: 0.20 },
+              { id: 'b4', minIncome: 1800, maxIncome: null, rate: 0.30 }
+          ]
+      }
+  ],
   isLoading: false,
   error: null,
 
@@ -224,6 +252,14 @@ export const usePayrollStore = create<PayrollState>((set) => ({
   setSchedules: (schedules) => set({ schedules }),
   setPayslips: (payslips) => set({ payslips }),
   setContracts: (contracts) => set({ contracts }),
+  setTaxRules: (rules) => set({ taxRules: rules }),
+  setPensionProviders: (providers) => set({ pensionProviders: providers }),
+
+  createTaxRule: (rule) => set(state => ({ taxRules: [...state.taxRules, { ...rule, id: `tr-${Date.now()}` }] })),
+  updateTaxRule: (rule) => set(state => ({ taxRules: state.taxRules.map(tr => tr.id === rule.id ? rule : tr) })),
+
+  createPensionProvider: (provider) => set(state => ({ pensionProviders: [...state.pensionProviders, { ...provider, id: `pens-${Date.now()}` }] })),
+  updatePensionProvider: (provider) => set(state => ({ pensionProviders: state.pensionProviders.map(p => p.id === provider.id ? provider : p) })),
 
   overridePayslip: (slipId, updates, reason, userId) => {
     useAuditLogger.getState().logAction({
@@ -355,14 +391,17 @@ export const usePayrollStore = create<PayrollState>((set) => ({
     const runId = run.id || `run-${Date.now()}`;
     useAuditLogger.getState().logAction({
       userId: run.processedBy || 'system',
-      action: 'Payroll Drafted',
+      action: 'Payroll Calculated',
       module: 'Payroll',
-      details: `Drafted payroll run ${run.name} (Total Gross: ${run.totalGross})`
+      details: `Calculated payroll run ${run.name} (Total Gross: ${run.totalGross})`
     });
     set((state) => ({
     runs: [{
         ...run,
         id: runId,
+        status: run.status || 'calculated',
+        approvalStage: 'hr',
+        approvals: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
     } as PayrollRun, ...state.runs]
@@ -376,12 +415,80 @@ export const usePayrollStore = create<PayrollState>((set) => ({
       module: 'Payroll',
       details: `Payroll run ${runId} status changed to ${status} by ${approvedBy || 'system'}`
     });
+    set((state) => {
+      let updatedAdvances = state.advances;
+      let updatedPayslips = state.payslips;
+
+      if (status === 'paid') {
+        const runPayslips = state.payslips.filter(p => p.runId === runId);
+        updatedPayslips = state.payslips.map(p => 
+           p.runId === runId ? { ...p, status: 'paid' as const } : p
+        );
+        
+        // Process advance deductions inside the payslips
+        const advanceDeductionsMap = new Map<string, number>();
+        runPayslips.forEach(ps => {
+            ps.advanceDeductions?.forEach(ad => {
+                const current = advanceDeductionsMap.get(ad.advanceId) || 0;
+                advanceDeductionsMap.set(ad.advanceId, current + ad.amount);
+            });
+        });
+
+        updatedAdvances = state.advances.map(adv => {
+           if (advanceDeductionsMap.has(adv.id)) {
+               const deductedAmount = advanceDeductionsMap.get(adv.id)!;
+               const newRemaining = Math.max(0, adv.remainingBalance - deductedAmount);
+               return {
+                   ...adv,
+                   remainingBalance: newRemaining,
+                   status: newRemaining === 0 ? 'repaid' : adv.status
+               };
+           }
+           return adv;
+        });
+      }
+
+      return {
+        runs: state.runs.map(run => {
+            if (run.id === runId) {
+                return { ...run, status, approvedBy: approvedBy || run.approvedBy, updatedAt: new Date().toISOString() };
+            }
+            return run;
+        }),
+        payslips: updatedPayslips,
+        advances: updatedAdvances
+      };
+    });
+  },
+
+  addRunApproval: (runId, approval) => {
+    useAuditLogger.getState().logAction({
+      userId: approval.approverId,
+      action: `Payroll Approval (${approval.stage})`,
+      module: 'Payroll',
+      details: `Payroll run ${runId} was ${approval.status} by ${approval.approverName} at stage ${approval.stage}.`
+    });
     set((state) => ({
       runs: state.runs.map(run => {
-          if (run.id === runId) {
-              return { ...run, status, approvedBy: approvedBy || run.approvedBy, updatedAt: new Date().toISOString() };
-          }
-          return run;
+        if (run.id === runId) {
+           const existingApprovals = run.approvals || [];
+           const nextApprovals = [...existingApprovals, approval];
+           let nextStatus = run.status;
+           let nextStage = run.approvalStage;
+           
+           if (approval.status === 'rejected') {
+               nextStatus = 'draft'; 
+               nextStage = 'hr'; 
+           } else {
+               if (approval.stage === 'hr') nextStage = 'finance';
+               else if (approval.stage === 'finance') { nextStage = 'treasurer'; nextStatus = 'pending_approval'; }
+               else if (approval.stage === 'treasurer') nextStage = 'pastor';
+               else if (approval.stage === 'pastor') { nextStage = 'completed'; nextStatus = 'approved'; }
+           }
+           
+           return { ...run, approvals: nextApprovals, approvalStage: nextStage, status: nextStatus, updatedAt: new Date().toISOString() };
+        }
+        return run;
       })
     }));
   }

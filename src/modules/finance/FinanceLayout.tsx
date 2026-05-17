@@ -27,6 +27,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 const FINANCE_NAV = [
   { name: 'Overview', path: '/finance/dashboard', icon: <LayoutDashboard size={18} /> },
+  { name: "Treasurer's Desk", path: '/finance/treasurer', icon: <Building2 size={18} /> },
   { name: 'Donations', path: '/finance/donations', icon: <Wallet size={18} /> },
   { name: 'Transactions', path: '/finance/transactions', icon: <ArrowLeftRight size={18} /> },
   { name: 'Accounting', path: '/finance/accounting', icon: <BookOpen size={18} /> },

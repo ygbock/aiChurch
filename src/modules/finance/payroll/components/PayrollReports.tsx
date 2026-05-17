@@ -14,7 +14,8 @@ export default function PayrollReports() {
     name: r.name,
     NetPay: r.totalNetPay,
     Taxes: r.totalTaxes,
-    Pensions: r.totalPensions,
+    EEPensions: r.totalPensions,
+    ERPensions: r.totalEmployerPensions || 0,
     GrossPay: r.totalGross
   }));
 
@@ -57,9 +58,10 @@ export default function PayrollReports() {
                             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                         />
                         <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
-                        <Bar dataKey="NetPay" fill="#6366f1" radius={[4, 4, 0, 0]} name="Net Payroll" />
-                        <Bar dataKey="Taxes" fill="#f43f5e" radius={[4, 4, 0, 0]} name="Taxes" />
-                        <Bar dataKey="Pensions" fill="#10b981" radius={[4, 4, 0, 0]} name="Pensions" />
+                        <Bar dataKey="NetPay" fill="#6366f1" radius={[4, 4, 0, 0]} name="Net Payroll" stackId="a" />
+                        <Bar dataKey="Taxes" fill="#f43f5e" radius={[4, 4, 0, 0]} name="Taxes" stackId="a" />
+                        <Bar dataKey="EEPensions" fill="#10b981" radius={[4, 4, 0, 0]} name="EE Pensions" stackId="a" />
+                        <Bar dataKey="ERPensions" fill="#0d9488" radius={[4, 4, 0, 0]} name="ER Pensions" stackId="a" />
                     </BarChart>
                 </ResponsiveContainer>
             </div>
@@ -102,7 +104,7 @@ export default function PayrollReports() {
           </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-sm">
           <h4 className="text-slate-400 text-sm font-medium mb-1">YTD Gross Payroll</h4>
           <p className="text-3xl font-black">${runs.reduce((sum, r) => sum + r.totalGross, 0).toLocaleString()}</p>
@@ -112,8 +114,12 @@ export default function PayrollReports() {
           <p className="text-3xl font-black text-slate-900">${runs.reduce((sum, r) => sum + r.totalTaxes, 0).toLocaleString()}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <h4 className="text-slate-500 text-sm font-medium mb-1">YTD Pension Contributions</h4>
+          <h4 className="text-slate-500 text-sm font-medium mb-1">YTD EE Pension Contributions</h4>
           <p className="text-3xl font-black text-slate-900">${runs.reduce((sum, r) => sum + r.totalPensions, 0).toLocaleString()}</p>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h4 className="text-slate-500 text-sm font-medium mb-1">YTD ER Pension Contributions</h4>
+          <p className="text-3xl font-black text-slate-900">${runs.reduce((sum, r) => sum + (r.totalEmployerPensions || 0), 0).toLocaleString()}</p>
         </div>
       </div>
 
@@ -178,7 +184,8 @@ export default function PayrollReports() {
                   <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Period</th>
                   <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Gross Pay</th>
                   <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Taxes</th>
-                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Pensions</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">EE Pensions</th>
+                  <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">ER Pensions</th>
                   <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Net Pay</th>
                   <th className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
                 </tr>
@@ -191,6 +198,7 @@ export default function PayrollReports() {
                     <td className="p-4 text-sm font-medium text-slate-900 text-right">${run.totalGross.toLocaleString()}</td>
                     <td className="p-4 text-sm text-slate-500 text-right">${run.totalTaxes.toLocaleString()}</td>
                     <td className="p-4 text-sm text-slate-500 text-right">${run.totalPensions.toLocaleString()}</td>
+                    <td className="p-4 text-sm text-slate-500 text-right">${(run.totalEmployerPensions || 0).toLocaleString()}</td>
                     <td className="p-4 text-sm font-black text-indigo-600 text-right">${run.totalNetPay.toLocaleString()}</td>
                     <td className="p-4">
                       <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${

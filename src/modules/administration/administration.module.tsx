@@ -1,7 +1,7 @@
 import { lazy } from 'react';
 import React from 'react';
 import { PlatformModule } from '../../core/platform/registry';
-import { CheckCircle2, Copy, Map, ArrowLeftRight, Globe, BarChart3, Settings as SettingsIcon, CheckSquare } from 'lucide-react';
+import { CheckCircle2, Copy, Map, ArrowLeftRight, Globe, BarChart3, Settings as SettingsIcon, CheckSquare, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Reports = lazy(() => import('./pages/Reports'));
@@ -12,6 +12,7 @@ const SystemAlerts = lazy(() => import('./pages/SystemAlerts'));
 const AdminDistricts = lazy(() => import('./pages/AdminDistricts'));
 const AdminRegistration = lazy(() => import('./pages/AdminRegistration'));
 const ServiceReports = lazy(() => import('./pages/ServiceReports'));
+const HrDashboard = lazy(() => import('./pages/HrDashboard'));
 
 const TasksWidget = lazy(() => import('./widgets/TasksWidget'));
 const TelemetryStreamWidget = lazy(() => import('./widgets/TelemetryStreamWidget'));
@@ -30,7 +31,8 @@ export const administrationModule: PlatformModule = {
     { path: 'system-alerts', element: <SystemAlerts /> },
     { path: 'districts', element: <AdminDistricts /> },
     { path: '/register', element: <AdminRegistration />, layout: 'none' },
-    { path: 'service-reports', element: <ServiceReports /> }
+    { path: 'service-reports', element: <ServiceReports /> },
+    { path: 'hr', element: <HrDashboard /> }
   ],
   widgets: [
     {
@@ -47,6 +49,7 @@ export const administrationModule: PlatformModule = {
     }
   ],
   navigation: [
+    { label: 'HR Dashboard', path: '/hr', icon: Users, category: 'operations' },
     { label: 'Districts', path: '/districts', permission: 'admin.super', icon: Map },
     { label: 'Transfers', path: '/transfers', icon: ArrowLeftRight },
     { label: 'CMS', path: '/cms', icon: Globe },

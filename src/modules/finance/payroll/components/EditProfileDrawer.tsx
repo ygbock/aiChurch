@@ -11,7 +11,7 @@ interface EditProfileDrawerProps {
 }
 
 export default function EditProfileDrawer({ profile, onClose }: EditProfileDrawerProps) {
-  const { updateProfile, createProfile, profiles } = usePayrollStore();
+  const { updateProfile, createProfile, profiles, taxRules } = usePayrollStore();
   const [formData, setFormData] = useState<PayrollProfile>({ ...profile });
   const [departments, setDepartments] = useState<{id: string, name: string}[]>([]);
   const [districts, setDistricts] = useState<{id: string, name: string}[]>([]);
@@ -405,31 +405,125 @@ export default function EditProfileDrawer({ profile, onClose }: EditProfileDrawe
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Tax Band</label>
+                    <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Tax Rule (Optional)</label>
                     <select 
-                      value={formData.taxProfile?.taxBand || 'standard'} 
-                      onChange={e => handleChange('taxProfile', { ...formData.taxProfile, taxBand: e.target.value })}
+                      value={formData.taxProfile?.taxRuleId || ''} 
+                      onChange={e => handleChange('taxProfile', { ...formData.taxProfile, taxRuleId: e.target.value || undefined })}
                       className="w-full p-2 border border-slate-200 rounded bg-white text-xs"
                     >
-                      <option value="standard">Standard Rate</option>
-                      <option value="exempt">Tax Exempt</option>
-                      <option value="reduced">Reduced Rate</option>
+                      <option value="">Auto (Match Country)</option>
+                      {taxRules?.map(tr => (
+                         <option key={tr.id} value={tr.id}>{tr.name}</option>
+                      ))}
                     </select>
                   </div>
+                </div>
+                {/* Legacy Tax Band or General Override fallback */}
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200 mt-2">
+                  <div>
+                      <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Override Type</label>
+                      <select 
+                        value={formData.taxProfile?.override?.overrideType || formData.taxProfile?.taxBand || 'standard'} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          if (val === 'standard') {
+                              handleChange('taxProfile', { ...formData.taxProfile, override: undefined, taxBand: 'standard' });
+                          } else if (val === 'exempt') {
+                              handleChange('taxProfile', { ...formData.taxProfile, override: { overrideType: 'exempt', value: 0 }, taxBand: 'exempt' });
+                          } else if (val === 'fixed_amount' || val === 'percentage') {
+                              handleChange('taxProfile', { ...formData.taxProfile, override: { overrideType: val, value: 0 }, taxBand: 'standard' });
+                          } else {
+                              handleChange('taxProfile', { ...formData.taxProfile, taxBand: val as any, override: undefined });
+                          }
+                        }}
+                        className="w-full p-2 border border-slate-200 rounded bg-white text-xs"
+                      >
+                        <option value="standard">None (Use Computed Rule)</option>
+                        <option value="exempt">Tax Exempt</option>
+                        <option value="reduced">Legacy Reduced (50%)</option>
+                        <option value="fixed_amount">Fixed Amount</option>
+                        <option value="percentage">Percentage</option>
+                      </select>
+                  </div>
+                  {formData.taxProfile?.override && formData.taxProfile.override.overrideType !== 'exempt' && (
+                     <div>
+                       <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Override Value</label>
+                       <input 
+                         type="number" 
+                         step={formData.taxProfile.override.overrideType === 'percentage' ? "0.01" : "1"}
+                         value={formData.taxProfile.override.value || 0} 
+                         onChange={e => handleChange('taxProfile', { 
+                           ...formData.taxProfile, 
+                           override: { ...formData.taxProfile!.override!, value: Number(e.target.value) } 
+                         })}
+                         className="w-full p-2 border border-slate-200 rounded bg-white text-xs font-bold"
+                         placeholder={formData.taxProfile.override.overrideType === 'percentage' ? 'e.g. 0.15' : 'Amount'}
+                       />
+                     </div>
+                  )}
                 </div>
               </div>
               
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-3 col-span-2">
                 <p className="text-xs font-bold text-slate-700">Pension Details</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2">
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Pension Provider</label>
+                    <select
+                      value={formData.pensionDetails?.providerId || ''}
+                      onChange={e => handleChange('pensionDetails', { ...formData.pensionDetails, providerId: e.target.value })}
+                      className="w-full p-2 border border-slate-200 rounded bg-white text-xs"
+                    >
+                      <option value="">Default Provider / None</option>
+                      {usePayrollStore.getState().pensionProviders?.map(p => (
+                         <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
                     <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Pension Number</label>
                     <input 
                       type="text" 
                       value={formData.pensionDetails?.pensionNumber || ''} 
                       onChange={e => handleChange('pensionDetails', { ...formData.pensionDetails, pensionNumber: e.target.value })}
                       className="w-full p-2 border border-slate-200 rounded bg-white text-xs"
+                      placeholder="e.g. PEN-1090"
                     />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">EE Contrib Rate</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      value={formData.pensionDetails?.employeeContributionRate || ''} 
+                      onChange={e => handleChange('pensionDetails', { ...formData.pensionDetails, employeeContributionRate: Number(e.target.value) || 0 })}
+                      className="w-full p-2 border border-slate-200 rounded bg-white text-xs"
+                      placeholder="Override Employee Rate"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">ER Contrib Rate</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      value={formData.pensionDetails?.employerContributionRate || ''} 
+                      onChange={e => handleChange('pensionDetails', { ...formData.pensionDetails, employerContributionRate: Number(e.target.value) || 0 })}
+                      className="w-full p-2 border border-slate-200 rounded bg-white text-xs"
+                      placeholder="Override Employer Rate"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Calculation Basis Override</label>
+                    <select
+                      value={formData.pensionDetails?.calculationBasisOverride || ''}
+                      onChange={e => handleChange('pensionDetails', { ...formData.pensionDetails, calculationBasisOverride: (e.target.value as any) || undefined })}
+                      className="w-full p-2 border border-slate-200 rounded bg-white text-xs"
+                    >
+                      <option value="">Default (From Provider)</option>
+                      <option value="basic_salary">Basic Salary Only</option>
+                      <option value="basic_plus_taxable_allowances">Basic Salary + Taxable Allowances</option>
+                      <option value="gross_pay">Total Gross Pay</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -637,8 +731,8 @@ export default function EditProfileDrawer({ profile, onClose }: EditProfileDrawe
                              next[idx].type = e.target.value as any;
                              // Set default names for common types
                              const names: Record<string, string> = {
-                               tax: 'Tax Deduction',
-                               pension: 'Pension Contribution',
+                               tax: 'Additional Tax',
+                               pension: 'Voluntary Pension',
                                loan: 'Loan Repayment',
                                advance: 'Salary Advance Recovery',
                                welfare: 'Welfare Contribution',
@@ -654,8 +748,8 @@ export default function EditProfileDrawer({ profile, onClose }: EditProfileDrawe
                            className="w-1/2 md:w-32 p-2 text-xs border border-slate-200 rounded bg-white shadow-sm shrink-0"
                          >
                            <option value="custom">Custom</option>
-                           <option value="tax">Tax</option>
-                           <option value="pension">Pension</option>
+                           <option value="tax">Additional Tax</option>
+                           <option value="pension">Voluntary Pension</option>
                            <option value="loan">Loan Repayment</option>
                            <option value="advance">Salary Advance</option>
                            <option value="welfare">Welfare</option>

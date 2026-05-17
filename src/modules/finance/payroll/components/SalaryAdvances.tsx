@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { usePayrollStore } from '../stores/usePayrollStore';
-import { Plus, Search, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, Search, CheckCircle2, XCircle, ArrowRightCircle, Banknote } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AdvanceStatus } from '../types';
+import RequestAdvanceModal from './RequestAdvanceModal';
 
 export default function SalaryAdvances() {
   const { advances, updateAdvanceStatus } = usePayrollStore();
   const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const filtered = advances.filter(a => 
     a.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -15,7 +17,8 @@ export default function SalaryAdvances() {
 
   const getStatusColor = (status: AdvanceStatus) => {
     switch(status) {
-        case 'pending_approval': return 'bg-amber-100 text-amber-700';
+        case 'pending_finance': return 'bg-amber-100 text-amber-700';
+        case 'pending_treasurer': return 'bg-purple-100 text-purple-700';
         case 'approved': return 'bg-blue-100 text-blue-700';
         case 'paid': return 'bg-indigo-100 text-indigo-700';
         case 'repaying': return 'bg-orange-100 text-orange-700';
@@ -38,7 +41,10 @@ export default function SalaryAdvances() {
             className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
-        <button className="px-4 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 text-sm transition-colors flex items-center justify-center gap-2">
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="px-4 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 text-sm transition-colors flex items-center justify-center gap-2"
+        >
           <Plus size={16} /> New Advance Request
         </button>
       </div>
@@ -70,30 +76,56 @@ export default function SalaryAdvances() {
                         exit={{ opacity: 0 }}
                         className="hover:bg-slate-50"
                     >
-                    <td className="px-6 py-4 font-bold text-slate-900">{adv.employeeName}</td>
+                    <td className="px-6 py-4 font-bold text-slate-900">
+                        {adv.employeeName}
+                        {adv.isEmergency && <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-100 text-amber-800 uppercase">Emergency</span>}
+                    </td>
                     <td className="px-6 py-4 text-slate-600 max-w-[200px] truncate">{adv.purpose}</td>
                     <td className="px-6 py-4 font-medium">${adv.amountRequested}</td>
                     <td className="px-6 py-4 text-orange-600 font-bold">${adv.remainingBalance}</td>
-                    <td className="px-6 py-4 text-slate-500">${adv.monthlyDeduction}</td>
+                    <td className="px-6 py-4 text-slate-500">
+                      ${adv.monthlyDeduction.toFixed(2)}
+                      <span className="text-[10px] block text-slate-400">{adv.repaymentMonths} months</span>
+                    </td>
                     <td className="px-6 py-4">
                         <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-full tracking-wider ${getStatusColor(adv.status)}`}>
                             {adv.status.replace('_', ' ')}
                         </span>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
-                        {adv.status === 'pending_approval' && (
+                        {adv.status === 'pending_finance' && (
                             <>
-                                <button onClick={() => updateAdvanceStatus(adv.id, 'approved')} className="p-1 hover:bg-emerald-50 text-emerald-600 rounded">
-                                    <CheckCircle2 size={18} />
+                                <button onClick={() => updateAdvanceStatus(adv.id, 'pending_treasurer')} className="p-1 hover:bg-emerald-50 text-emerald-600 rounded" title="Finance Approve">
+                                    <ArrowRightCircle size={18} />
                                 </button>
-                                <button onClick={() => updateAdvanceStatus(adv.id, 'rejected')} className="p-1 hover:bg-red-50 text-red-600 rounded">
+                                <button onClick={() => updateAdvanceStatus(adv.id, 'rejected')} className="p-1 hover:bg-red-50 text-red-600 rounded" title="Reject">
                                     <XCircle size={18} />
                                 </button>
                             </>
                         )}
-                        {(adv.status === 'approved' || adv.status === 'paid') && (
-                            <button onClick={() => updateAdvanceStatus(adv.id, 'repaying')} className="text-xs font-bold text-indigo-600 hover:text-indigo-800">
-                                Mark Repaying
+                        {adv.status === 'pending_treasurer' && (
+                            <>
+                                <button onClick={() => updateAdvanceStatus(adv.id, 'approved')} className="p-1 hover:bg-emerald-50 text-emerald-600 rounded" title="Treasurer Approve">
+                                    <CheckCircle2 size={18} />
+                                </button>
+                                <button onClick={() => updateAdvanceStatus(adv.id, 'rejected')} className="p-1 hover:bg-red-50 text-red-600 rounded" title="Reject">
+                                    <XCircle size={18} />
+                                </button>
+                            </>
+                        )}
+                        {adv.status === 'approved' && (
+                            <button onClick={() => updateAdvanceStatus(adv.id, 'paid')} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center justify-end w-full gap-1">
+                                <Banknote size={14} /> Mark Paid
+                            </button>
+                        )}
+                        {adv.status === 'paid' && (
+                            <button onClick={() => updateAdvanceStatus(adv.id, 'repaying')} className="text-xs font-bold text-orange-600 hover:text-orange-800">
+                                Start Repayment
+                            </button>
+                        )}
+                        {adv.status === 'repaying' && adv.remainingBalance <= 0 && (
+                            <button onClick={() => updateAdvanceStatus(adv.id, 'repaid')} className="text-xs font-bold text-emerald-600 hover:text-emerald-800">
+                                Mark Complete
                             </button>
                         )}
                     </td>
@@ -104,6 +136,10 @@ export default function SalaryAdvances() {
             </table>
         </div>
       </div>
+      
+      {isModalOpen && (
+        <RequestAdvanceModal onClose={() => setIsModalOpen(false)} />
+      )}
     </motion.div>
   );
 }

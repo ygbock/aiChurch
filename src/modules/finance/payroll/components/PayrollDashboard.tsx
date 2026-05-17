@@ -11,6 +11,18 @@ export default function PayrollDashboard() {
   const activeProfiles = profiles.filter(p => p.isActive).length;
   const lastRun = runs[0]; // Assuming runs are sorted newest first, index 0 is latest
 
+  const getStatusClasses = (status: string) => {
+    switch (status) {
+      case 'paid': return 'bg-emerald-100 text-emerald-700';
+      case 'approved': return 'bg-blue-100 text-blue-700';
+      case 'calculated': return 'bg-purple-100 text-purple-700';
+      case 'pending_approval': return 'bg-orange-100 text-orange-700';
+      case 'reversed':
+      case 'failed': return 'bg-rose-100 text-rose-700';
+      default: return 'bg-slate-100 text-slate-700';
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -18,7 +30,7 @@ export default function PayrollDashboard() {
           <div className="flex justify-between items-start mb-4">
             <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600"><Clock size={20} /></div>
             {lastRun && (
-                <span className={`text-xs font-bold px-2 py-1 rounded-full ${lastRun.status === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                <span className={`text-xs font-bold px-2 py-1 rounded-full ${getStatusClasses(lastRun.status)}`}>
                     {lastRun.status.replace('_', ' ')}
                 </span>
             )}
@@ -40,8 +52,8 @@ export default function PayrollDashboard() {
             <div className="p-3 bg-orange-50 rounded-xl text-orange-600"><Clock size={20} /></div>
             <span className="bg-orange-50 text-orange-700 text-xs font-bold px-2 py-1 rounded-full">Upcoming</span>
           </div>
-          <p className="text-sm font-medium text-slate-500 mb-1">Pending Approval</p>
-          <h4 className="text-3xl font-black text-slate-900">{runs.filter(r => r.status === 'calculated').length}</h4>
+          <p className="text-sm font-medium text-slate-500 mb-1">Needs Approval</p>
+          <h4 className="text-3xl font-black text-slate-900">{runs.filter(r => r.status === 'calculated' || r.status === 'pending_approval').length}</h4>
         </div>
       </div>
 
@@ -68,9 +80,7 @@ export default function PayrollDashboard() {
                 </td>
                 <td className="px-6 py-4 font-black">${run.totalNetPay}</td>
                 <td className="px-6 py-4">
-                  <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-full tracking-wider ${
-                      run.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                  }`}>
+                  <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-full tracking-wider ${getStatusClasses(run.status)}`}>
                       {run.status.replace('_', ' ')}
                   </span>
                 </td>

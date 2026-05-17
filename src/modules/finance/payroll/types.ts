@@ -2,7 +2,7 @@ export type EmploymentType = 'full_time' | 'part_time' | 'contract' | 'volunteer
 export type PaymentMethod = 'bank_transfer' | 'mobile_money' | 'cash' | 'wallet' | 'split';
 export type CompensationModel = 'fixed_salary' | 'pastor_stipend' | 'volunteer_allowance' | 'per_service' | 'hourly' | 'contract_rate';
 
-export type AdvanceStatus = 'pending_approval' | 'approved' | 'paid' | 'repaying' | 'repaid' | 'rejected';
+export type AdvanceStatus = 'pending_finance' | 'pending_treasurer' | 'approved' | 'paid' | 'repaying' | 'repaid' | 'rejected';
 export type ContractStatus = 'active' | 'expired' | 'terminated' | 'pending_renewal';
 
 export interface SplitAllocation {
@@ -40,19 +40,27 @@ export interface SalaryAdvance {
   amountRequested: number;
   remainingBalance: number;
   monthlyDeduction: number;
+  repaymentMonths: number;
   purpose: string;
+  isEmergency: boolean;
   status: AdvanceStatus;
   requestDate: string;
-  approvedDate?: string;
+  financeReviewedAt?: string;
+  treasurerApprovedAt?: string;
   paidDate?: string;
 }
 
-export interface PensionScheme {
+export type PensionCalculationBasis = 'basic_salary' | 'gross_pay' | 'basic_plus_taxable_allowances';
+
+export interface PensionProvider {
   id: string;
   name: string;
-  provider: string;
-  employeeContributionRate: number; // e.g. 0.05
-  employerContributionRate: number; // e.g. 0.05
+  contactEmail?: string;
+  contactPhone?: string;
+  defaultEmployeeRate: number; // e.g. 0.05
+  defaultEmployerRate: number; // e.g. 0.05
+  calculationBasis: PensionCalculationBasis;
+  isActive: boolean;
 }
 
 export interface PayrollProfile {
@@ -84,12 +92,15 @@ export interface PayrollProfile {
   taxProfile?: {
     taxId: string;
     taxBand: string;
+    taxRuleId?: string;
+    override?: Omit<TaxOverride, 'profileId'>;
   };
   pensionDetails?: {
     providerId: string;
     employeeContributionRate: number;
     employerContributionRate: number;
     pensionNumber: string;
+    calculationBasisOverride?: PensionCalculationBasis;
   };
   allowances?: PayrollAllowance[];
   deductions?: PayrollDeduction[];
@@ -99,6 +110,32 @@ export interface PayrollProfile {
 export type AllowanceType = 'housing' | 'transportation' | 'feeding' | 'communication' | 'welfare' | 'ministry_support' | 'risk_allowance' | 'bonus' | 'overtime' | 'custom';
 export type DeductionType = 'tax' | 'pension' | 'loan' | 'advance' | 'welfare' | 'insurance' | 'disciplinary' | 'monthly_contribution' | 'custom';
 export type CalculationMethod = 'fixed' | 'percentage_of_basic';
+
+export interface TaxBracket {
+  id: string;
+  minIncome: number;
+  maxIncome: number | null; // null for infinity
+  rate: number; // Decimal representing percentage (e.g., 0.10 for 10%)
+  baseAmount?: number; // Pre-calculated tax amount for the minIncome tier
+}
+
+export interface TaxRule {
+  id: string;
+  country: string;
+  organizationId?: string;
+  name: string;
+  brackets: TaxBracket[];
+  personalReliefAmount?: number; // Fixed exemption/relief amount subtracted from gross before tax
+  personalReliefPercentage?: number; // Percentage exemption on gross income
+  consolidatedReliefAmount?: number;
+  isActive: boolean;
+}
+
+export interface TaxOverride {
+  profileId: string;
+  overrideType: 'fixed_amount' | 'percentage' | 'exempt';
+  value: number; // The amount or percentage (0 for exempt)
+}
 
 export interface PayrollAllowance {
   id: string;
@@ -141,6 +178,16 @@ export interface PayrollSchedule {
 }
 
 export type PayrollRunStatus = 'draft' | 'calculated' | 'pending_approval' | 'approved' | 'paid' | 'reversed' | 'failed';
+export type ApprovalStage = 'hr' | 'finance' | 'treasurer' | 'pastor' | 'completed';
+
+export interface ApprovalRecord {
+  stage: ApprovalStage;
+  approverId: string;
+  approverName: string;
+  status: 'approved' | 'rejected';
+  comment?: string;
+  date: string;
+}
 
 export interface PayrollRun {
   id: string;
@@ -154,7 +201,11 @@ export interface PayrollRun {
   totalNetPay: number;
   totalTaxes: number;
   totalPensions: number;
+  totalEmployerPensions?: number;
   status: PayrollRunStatus;
+  isLocked?: boolean;
+  approvalStage?: ApprovalStage;
+  approvals?: ApprovalRecord[];
   branchId: string;
   processedBy: string;
   approvedBy?: string;
@@ -171,10 +222,13 @@ export interface Payslip {
   baseSalary: number;
   allowances: { name: string; amount: number }[];
   deductions: { name: string; amount: number }[];
+  advanceDeductions?: { advanceId: string; amount: number }[];
   grossPay: number;
   netPay: number;
   taxes: number;
   pension: number;
+  employerPension?: number;
+  pensionProviderId?: string;
   currency?: string;
   status: 'pending' | 'paid' | 'failed';
   paymentMethod: PaymentMethod;

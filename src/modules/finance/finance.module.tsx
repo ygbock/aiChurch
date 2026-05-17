@@ -1,11 +1,12 @@
 import { lazy } from 'react';
 import React from 'react';
 import { PlatformModule } from '../../core/platform/registry';
-import { Zap, Banknote } from 'lucide-react';
+import { Zap, Banknote, Building2 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
 const FinanceLayout = lazy(() => import('./FinanceLayout'));
 const FinanceDashboard = lazy(() => import('./dashboard/FinanceDashboard'));
+const TreasurerDashboard = lazy(() => import('./dashboard/TreasurerDashboard'));
 const Donations = lazy(() => import('./donations/Donations'));
 const Accounting = lazy(() => import('./accounting/Accounting'));
 const Transactions = lazy(() => import('./transactions/Transactions'));
@@ -32,6 +33,7 @@ export const financeModule: PlatformModule = {
       children: [
         { index: true, element: <Navigate to="/finance/dashboard" replace /> },
         { path: 'dashboard', element: <FinanceDashboard /> },
+        { path: 'treasurer', element: <TreasurerDashboard /> },
         { path: 'donations', element: <Donations /> },
         { path: 'transactions', element: <Transactions /> },
         { path: 'accounting', element: <Accounting /> },
@@ -54,6 +56,7 @@ export const financeModule: PlatformModule = {
     }
   ],
   navigation: [
-    { label: 'Financials', path: '/finance', icon: Banknote }
+    { label: 'Financials', path: '/finance', icon: Banknote },
+    { label: 'Treasurer', path: '/finance/treasurer', icon: Building2, category: 'operations' }
   ]
 };

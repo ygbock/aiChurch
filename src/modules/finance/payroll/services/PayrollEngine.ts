@@ -1,4 +1,4 @@
-import { PayrollProfile, PayrollRun, Payslip, PayrollAllowance, PayrollDeduction, PensionScheme } from '../types';
+import { PayrollProfile, PayrollRun, Payslip, PayrollAllowance, PayrollDeduction, PensionProvider, TaxRule } from '../types';
 import { usePayrollStore } from '../stores/usePayrollStore';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,8 +8,9 @@ export class PayrollEngine {
     profile: PayrollProfile, 
     allowances: PayrollAllowance[], 
     deductions: PayrollDeduction[],
-    pensionScheme?: PensionScheme,
-    metrics?: { units?: number; services?: number }
+    pensionProvider?: PensionProvider,
+    metrics?: { units?: number; services?: number },
+    taxRule?: TaxRule
   ) {
     let baseComp = profile.baseSalary || 0;
     
@@ -43,91 +44,89 @@ export class PayrollEngine {
     const taxableAllowances = allowances.filter(a => a.isTaxable).reduce((sum, a) => sum + getEffectiveAllowanceAmount(a), 0);
     const taxableIncome = baseComp + taxableAllowances;
     
-    // Localized progressive tax table simulation based on currency
     let computedTax = 0;
     
-    // Check if employee is tax exempt
-    if (profile.taxProfile?.taxBand === 'exempt' || profile.employmentType === 'volunteer') {
+    // Check if employee is tax exempt explicitly or via override
+    if (
+        profile.taxProfile?.taxBand === 'exempt' || 
+        profile.employmentType === 'volunteer' ||
+        profile.taxProfile?.override?.overrideType === 'exempt'
+    ) {
        computedTax = 0;
-    } else if (profile.employmentType === 'full_time' || profile.employmentType === 'part_time') {
-       if (profile.currency === 'USD') {
-           // USA Brackets (Simplified Monthly)
-           // 10% up to $833, 12% up to $3500, 22% up to $7000
-           if (taxableIncome > 7000) {
-               computedTax = (833 * 0.10) + ((3500 - 833) * 0.12) + ((7000 - 3500) * 0.22) + ((taxableIncome - 7000) * 0.24);
-           } else if (taxableIncome > 3500) {
-               computedTax = (833 * 0.10) + ((3500 - 833) * 0.12) + ((taxableIncome - 3500) * 0.22);
-           } else if (taxableIncome > 833) {
-               computedTax = (833 * 0.10) + ((taxableIncome - 833) * 0.12);
-           } else {
-               computedTax = taxableIncome * 0.10;
-           }
-       } else if (profile.currency === 'NGN') {
-           // Nigeria PAYE (Simplified Monthly)
-           // CRA (Consolidated Relief Allowance)
-           const cra = 200000 / 12 + (0.2 * taxableIncome);
-           const chargeableIncome = Math.max(0, taxableIncome - cra);
-           // 7% on first 300k, 11% on next 300k, 15% on next 500k, 19% on next 500k, 21% on next 1.6M, 24% above
-           if (chargeableIncome > 3200000) {
-               computedTax = (300000 * 0.07) + (300000 * 0.11) + (500000 * 0.15) + (500000 * 0.19) + (1600000 * 0.21) + ((chargeableIncome - 3200000) * 0.24);
-           } else if (chargeableIncome > 1600000) {
-               computedTax = (300000 * 0.07) + (300000 * 0.11) + (500000 * 0.15) + (500000 * 0.19) + ((chargeableIncome - 1600000) * 0.21);
-           } else {
-               computedTax = chargeableIncome * 0.10; // simplistic fallback for mid ranges
-           }
-           // Minimum tax check (1% of gross)
-           if (computedTax < taxableIncome * 0.01) {
-               computedTax = taxableIncome * 0.01;
-           }
-       } else if (profile.currency === 'GBP') {
-           // UK Standard Monthly
-           // P.A. 1047 / mo tax free, 20% basic, 40% higher
-           if (taxableIncome > 4189) {
-               computedTax = ((4189 - 1047) * 0.20) + ((taxableIncome - 4189) * 0.40);
-           } else if (taxableIncome > 1047) {
-               computedTax = (taxableIncome - 1047) * 0.20;
-           } else {
-               computedTax = 0;
-           }
-       } else if (profile.currency === 'KES') {
-           // Kenya PAYE Monthly 2023
-           // 10% on first 24000, 25% on next 8333, 30% above 32333
-           if (taxableIncome > 32333) {
-               computedTax = (24000 * 0.10) + (8333 * 0.25) + ((taxableIncome - 32333) * 0.30);
-           } else if (taxableIncome > 24000) {
-               computedTax = (24000 * 0.10) + ((taxableIncome - 24000) * 0.25);
-           } else {
-               computedTax = taxableIncome * 0.10;
-           }
-           // Personal Relief
-           computedTax = Math.max(0, computedTax - 2400); 
-       } else if (profile.currency === 'SLE') {
-           // Sierra Leone PAYE Monthly (Simplified)
-           // First 600 Le exempt, next 600 at 15%, next 600 at 20%, above 1800 at 30%
-           if (taxableIncome > 1800) {
-               computedTax = (600 * 0.15) + (600 * 0.20) + ((taxableIncome - 1800) * 0.30);
-           } else if (taxableIncome > 1200) {
-               computedTax = (600 * 0.15) + ((taxableIncome - 1200) * 0.20);
-           } else if (taxableIncome > 600) {
-               computedTax = (taxableIncome - 600) * 0.15;
-           } else {
-               computedTax = 0;
-           }
-       } else {
-           computedTax = taxableIncome * 0.10; // Fallback flat 10%
-       }
-       
-       // Handle reduced rate
-       if (profile.taxProfile?.taxBand === 'reduced') {
-           computedTax = computedTax * 0.5;
-       }
+    } else if (profile.taxProfile?.override?.overrideType === 'fixed_amount') {
+       computedTax = profile.taxProfile.override.value || 0;
+    } else if (profile.taxProfile?.override?.overrideType === 'percentage') {
+       computedTax = taxableIncome * (profile.taxProfile.override.value || 0);
+    } else if (taxRule && taxRule.isActive) {
+        // Calculate Reliefs
+        const personalRelief = taxRule.personalReliefAmount || 0;
+        const percentageRelief = (taxRule.personalReliefPercentage || 0) * taxableIncome;
+        const consolidatedRelief = taxRule.consolidatedReliefAmount || 0;
+        
+        const totalRelief = personalRelief + percentageRelief + consolidatedRelief;
+        const chargeableIncome = Math.max(0, taxableIncome - totalRelief);
+        
+        // Calculate based on brackets
+        let tax = 0;
+        const sortedBrackets = [...taxRule.brackets].sort((a,b) => a.minIncome - b.minIncome);
+        
+        for (const bracket of sortedBrackets) {
+            if (chargeableIncome > bracket.minIncome) {
+                 const amountInBracket = bracket.maxIncome 
+                     ? Math.min(chargeableIncome, bracket.maxIncome) - bracket.minIncome
+                     : chargeableIncome - bracket.minIncome;
+                     
+                 if (amountInBracket > 0) {
+                     tax += amountInBracket * bracket.rate;
+                 }
+            } else {
+                 break;
+            }
+        }
+        computedTax = tax;
+    } else {
+        // Fallback simplistic flat tax if no rule is supplied
+        computedTax = taxableIncome * 0.10; 
+    }
+    
+    // Handle reduced rate (legacy band approach, could be superseded by overrides)
+    if (profile.taxProfile?.taxBand === 'reduced') {
+        computedTax = computedTax * 0.5;
     }
     
     // Pension based on scheme or fallback
     let computedPension = 0;
-    if (profile.employmentType === 'full_time' || profile.employmentType === 'part_time') {
-        const pensionRate = pensionScheme ? pensionScheme.employeeContributionRate : 0.05;
-        computedPension = profile.baseSalary * pensionRate;
+    let computedEmployerPension = 0;
+    let computedPensionProviderId: string | undefined;
+
+    if (profile.pensionDetails || profile.employmentType === 'full_time' || profile.employmentType === 'part_time') {
+        let pensionRate = 0;
+        let employerPensionRate = 0;
+        let basis: string = 'basic_salary';
+
+        if (profile.pensionDetails) {
+            pensionRate = profile.pensionDetails.employeeContributionRate || 0;
+            employerPensionRate = profile.pensionDetails.employerContributionRate || 0;
+            computedPensionProviderId = profile.pensionDetails.providerId;
+            basis = profile.pensionDetails.calculationBasisOverride || (pensionProvider ? pensionProvider.calculationBasis : 'basic_salary');
+        } else if (pensionProvider && pensionProvider.isActive) {
+            pensionRate = pensionProvider.defaultEmployeeRate;
+            employerPensionRate = pensionProvider.defaultEmployerRate;
+            computedPensionProviderId = pensionProvider.id;
+            basis = pensionProvider.calculationBasis;
+        } else {
+            pensionRate = 0.05; // 5% default fallback
+        }
+        
+        let calculationAmount = profile.baseSalary;
+        if (basis === 'gross_pay') {
+             calculationAmount = baseComp + totalAllowances;
+        } else if (basis === 'basic_plus_taxable_allowances') {
+             calculationAmount = baseComp + taxableAllowances;
+        }
+
+        computedPension = calculationAmount * pensionRate;
+        computedEmployerPension = calculationAmount * employerPensionRate;
     }
 
     const grossPay = baseComp + totalAllowances;
@@ -138,6 +137,8 @@ export class PayrollEngine {
       netPay,
       taxes: computedTax,
       pension: computedPension,
+      employerPension: computedEmployerPension,
+      pensionProviderId: computedPensionProviderId,
       totalAllowances,
       totalDeductions,
       allowanceBreakdown: allowances.map(a => ({ name: a.name, amount: getEffectiveAllowanceAmount(a) })),
@@ -148,7 +149,7 @@ export class PayrollEngine {
   public static processPayrollRun(name: string, periodStart: string, periodEnd: string, branchId: string, processorId: string) {
       const state = usePayrollStore.getState();
       const activeProfiles = state.profiles.filter(p => p.isActive && p.branchId === branchId);
-      const defaultPensionScheme = state.pensionSchemes[0];
+      const defaultPensionProvider = state.pensionProviders?.[0];
 
       const payslips: Payslip[] = [];
       let runTotalGross = 0;
@@ -157,6 +158,7 @@ export class PayrollEngine {
       let runTotalNetPay = 0;
       let runTotalTaxes = 0;
       let runTotalPensions = 0;
+      let runTotalEmployerPensions = 0;
       
       const runId = uuidv4();
 
@@ -200,6 +202,8 @@ export class PayrollEngine {
               });
           }
 
+          const advanceDeductionsResult: { advanceId: string, amount: number }[] = [];
+
           // Add advances to deductions
           activeAdvances.forEach(adv => {
              // Calculate how much we can reasonably deduct (up to the remaining balance or max monthly)
@@ -214,12 +218,21 @@ export class PayrollEngine {
                      frequency: 'recurring',
                      calculationMethod: 'fixed'
                  });
-                 // NOTE: In a complete system, we would also reduce the remainingBalance on the store here
-                 // or fire an event to track it via the accounting ledger.
+                 advanceDeductionsResult.push({ advanceId: adv.id, amount: deductionAmount });
              }
           });
 
-          const calculation = this.calculateNetPay(profile, personAllowances, personDeductions, defaultPensionScheme);
+          // Find active tax rule
+          let applicableTaxRule: TaxRule | undefined;
+          if (profile.taxProfile?.taxRuleId) {
+              applicableTaxRule = state.taxRules?.find(tr => tr.id === profile.taxProfile!.taxRuleId && tr.isActive);
+          } else {
+              // Try to find a default rule for currency/country context
+              // For demonstration assuming we match country = currency map or just a default org rule
+              applicableTaxRule = state.taxRules?.find(tr => tr.isActive && (tr.country === profile.currency || tr.country === 'SLE')); 
+          }
+
+          const calculation = this.calculateNetPay(profile, personAllowances, personDeductions, defaultPensionProvider, personMetrics, applicableTaxRule);
 
           runTotalGross += calculation.grossPay;
           runTotalAllowances += calculation.totalAllowances;
@@ -227,6 +240,7 @@ export class PayrollEngine {
           runTotalNetPay += calculation.netPay;
           runTotalTaxes += calculation.taxes;
           runTotalPensions += calculation.pension;
+          runTotalEmployerPensions += calculation.employerPension;
 
           // Compute split payments if applicable
           let splitPayments: { method: any, amount: number, provider?: string, account?: string }[] | undefined = undefined;
@@ -278,10 +292,13 @@ export class PayrollEngine {
               baseSalary: profile.baseSalary,
               allowances: calculation.allowanceBreakdown,
               deductions: calculation.deductionBreakdown,
+              advanceDeductions: advanceDeductionsResult,
               grossPay: calculation.grossPay,
               netPay: calculation.netPay,
               taxes: calculation.taxes,
               pension: calculation.pension,
+              employerPension: calculation.employerPension,
+              pensionProviderId: calculation.pensionProviderId,
               status: 'pending',
               paymentMethod: profile.paymentMethod,
               splitPayments
@@ -299,6 +316,7 @@ export class PayrollEngine {
           totalNetPay: runTotalNetPay,
           totalTaxes: runTotalTaxes,
           totalPensions: runTotalPensions,
+          totalEmployerPensions: runTotalEmployerPensions,
           status: 'calculated', // Not approved yet
           branchId,
           processedBy: processorId,
